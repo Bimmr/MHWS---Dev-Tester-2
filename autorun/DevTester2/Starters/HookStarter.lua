@@ -1,5 +1,6 @@
 local State = require("DevTester2.State")
 local Helpers = require("DevTester2.Helpers")
+local BaseStarter = require("DevTester2.Starters.BaseStarter")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -30,10 +31,11 @@ end
 
 function HookStarter.render(node)
     imnodes.begin_node(node.node_id)
+
     imnodes.begin_node_titlebar()
-    local pos_for_debug = imgui.get_cursor_pos()
     imgui.text("Hook Starter")
     imnodes.end_node_titlebar()
+
     if node.is_initialized then
         imgui.begin_disabled()
     end
@@ -175,9 +177,7 @@ function HookStarter.render(node)
             end
         end
         imgui.same_line()
-        local text_width = imgui.calc_text_size("Last call: " .. time_since_call).x
-        local node_width = imnodes.get_node_dimensions(node.node_id).x
-        pos.x = pos.x + node_width - text_width - 26
+        local pos = Helpers.get_right_cursor_pos(node.node_id, "Last call: " .. time_since_call)
         imgui.set_cursor_pos(pos)
         imgui.text("Last call: " .. time_since_call)
         imgui.spacing()
@@ -202,9 +202,7 @@ function HookStarter.render(node)
                 display_value = tostring(node.ending_value)
             end
             local display = display_value .. " (?)"
-            local display_width = imgui.calc_text_size(display).x
-            local node_width = imnodes.get_node_dimensions(node.node_id).x
-            pos.x = pos.x + node_width - display_width - 26
+            local pos = Helpers.get_right_cursor_pos(node.node_id, display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -228,10 +226,7 @@ function HookStarter.render(node)
                 end
             if type(node.ending_value) == "userdata" then
                 imgui.spacing()
-                local button_pos = imgui.get_cursor_pos()
-                local button_width = imgui.calc_text_size("+ Add Child to Output").x
-                local node_width = imnodes.get_node_dimensions(node.node_id).x
-                button_pos.x = button_pos.x + node_width - button_width - 20
+                local button_pos = Helpers.get_right_cursor_pos(node.node_id, "+ Add Child to Output")
                 imgui.set_cursor_pos(button_pos)
                 if imgui.button("+ Add Child to Output") then
                     Helpers.add_child_node(node)
@@ -309,9 +304,7 @@ function HookStarter.render(node)
                 display_value = tostring(node.return_value)
             end
             local return_display = display_value .. " (?)"
-            local return_display_width = imgui.calc_text_size(return_display).x
-            local return_node_width = imnodes.get_node_dimensions(node.node_id).x
-            return_pos.x = return_pos.x + return_node_width - return_display_width - 26
+            local return_pos = Helpers.get_right_cursor_pos(node.node_id, return_display)
             imgui.set_cursor_pos(return_pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -393,10 +386,7 @@ function HookStarter.render(node)
             if node.return_value ~= nil and type(node.return_value) == "userdata" then
                 imgui.spacing()
                 local return_button_text = "+ Add Child to Return"
-                local return_button_pos = imgui.get_cursor_pos()
-                local return_button_width = imgui.calc_text_size(return_button_text).x 
-                local return_node_width = imnodes.get_node_dimensions(node.node_id).x
-                return_button_pos.x = return_button_pos.x + return_node_width - return_button_width - 20
+                local return_button_pos = Helpers.get_right_cursor_pos(node.node_id, return_button_text)
                 imgui.set_cursor_pos(return_button_pos)
                 if imgui.button(return_button_text) then
                     Helpers.add_child_node_to_return(node)
@@ -417,45 +407,7 @@ function HookStarter.render(node)
         end
         Helpers.remove_starter_node(node)
     end
-    local input_attrs = {}
-    if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
-    if node.return_override_attr then table.insert(input_attrs, tostring(node.return_override_attr)) end
-    if node.param_manual_values then
-        for i = 1, #(node.param_manual_values) do
-            local param_pin_id = Helpers.get_param_pin_id(node, i)
-            if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
-        end
-    end
-    local input_links, output_links = {}, {}
-    for _, link in ipairs(State.all_links) do
-        if link.to_node == node.id then
-            table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
-        end
-        if link.from_node == node.id then
-            table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
-        end
-    end
-    local debug_info = string.format(
-        "Node ID: %s\nStatus: %s\nInput Attrs: %s\nOutput Attr: %s\nReturn Attr: %s\nReturn Override Attr: %s\nReturn Override Conn: %s\nReturn Overridden: %s\nInput Links: %s\nOutput Links: %s",
-        tostring(node.node_id),
-        tostring(node.status or "None"),
-        #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
-        tostring(node.output_attr or "None"),
-        tostring(node.return_attr or "None"),
-        tostring(node.return_override_attr or "None"),
-        tostring(node.return_override_connection or "None"),
-        tostring(node.is_return_overridden and "Yes" or "No"),
-        #input_links > 0 and table.concat(input_links, ", ") or "None",
-        #output_links > 0 and table.concat(output_links, ", ") or "None"
-    )
-    local text_width = imgui.calc_text_size("[?]").x
-    local node_width = imnodes.get_node_dimensions(node.node_id).x
-    pos_for_debug.x = pos_for_debug.x + node_width - text_width - 16
-    imgui.set_cursor_pos(pos_for_debug)
-    imgui.text_colored("[?]", 0xFFDADADA)
-    if imgui.is_item_hovered() then
-        imgui.set_tooltip(debug_info)
-    end
+    BaseStarter.render_debug_info(node)
     imnodes.end_node()
 end
 

@@ -3,6 +3,7 @@
 
 local State = require("DevTester2.State")
 local Helpers = require("DevTester2.Helpers")
+local Constants = require("DevTester2.Constants")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -27,26 +28,26 @@ local Nodes = {}
 function Nodes.render_starter_node(node)
     
     if node.type == 0 then -- Type
-        Helpers.set_node_titlebar_color(0xFF9C27B0) -- Purple
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_TYPE) -- Purple
         TypeStarter.render(node)
     elseif node.type == 1 then -- Managed
-        Helpers.set_node_titlebar_color(0xFF4CAF50) -- Green
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_MANAGED) -- Green
         ManagedStarter.render(node)
     elseif node.type == 2 then -- Hook
-        Helpers.set_node_titlebar_color(0xFF2196F3) -- Blue
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_HOOK) -- Blue
         HookStarter.render(node)
     elseif node.type == 3 then -- Enum
-        Helpers.set_node_titlebar_color(0xFFE91E63) -- Magenta
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_ENUM) -- Magenta
         EnumStarter.render(node)
     elseif node.type == 4 then -- Native
-        Helpers.set_node_titlebar_color(0xFFFF9800) -- Orange
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_NATIVE) -- Orange
         NativeStarter.render(node)
     elseif node.type == 5 then -- Primitive
         
-    imgui.push_item_width(200)
-        Helpers.set_node_titlebar_color(0xFF0097A7) -- Dark Cyan
+        imgui.push_item_width(Constants.PRIMITIVE_NODE_WIDTH)
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_PRIMITIVE) -- Dark Cyan
         PrimitiveStarter.render(node)
-    imgui.pop_item_width()
+        imgui.pop_item_width()
     end
     
     -- Reset title bar color
@@ -54,16 +55,14 @@ function Nodes.render_starter_node(node)
 end
 
 function Nodes.render_operation_node(node)
-    -- Apply operation title bar color (dark gray)
-    
     if node.operation == 0 then -- Method
-        Helpers.set_node_titlebar_color(0xFFFFC107) -- Yellow
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_METHOD) -- Yellow
         MethodOperation.render(node)
     elseif node.operation == 1 then -- Field
-        Helpers.set_node_titlebar_color(0xFF8BC34A) -- Lime
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_FIELD) -- Lime
         FieldOperation.render(node)
     elseif node.operation == 2 then -- Array
-        Helpers.set_node_titlebar_color(0xFFFF5722) -- Deep Orange
+        Helpers.set_node_titlebar_color(Constants.COLOR_NODE_ARRAY) -- Deep Orange
         ArrayOperation.render(node)
     end
     

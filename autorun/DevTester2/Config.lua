@@ -35,8 +35,7 @@ function Config.save_configuration(name, description)
         nodes = Config.serialize_all_nodes(),
         links = Config.serialize_all_links(),
         next_node_id = State.next_node_id,
-        next_link_id = State.next_link_id,
-        next_pin_id = State.next_pin_id
+        next_link_id = State.next_link_id
     }
     
     -- Save using REFramework's json.dump_file
@@ -228,6 +227,46 @@ function Config.load_configuration(config_path)
     -- Clear existing nodes
     Helpers.clear_all_nodes()
     
+    -- Restore ID counters from config BEFORE creating nodes
+    State.next_node_id = config.next_node_id or 1
+    State.next_link_id = config.next_link_id or 1
+    
+    -- Calculate the correct next pin ID value based on the highest pin ID used in the config
+    local max_pin_id = 0
+    for _, node_data in ipairs(config.nodes or {}) do
+        if node_data.input_attr and node_data.input_attr > max_pin_id then
+            max_pin_id = node_data.input_attr
+        end
+        if node_data.output_attr and node_data.output_attr > max_pin_id then
+            max_pin_id = node_data.output_attr
+        end
+        if node_data.param_input_attrs then
+            for _, pin_id in pairs(node_data.param_input_attrs) do
+                if pin_id > max_pin_id then
+                    max_pin_id = pin_id
+                end
+            end
+        end
+        -- Check other pin types that might exist
+        if node_data.value_input_attr and node_data.value_input_attr > max_pin_id then
+            max_pin_id = node_data.value_input_attr
+        end
+        if node_data.return_attr and node_data.return_attr > max_pin_id then
+            max_pin_id = node_data.return_attr
+        end
+        if node_data.return_override_attr and node_data.return_override_attr > max_pin_id then
+            max_pin_id = node_data.return_override_attr
+        end
+        if node_data.hook_arg_attrs then
+            for _, pin_id in pairs(node_data.hook_arg_attrs) do
+                if pin_id > max_pin_id then
+                    max_pin_id = pin_id
+                end
+            end
+        end
+    end
+    State.next_pin_id = max_pin_id + 1
+    
     -- Deserialize nodes
     local node_map = {} -- Map old IDs to new node instances
     for _, node_data in ipairs(config.nodes or {}) do
@@ -249,8 +288,10 @@ function Config.load_configuration(config_path)
             -- Add node to appropriate state array
             if node.node_category == "starter" then
                 table.insert(State.starter_nodes, node)
+                State.node_map[node.node_id] = node  -- Add to hash map
             elseif node.node_category == "operation" then
                 table.insert(State.all_nodes, node)
+                State.node_map[node.node_id] = node  -- Add to hash map
             end
         end
     end
@@ -274,9 +315,6 @@ function Config.load_configuration(config_path)
     -- Update state
     State.current_config_name = config.name
     State.current_config_description = config.description or ""
-    State.next_node_id = config.next_node_id or 1
-    State.next_link_id = config.next_link_id or 1
-    State.next_pin_id = config.next_pin_id or 1
     Helpers.mark_as_saved()
     
     return true, nil

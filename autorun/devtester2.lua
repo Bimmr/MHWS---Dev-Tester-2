@@ -6,6 +6,7 @@ local Config = require("DevTester2.Config")
 local Nodes = require("DevTester2.Nodes")
 local Helpers = require("DevTester2.Helpers")
 local State = require("DevTester2.State")
+local Constants = require("DevTester2.Constants")
 
 -- Local references
 local re = re
@@ -44,11 +45,12 @@ re.on_draw_ui(function()
     end
     
     imgui.push_id("DevTester2")
+
     -- Main window
-    imgui.push_style_var(3, 7.5) -- Rounded corners
-    imgui.push_style_var(12, 5.0) -- Rounding
-    imgui.push_style_var(11, Vector2f.new(5, 5)) -- Padding
-    
+    imgui.push_style_var(imgui.ImGuiStyleVar.WindowRounding, Constants.WINDOW_ROUNDING) -- Window rounded corners
+    imgui.push_style_var(imgui.ImGuiStyleVar.FrameRounding, Constants.FRAME_ROUNDING) -- Frame rounded corners
+    imgui.push_style_var(imgui.ImGuiStyleVar.FramePadding, Constants.FRAME_PADDING) -- Frame padding
+
     -- Static window title to preserve window position/size
     local window_title = "DevTester v2.0"
     
@@ -65,8 +67,8 @@ re.on_draw_ui(function()
         imgui.end_window()
     end
     
-    imgui.pop_id()
     imgui.pop_style_var(3)
+    imgui.pop_id()
     
 end)
 
@@ -82,7 +84,7 @@ end)
 
 -- Menu bar rendering
 function render_menu_bar()
-    imgui.push_style_var(2, Vector2f.new(5, 5)) -- Extra padding on menu bar
+    imgui.push_style_var(2, Constants.MENU_PADDING) -- Extra padding on menu bar
     
     if imgui.begin_menu_bar() then
         -- File menu
@@ -110,19 +112,19 @@ function render_menu_bar()
         -- Create Starter dropdown menu
         if imgui.begin_menu("+ Create Starter  ▼") then
             if imgui.menu_item("Managed") then
-                Helpers.create_starter_node(1) -- Managed = 1
+                Helpers.create_starter_node(Constants.NODE_TYPE_MANAGED) -- Managed
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
             end
             if imgui.menu_item("Native") then
-                Helpers.create_starter_node(4) -- Native = 4
+                Helpers.create_starter_node(Constants.NODE_TYPE_NATIVE) -- Native
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
             end
             if imgui.menu_item("Hook") then
-                Helpers.create_starter_node(2) -- Hook = 2
+                Helpers.create_starter_node(Constants.NODE_TYPE_HOOK) -- Hook
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Hook node to hook native functions")
@@ -132,7 +134,7 @@ function render_menu_bar()
         
         -- Create Primitive button
         if imgui.menu_item("+ Primitive") then
-            Helpers.create_starter_node(5) -- Primitive = 5
+            Helpers.create_starter_node(Constants.NODE_TYPE_PRIMITIVE) -- Primitive
         end
         if imgui.is_item_hovered() then
             imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
@@ -140,7 +142,7 @@ function render_menu_bar()
         
         -- Create Enum button
         if imgui.menu_item("+ Enum") then
-            Helpers.create_starter_node(3) -- Enum = 3
+            Helpers.create_starter_node(Constants.NODE_TYPE_ENUM) -- Enum
         end
         if imgui.is_item_hovered() then
             imgui.set_tooltip("Create an Enum node for enumerated values")
@@ -158,10 +160,11 @@ State.nodes_positioned = State.nodes_positioned or {}
 
 function render_node_editor()
     -- Add some styling for the node editor
-    imgui.push_style_color(21, 0xFF714A29) -- Button color (AABBGGRR)
-    imgui.push_style_color(22, 0xFFFA9642) -- Button hover color (AABBGGRR)
-    imnodes.push_color_style(1, 0xFF3C3C3C) -- Node hover background (AABBGGRR)
-    imnodes.push_color_style(2, 0xFF3C3C3C) -- Node selected background (AABBGGRR)
+    imgui.push_style_color(21, Constants.COLOR_BUTTON_NORMAL)
+    imgui.push_style_color(22, Constants.COLOR_BUTTON_HOVER)
+    imnodes.push_color_style(1, Constants.COLOR_NODE_HOVER)
+    imnodes.push_color_style(2, Constants.COLOR_NODE_SELECTED)
+
     imnodes.begin_node_editor()
     
     -- Set node width
@@ -220,7 +223,7 @@ function render_node_editor()
         local target_node = Helpers.get_node_by_id(link.to_node)
         if target_node and target_node.is_paused then
             -- Render paused link in dark red
-            imnodes.push_color_style(7, 0x80142196) -- Link color (AABBGGRR) - Dark red
+            imnodes.push_color_style(7, Constants.COLOR_DISABLED) -- Link color
             imnodes.link(link.id, link.from_pin, link.to_pin)
             imnodes.pop_color_style()
         else
@@ -229,7 +232,7 @@ function render_node_editor()
         end
     end
     
-    imnodes.minimap(0.2, 0) -- 0.2 = 20% size, 0 = bottom-left corner
+    imnodes.minimap(Constants.MINIMAP_SIZE, Constants.MINIMAP_POSITION) -- Size and position
     
     imnodes.end_node_editor()
     

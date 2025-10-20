@@ -1,5 +1,7 @@
 local State = require("DevTester2.State")
 local Helpers = require("DevTester2.Helpers")
+local Constants = require("DevTester2.Constants")
+local BaseOperation = require("DevTester2.Nodes.BaseOperation")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -11,107 +13,23 @@ local MethodOperation = {}
 -- ========================================
 
 function MethodOperation.render(node)
-    local parent_value = Helpers.get_parent_value(node)
+    local parent_value = BaseOperation.check_parent_connection(node)
+    if not parent_value then return end
 
-    if not node.parent_node_id then
-        Helpers.render_disconnected_operation_node(node, "no_parent")
-        return
-    elseif parent_value == nil then
-        Helpers.render_disconnected_operation_node(node, "parent_nil")
-        return
-    end
-
-    -- Get parent type for method enumeration
-    local success, parent_type = pcall(function()
-        return parent_value:get_type_definition()
-    end)
-
-    if not success or not parent_type then
+    local parent_type = BaseOperation.get_parent_type(parent_value)
+    if not parent_type then
         Helpers.render_disconnected_operation_node(node, "type_error")
         return
     end
 
     imnodes.begin_node(node.node_id)
 
-    local pos_for_debug = imgui.get_cursor_pos()
+    BaseOperation.render_title_bar(node, parent_type)
 
-    -- Title bar with type name and input pin
-    imnodes.begin_node_titlebar()
-    -- Main input pin with type name inside
-    if not node.input_attr then
-        node.input_attr = Helpers.next_pin_id()
-    end
-
-    imnodes.begin_input_attribute(node.input_attr)
-    imgui.text(parent_type:get_full_name())
-    imnodes.end_input_attribute()
-    imnodes.end_node_titlebar()
-
-    -- Operation dropdown
-    -- Note: imgui.combo uses 1-based indexing
-    local has_children = Helpers.has_children(node)
-    if has_children then
-        imgui.begin_disabled()
-    end
-    
-    -- Build operation options dynamically based on parent value type
-    local operation_options = {"Method", "Field"}
-    local operation_values = {0, 1} -- Corresponding operation values
-    
-    -- Only add Array option if parent value is an array
-    if parent_value and Helpers.is_array(parent_value) then
-        table.insert(operation_options, "Array")
-        table.insert(operation_values, 2)
-    end
-    
-    -- If current operation is not available, reset to first available option
-    local current_option_index = 1
-    for i, op_value in ipairs(operation_values) do
-        if op_value == node.operation then
-            current_option_index = i
-            break
-        end
-    end
-    
-    local op_changed, new_option_index = imgui.combo("Operation", current_option_index, operation_options)
-    if op_changed then
-        node.operation = operation_values[new_option_index]
-        Helpers.reset_operation_data(node)
-        Helpers.mark_as_modified()
-    end
-    
-    if has_children then
-        imgui.end_disabled()
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Cannot change operation while node has children")
-        end
-    end
+    BaseOperation.render_operation_dropdown(node, parent_value)
 
     -- Type dropdown (Run/Call)
-    if not node.action_type then
-        node.action_type = 0 -- Default to Run
-    end
-    local has_children = Helpers.has_children(node)
-    if has_children then
-        imgui.begin_disabled()
-    end
-    local type_changed, new_type = imgui.combo("Type",
-        node.action_type + 1, {"Run", "Call"})
-    if type_changed then
-        node.action_type = new_type - 1
-        -- Selective reset for type changes - preserve parameter values
-        node.ending_value = nil
-        node.status = nil
-        node.last_call_time = nil  -- Reset call timer when changing modes
-
-        Helpers.mark_as_modified()
-    end
-    if has_children then
-        imgui.end_disabled()
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Cannot change type while node has children")
-        end
-    end
+    BaseOperation.render_action_type_dropdown(node, {"Run", "Call"})
 
     -- Method selection
     local methods = Helpers.get_methods_for_combo(parent_type)
@@ -121,16 +39,16 @@ function MethodOperation.render(node)
         if not node.selected_method_combo then
             node.selected_method_combo = 1
         end
-        
+
         local has_children = Helpers.has_children(node)
         if has_children then
             imgui.begin_disabled()
         end
-        local method_changed, new_combo_index = imgui.combo("Methods", 
+        local method_changed, new_combo_index = imgui.combo("Methods",
             node.selected_method_combo, methods)
         if method_changed then
             node.selected_method_combo = new_combo_index
-            
+
             -- Parse the group_index and method_index from the selected string
             if new_combo_index > 1 then
                 local combo_method = methods[new_combo_index]
@@ -147,12 +65,12 @@ function MethodOperation.render(node)
                 node.method_group_index = nil
                 node.method_index = nil
             end
-            
+
             node.param_manual_values = {} -- Reset params
-            
+
             -- Check if selected method returns void, if so switch to Call mode
             if node.method_group_index and node.method_index then
-                local current_method = Helpers.get_method_by_group_and_index(parent_type, 
+                local current_method = Helpers.get_method_by_group_and_index(parent_type,
                     node.method_group_index, node.method_index)
                 if current_method then
                     local success_return, return_type = pcall(function()
@@ -161,37 +79,40 @@ function MethodOperation.render(node)
                     if success_return and return_type then
                         local return_type_name = return_type:get_name()
                         if return_type_name == "Void" or return_type_name == "System.Void" then
-                            node.action_type = 1 -- Switch to Call mode
+                            node.action_type = Constants.ACTION_SET -- Switch to Call mode
                         end
                     end
-                    
+
                     -- Disconnect links for parameters that no longer exist
-                    local success_param, param_types = pcall(function() 
-                        return current_method:get_param_types() 
+                    local success_param, param_types = pcall(function()
+                        return current_method:get_param_types()
                     end)
                     if success_param and param_types then
                         local new_param_count = #param_types
                         -- Remove links for parameter pins beyond the new count
                         for i = new_param_count + 1, 100 do -- Arbitrary high number to cover old params
-                            local old_param_pin = Helpers.get_param_pin_id(node, i)
-                            Helpers.remove_links_for_pin(old_param_pin)
+                            if node.param_input_attrs and node.param_input_attrs[i] then
+                                Helpers.remove_links_for_pin(node.param_input_attrs[i])
+                            end
                         end
                     else
                         -- No parameters, remove all param links
-                        for i = 1, 100 do
-                            local param_pin = Helpers.get_param_pin_id(node, i)
-                            Helpers.remove_links_for_pin(param_pin)
+                        if node.param_input_attrs then
+                            for i, pin_id in pairs(node.param_input_attrs) do
+                                Helpers.remove_links_for_pin(pin_id)
+                            end
                         end
                     end
                 end
             else
                 -- No method selected, remove all param links
-                for i = 1, 100 do
-                    local param_pin = Helpers.get_param_pin_id(node, i)
-                    Helpers.remove_links_for_pin(param_pin)
+                if node.param_input_attrs then
+                    for i, pin_id in pairs(node.param_input_attrs) do
+                        Helpers.remove_links_for_pin(pin_id)
+                    end
                 end
             end
-            
+
             Helpers.mark_as_modified()
         end
         if has_children then
@@ -308,64 +229,53 @@ function MethodOperation.render(node)
                 -- Helpers.unpause_child_nodes(node, result_type_name)
             end
         end
-        -- Create output attribute if result is not nil and method doesn't return void, OR if we already have one from config (but not for void methods)
-        local should_show_output = (result ~= nil and not returns_void) or (node.output_attr and not returns_void)
-        if should_show_output then
+        -- Create output attribute only if we should show the pin
+        local should_show_output_pin = (result ~= nil and not returns_void) or (node.output_attr and not returns_void)
+        
+        if should_show_output_pin then
             if not node.output_attr then
                 node.output_attr = Helpers.next_pin_id()
             end
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
-            
-            if result ~= nil and not returns_void then
-                -- Display the actual result
-                local display_value = "Object"
-                if type(result) == "userdata" then
-                    local success, type_info = pcall(function() return result:get_type_definition() end)
-                    if success and type_info then
-                        display_value = type_info:get_name()
-                    end
-                else
-                    display_value = tostring(result)
-                end
-                local output_display = display_value .. " (?)"
-                local pos = imgui.get_cursor_pos()
-                local display_width = imgui.calc_text_size(output_display).x
-                local node_width = imnodes.get_node_dimensions(node.node_id).x
-                pos.x = pos.x + node_width - display_width - 26
-                imgui.set_cursor_pos(pos)
-                imgui.text(display_value)
-                imgui.same_line()
-                imgui.text("(?)")
-                if imgui.is_item_hovered() then
-                    -- Show tooltip with detailed info including address
-                    if type(result) == "userdata" then
-                        local type_info = result:get_type_definition()
-                        local address = string.format("0x%X", result:get_address())
-                        local tooltip_text = string.format(
-                            "Type: %s\nAddress: %s\nFull Name: %s",
-                            type_info:get_name(), address, type_info:get_full_name()
-                        )
-                        imgui.set_tooltip(tooltip_text)
-                    else
-                        imgui.set_tooltip("Result: " .. tostring(result))
-                    end
+        else
+            imgui.spacing()
+        end
+        
+        if result ~= nil and not returns_void then
+            -- Display the actual result
+            local display_value = "Object"
+            if type(result) == "userdata" then
+                local success, type_info = pcall(function() return result:get_type_definition() end)
+                if success and type_info then
+                    display_value = type_info:get_name()
                 end
             else
-                -- Show nil/disconnected state
-                local output_text = "nil"
-                local pos = imgui.get_cursor_pos()
-                local display_width = imgui.calc_text_size(output_text).x
-                local node_width = imnodes.get_node_dimensions(node.node_id).x
-                pos.x = pos.x + node_width - display_width - 26
-                imgui.set_cursor_pos(pos)
-                imgui.text(output_text)
+                display_value = tostring(result)
             end
-            imnodes.end_output_attribute()
+            local output_display = display_value .. " (?)"
+            local pos = Helpers.get_right_cursor_pos(node.node_id, output_display)
+            imgui.set_cursor_pos(pos)
+            imgui.text(display_value)
+            imgui.same_line()
+            imgui.text("(?)")
+            if imgui.is_item_hovered() then
+                -- Show tooltip with detailed info including address
+                if type(result) == "userdata" then
+                    local type_info = result:get_type_definition()
+                    local address = string.format("0x%X", result:get_address())
+                    local tooltip_text = string.format(
+                        "Type: %s\nAddress: %s\nFull Name: %s",
+                        type_info:get_name(), address, type_info:get_full_name()
+                    )
+                    imgui.set_tooltip(tooltip_text)
+                else
+                    imgui.set_tooltip("Result: " .. tostring(result))
+                end
+            end
         elseif returns_void then
-            -- For void methods, show execution status with tooltip only if executed
+            -- For void methods, show execution status
             if node.last_call_time then
-                imgui.spacing()
                 local elapsed = os.clock() - node.last_call_time
                 local time_since_call
                 if elapsed < 1 then
@@ -374,12 +284,9 @@ function MethodOperation.render(node)
                     time_since_call = string.format("%.1fs ago", elapsed)
                 end
                 local executed_text = "Executed | Last call: " .. time_since_call
-                local pos = imgui.get_cursor_pos()
-                local display_width = imgui.calc_text_size(executed_text).x
-                local node_width = imnodes.get_node_dimensions(node.node_id).x
-                pos.x = pos.x + node_width - display_width - 26
+                local pos = Helpers.get_right_cursor_pos(node.node_id, executed_text)
                 imgui.set_cursor_pos(pos)
-                imgui.text("Executed | Last call: " .. time_since_call)
+                imgui.text(executed_text)
                 if imgui.is_item_hovered() then
                     -- Show tooltip with method info
                     local method_name = selected_method:get_name()
@@ -392,76 +299,34 @@ function MethodOperation.render(node)
                 end
             else
                 -- Show ready status for void methods that haven't been called
-                imgui.spacing()
                 local ready_text = "Ready"
-                local pos = imgui.get_cursor_pos()
-                local display_width = imgui.calc_text_size(ready_text).x
-                local node_width = imnodes.get_node_dimensions(node.node_id).x
-                pos.x = pos.x + node_width - display_width - 26
+                local pos = Helpers.get_right_cursor_pos(node.node_id, ready_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(ready_text)
             end
+        else
+            -- Show nil state
+            local output_text = "nil"
+            local pos = Helpers.get_right_cursor_pos(node.node_id, output_text)
+            imgui.set_cursor_pos(pos)
+            imgui.text(output_text)
+        end
+        
+        if should_show_output_pin then
+            imnodes.end_output_attribute()
         end
     else
         imgui.text("No methods available")
     end
 
     -- Action buttons
-    imgui.spacing()
-    local pos = imgui.get_cursor_pos()
-    if imgui.button("- Remove Node") then
-        Helpers.remove_operation_node(node)
-    end
-    -- Only show Add Child Node if result is userdata and method doesn't return void
-    if type(node.ending_value) == "userdata" and not returns_void then
-        imgui.same_line()
-        local display_width = imgui.calc_text_size("+ Add Child Node").x
-        local node_width = imnodes.get_node_dimensions(node.node_id).x
-        pos.x = pos.x + node_width - display_width - 20
-        imgui.set_cursor_pos(pos)
-        if imgui.button("+ Add Child Node") then
-            Helpers.add_child_node(node)
-        end
-    end
+    BaseOperation.render_action_buttons(node, function(node) 
+        return type(node.ending_value) == "userdata" and not returns_void 
+    end)
 
-    -- Debug info: Node ID, attributes, and connected Link IDs
-    -- Collect all input attributes (main + params)
-    local input_attrs = {}
-    if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
-    if node.param_manual_values then
-        for i = 1, #(node.param_manual_values) do
-            local param_pin_id = Helpers.get_param_pin_id(node, i)
-            if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
-        end
-    end
-    -- Find input and output links, showing pin/attr and link id
-    local input_links, output_links = {}, {}
-    for _, link in ipairs(State.all_links) do
-        if link.to_node == node.id then
-            table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
-        end
-        if link.from_node == node.id then
-            table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
-        end
-    end
-    local debug_info = string.format(
-        "Node ID: %s\nStatus: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
-        tostring(node.node_id),
-        tostring(node.status or "None"),
-        #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
-        tostring(node.output_attr or "None"),
-        #input_links > 0 and table.concat(input_links, ", ") or "None",
-        #output_links > 0 and table.concat(output_links, ", ") or "None"
-    )
-    -- Code to align debug info to the top right of the node using stored pos
-    local text_width = imgui.calc_text_size("[?]").x
-    local node_width = imnodes.get_node_dimensions(node.node_id).x
-    pos_for_debug.x = pos_for_debug.x + node_width - text_width - 16
-    imgui.set_cursor_pos(pos_for_debug)
-    imgui.text_colored("[?]", 0xFFDADADA)
-    if imgui.is_item_hovered() then
-        imgui.set_tooltip(debug_info)
-    end
+    -- Debug info
+    BaseOperation.render_debug_info(node)
+
     imnodes.end_node()
 end
 

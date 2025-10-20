@@ -4,6 +4,7 @@
 -- Note: get_node_by_id is an alias for find_node_by_id (for backward compatibility)
 
 local State = require("DevTester2.State")
+local Constants = require("DevTester2.Constants")
 local sdk = sdk
 local re = re
 
@@ -42,12 +43,7 @@ function Helpers.next_link_id()
 end
 
 function Helpers.get_link_by_id(link_id)
-    for _, link in ipairs(State.all_links) do
-        if link.id == link_id then
-            return link
-        end
-    end
-    return nil
+    return State.link_map[link_id]
 end
 
 function Helpers.next_pin_id()
@@ -83,8 +79,8 @@ end
 function Helpers.set_node_titlebar_color(color)
     -- Set title bar colors for nodes using style indices 3, 4, 5
     -- 3 = normal, 4 = hovered, 5 = selected
-    local hovered_color = Helpers.brighten_color(color, 1.2)  -- 20% brighter
-    local selected_color = Helpers.brighten_color(color, 1.4) -- 40% brighter
+    local hovered_color = Helpers.brighten_color(color, Constants.COLOR_BRIGHTEN_HOVER)
+    local selected_color = Helpers.brighten_color(color, Constants.COLOR_BRIGHTEN_SELECTED)
     
     imnodes.push_color_style(4, color)        -- Normal
     imnodes.push_color_style(5, hovered_color) -- Hovered
@@ -92,9 +88,7 @@ function Helpers.set_node_titlebar_color(color)
 end
 
 function Helpers.reset_node_titlebar_color()
-    imnodes.pop_color_style() -- Selected (6)
-    imnodes.pop_color_style() -- Hovered (5)
-    imnodes.pop_color_style() -- Normal (4)
+    imnodes.pop_color_style() -- Normal, Hovered, Selected
 end
 
 -- ========================================
@@ -107,7 +101,7 @@ function Helpers.create_starter_node(starter_type)
         id = node_id,
         node_id = node_id,
         node_category = "starter",
-        type = starter_type or 1, -- Default to Managed (1) if not specified
+        type = starter_type or Constants.NODE_TYPE_MANAGED, -- Default to Managed if not specified
         path = "",
         position = {x = 50, y = 50},
         ending_value = nil,
@@ -128,6 +122,7 @@ function Helpers.create_starter_node(starter_type)
     }
     
     table.insert(State.starter_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
     Helpers.mark_as_modified()
     return node
 end
@@ -145,8 +140,8 @@ function Helpers.create_operation_node(position)
         node_category = "operation",
         position = position or {x = 0, y = 0},
         parent_node_id = nil,
-        operation = 0, -- Default to Method (will be auto-detected)
-        action_type = 0, -- Default to Get
+        operation = Constants.OPERATION_METHOD, -- Default to Method
+        action_type = Constants.ACTION_GET, -- Default to Get
         -- Method-specific
         selected_method_combo = 1, -- 1-based indexing for combo
         method_group_index = nil, -- Parsed from selection
@@ -172,6 +167,7 @@ function Helpers.create_operation_node(position)
     }
     
     table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
     Helpers.mark_as_modified()
     return node
 end
@@ -190,6 +186,9 @@ function Helpers.remove_starter_node(node)
             break
         end
     end
+    
+    -- Remove from hash map
+    State.node_map[node.id] = nil
     
     Helpers.mark_as_modified()
     -- Reset node positioning state so nodes are repositioned after node removal
@@ -214,6 +213,9 @@ function Helpers.remove_operation_node(node)
             break
         end
     end
+    
+    -- Remove from hash map
+    State.node_map[node.id] = nil
     
     Helpers.mark_as_modified()
     -- Reset node positioning state so nodes are repositioned after node removal
@@ -287,6 +289,10 @@ function Helpers.clear_all_nodes()
     State.all_nodes = {}
     State.all_links = {}
     
+    -- Clear hash maps
+    State.node_map = {}
+    State.link_map = {}
+    
     -- Reset ID counters
     State.next_node_id = 1
     State.next_link_id = 1
@@ -314,10 +320,10 @@ end
 
 function Helpers.add_child_node(parent_node)
     -- Random Y offset between -150 and +150
-    local random_y_offset = math.random(-150, 150)
+    local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
     local child = Helpers.create_operation_node({
-        x = parent_node.position.x + State.NODE_WIDTH + 100,
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
     child.parent_node_id = parent_node.id
@@ -325,7 +331,7 @@ function Helpers.add_child_node(parent_node)
     -- Auto-detect if parent value is an array and set operation to Array
     if parent_node.ending_value then
         if Helpers.is_array(parent_node.ending_value) then
-            child.operation = 2 -- Array
+            child.operation = Constants.OPERATION_ARRAY
         end
     end
     
@@ -346,10 +352,10 @@ end
 
 function Helpers.add_child_node_to_arg(parent_node, arg_index)
     -- Random Y offset between -150 and +150
-    local random_y_offset = math.random(-150, 150)
+    local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
     local child = Helpers.create_operation_node({
-        x = parent_node.position.x + State.NODE_WIDTH + 100,
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
     child.parent_node_id = parent_node.id
@@ -374,10 +380,10 @@ end
 
 function Helpers.add_child_node_to_return(parent_node)
     -- Random Y offset between -150 and +150
-    local random_y_offset = math.random(-150, 150)
+    local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
     local child = Helpers.create_operation_node({
-        x = parent_node.position.x + State.NODE_WIDTH + 100,
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
     child.parent_node_id = parent_node.id
@@ -414,6 +420,7 @@ function Helpers.create_link(connection_type, from_node, from_pin, to_node, to_p
     }
     
     table.insert(State.all_links, link)
+    State.link_map[link.id] = link  -- Add to hash map
     Helpers.mark_as_modified()
     return link
 end
@@ -480,6 +487,7 @@ function Helpers.handle_link_destroyed(link_id)
             end
             
             table.remove(State.all_links, i)
+            State.link_map[link_id] = nil  -- Remove from hash map
             Helpers.mark_as_modified()
             break
         end
@@ -522,21 +530,7 @@ function Helpers.find_node_by_pin(pin_id)
 end
 
 function Helpers.find_node_by_id(node_id)
-    -- Search starter nodes
-    for _, node in ipairs(State.starter_nodes) do
-        if node.id == node_id then
-            return node
-        end
-    end
-    
-    -- Search operation nodes
-    for _, node in ipairs(State.all_nodes) do
-        if node.id == node_id then
-            return node
-        end
-    end
-    
-    return nil
+    return State.node_map[node_id]
 end
 
 -- ========================================
@@ -761,19 +755,79 @@ function Helpers.get_type_display_name(type_info)
 end
 
 -- ========================================
--- Method/Field Helpers
+-- Cache Management
 -- ========================================
 
-function Helpers.get_methods_for_combo(type_def)
-    local combo_items = {""}  -- Start with empty item
+function Helpers.get_cache_size(cache)
+    local count = 0
+    for _ in pairs(cache) do
+        count = count + 1
+    end
+    return count
+end
+
+function Helpers.cleanup_cache(cache, max_size)
+    if Helpers.get_cache_size(cache) <= max_size then
+        return
+    end
+    
+    -- Remove oldest entries (simple LRU approximation)
+    local to_remove = {}
+    local current_time = os.time()
+    
+    for key, entry in pairs(cache) do
+        if entry.last_accessed and (current_time - entry.last_accessed) > Constants.MEMORY_CLEANUP_AGE_SECONDS then
+            table.insert(to_remove, key)
+        end
+    end
+    
+    for _, key in ipairs(to_remove) do
+        cache[key] = nil
+    end
+    
+    -- If still too big, remove more aggressively
+    if Helpers.get_cache_size(cache) > max_size then
+        local keys = {}
+        for key in pairs(cache) do
+            table.insert(keys, key)
+        end
+        
+        -- Remove half of the remaining entries
+        local remove_count = math.floor(#keys / 2)
+        for i = 1, remove_count do
+            cache[keys[i]] = nil
+        end
+    end
+end
+
+function Helpers.get_cached_type_info(type_def)
+    local type_name = type_def:get_full_name()
+    
+    if not State.type_cache[type_name] then
+        State.type_cache[type_name] = {
+            methods = Helpers.build_method_list(type_def),
+            fields = Helpers.build_field_list(type_def),
+            last_accessed = os.time()
+        }
+        
+        Helpers.cleanup_cache(State.type_cache, Constants.TYPE_CACHE_SIZE_LIMIT)
+    else
+        State.type_cache[type_name].last_accessed = os.time()
+    end
+    
+    return State.type_cache[type_name]
+end
+
+function Helpers.build_method_list(type_def)
+    local methods = {}
     
     -- Walk inheritance chain and get methods from each type
     local current_type = type_def
     local level = 1
     
     while current_type do
-        local success, methods = pcall(function() return current_type:get_methods() end)
-        if not success or not methods then
+        local success, type_methods = pcall(function() return current_type:get_methods() end)
+        if not success or not type_methods then
             break
         end
         
@@ -781,10 +835,14 @@ function Helpers.get_methods_for_combo(type_def)
         local short_name = current_type:get_name()
         
         -- Add class separator
-        table.insert(combo_items, "\n" .. short_name)
+        table.insert(methods, {
+            type = "separator",
+            display = "\n" .. short_name,
+            level = level
+        })
         
         -- Add methods for this class
-        for method_idx, method in ipairs(methods) do
+        for method_idx, method in ipairs(type_methods) do
             local name = method:get_name()
             local return_type = method:get_return_type()
             local return_name = return_type and Helpers.get_type_display_name(return_type) or "Void"
@@ -806,7 +864,14 @@ function Helpers.get_methods_for_combo(type_def)
             -- Format: classLevel-methodIndex. methodName(params) | returnType
             local display = string.format("%d-%d. %s(%s) | %s", 
                 level, method_idx, name, params_str, return_name)
-            table.insert(combo_items, display)
+            
+            table.insert(methods, {
+                type = "method",
+                display = display,
+                method = method,
+                level = level,
+                index = method_idx
+            })
         end
         
         -- Move to parent type
@@ -819,22 +884,49 @@ function Helpers.get_methods_for_combo(type_def)
         end
     end
     
-    return combo_items
+    return methods
 end
 
-function Helpers.get_method_by_group_and_index(type_def, group_index, method_index)
-    -- Walk inheritance chain to find the specified group
+function Helpers.build_field_list(type_def)
+    local fields = {}
+    
+    -- Walk inheritance chain and get fields from each type
     local current_type = type_def
     local level = 1
     
     while current_type do
-        if level == group_index then
-            -- Found the right inheritance level
-            local success, methods = pcall(function() return current_type:get_methods() end)
-            if success and methods and methods[method_index] then
-                return methods[method_index]
-            end
-            return nil
+        local success, type_fields = pcall(function() return current_type:get_fields() end)
+        if not success or not type_fields then
+            break
+        end
+        
+        -- Get class name (get_name returns short name, better for generics)
+        local short_name = current_type:get_name()
+        
+        -- Add class separator
+        table.insert(fields, {
+            type = "separator",
+            display = "\n" .. short_name,
+            level = level
+        })
+        
+        -- Add fields for this class
+        for field_idx, field in ipairs(type_fields) do
+            local name = field:get_name()
+            local field_type = field:get_type()
+            local type_name = Helpers.get_type_display_name(field_type)
+            
+            -- Format: classLevel-fieldIndex. fieldName | type
+            local display = string.format("%d-%d. %s | %s", 
+                level, field_idx, name, type_name)
+            
+            table.insert(fields, {
+                type = "field",
+                display = display,
+                field = field,
+                level = level,
+                index = field_idx
+            })
         end
         
         -- Move to parent type
@@ -844,6 +936,36 @@ function Helpers.get_method_by_group_and_index(type_def, group_index, method_ind
             current_type = parent
         else
             break
+        end
+    end
+    
+    return fields
+end
+
+function Helpers.get_methods_for_combo(type_def)
+    local cache_key = type_def:get_full_name()
+    
+    if not State.combo_cache[cache_key] then
+        local type_info = Helpers.get_cached_type_info(type_def)
+        local combo_items = {""}  -- Start with empty item
+        
+        for _, item in ipairs(type_info.methods) do
+            table.insert(combo_items, item.display)
+        end
+        
+        State.combo_cache[cache_key] = combo_items
+        Helpers.cleanup_cache(State.combo_cache, Constants.COMBO_CACHE_SIZE_LIMIT)
+    end
+    
+    return State.combo_cache[cache_key]
+end
+
+function Helpers.get_method_by_group_and_index(type_def, group_index, method_index)
+    local type_info = Helpers.get_cached_type_info(type_def)
+    
+    for _, item in ipairs(type_info.methods) do
+        if item.type == "method" and item.level == group_index and item.index == method_index then
+            return item.method
         end
     end
     
@@ -873,71 +995,29 @@ function Helpers.get_method_from_combo_index(type_def, combo_index)
 end
 
 function Helpers.get_fields_for_combo(type_def)
-    local combo_items = {""}  -- Start with empty item
+    local cache_key = type_def:get_full_name()
     
-    -- Walk inheritance chain and get fields from each type
-    local current_type = type_def
-    local level = 1
-    
-    while current_type do
-        local success, fields = pcall(function() return current_type:get_fields() end)
-        if not success or not fields then
-            break
+    if not State.combo_cache[cache_key .. "_fields"] then
+        local type_info = Helpers.get_cached_type_info(type_def)
+        local combo_items = {""}  -- Start with empty item
+        
+        for _, item in ipairs(type_info.fields) do
+            table.insert(combo_items, item.display)
         end
         
-        -- Get class name (get_name returns short name, better for generics)
-        local short_name = current_type:get_name()
-        
-        -- Add class separator
-        table.insert(combo_items, "\n" .. short_name)
-        
-        -- Add fields for this class
-        for field_idx, field in ipairs(fields) do
-            local name = field:get_name()
-            local field_type = field:get_type()
-            local type_name = Helpers.get_type_display_name(field_type)
-            
-            -- Format: classLevel-fieldIndex. fieldName | type
-            local display = string.format("%d-%d. %s | %s", 
-                level, field_idx, name, type_name)
-            table.insert(combo_items, display)
-        end
-        
-        -- Move to parent type
-        level = level + 1
-        local success_parent, parent = pcall(function() return current_type:get_parent_type() end)
-        if success_parent and parent then
-            current_type = parent
-        else
-            break
-        end
+        State.combo_cache[cache_key .. "_fields"] = combo_items
+        Helpers.cleanup_cache(State.combo_cache, Constants.COMBO_CACHE_SIZE_LIMIT)
     end
     
-    return combo_items
+    return State.combo_cache[cache_key .. "_fields"]
 end
 
 function Helpers.get_field_by_group_and_index(type_def, group_index, field_index)
-    -- Walk inheritance chain to find the specified group
-    local current_type = type_def
-    local level = 1
+    local type_info = Helpers.get_cached_type_info(type_def)
     
-    while current_type do
-        if level == group_index then
-            -- Found the right inheritance level
-            local success, fields = pcall(function() return current_type:get_fields() end)
-            if success and fields and fields[field_index] then
-                return fields[field_index]
-            end
-            return nil
-        end
-        
-        -- Move to parent type
-        level = level + 1
-        local success_parent, parent = pcall(function() return current_type:get_parent_type() end)
-        if success_parent and parent then
-            current_type = parent
-        else
-            break
+    for _, item in ipairs(type_info.fields) do
+        if item.type == "field" and item.level == group_index and item.index == field_index then
+            return item.field
         end
     end
     
@@ -1097,6 +1177,12 @@ function Helpers.validate_and_restore_starter_node(node)
     elseif node.type == 2 then -- Hook
         -- Hooks need to be re-initialized manually
         node.status = "Requires re-initialization"
+    elseif node.type == 3 then -- Enum
+        if node.path and node.path ~= "" then
+            -- For enums, we need to generate the enum data and set the ending_value
+            -- This is complex, so we'll just set a placeholder and let the render function handle it
+            node.status = "Enum loaded - needs refresh"
+        end
     elseif node.type == 5 then -- Primitive
         -- Restore the value as ending_value
         node.ending_value = node.value
@@ -1133,47 +1219,70 @@ end
 -- Shared Node Rendering Functions
 -- ========================================
 
-function Helpers.render_disconnected_operation_node(node, reason)
-    -- Ensure all pin IDs exist before rendering
-    Helpers.ensure_node_pin_ids(node)
-    
-    imnodes.begin_node(node.node_id)
+function Helpers.get_right_cursor_pos(node_id, text)
+    local text_width = imgui.calc_text_size(text).x
+    local node_width = imnodes.get_node_dimensions(node_id).x
+    local pos = imgui.get_cursor_pos()
+    local node_pos = imnodes.get_node_editor_space_pos(node_id)
+    pos.x = node_pos.x + node_width - text_width - 15
+    return pos
+end
+
+function Helpers.get_top_right_cursor_pos(node_id, text)
+    local text_width = imgui.calc_text_size(text).x
+    local node_width = imnodes.get_node_dimensions(node_id).x
+    local node_pos = imnodes.get_node_editor_space_pos(node_id)
+    node_pos.x = node_pos.x + node_width - text_width - 10
+    node_pos.y = node_pos.y + 7
+    return node_pos
+end
+
+-- ========================================
+-- Shared Node Rendering Functions
+-- ========================================
+
+function Helpers.get_operation_name(operation)
+    if operation == Constants.OPERATION_METHOD then
+        return "Method"
+    elseif operation == Constants.OPERATION_FIELD then
+        return "Field"
+    elseif operation == Constants.OPERATION_ARRAY then
+        return "Array"
+    else
+        return "Unknown"
+    end
+end
+
+function Helpers.get_disconnection_message(reason)
+    if reason == "no_parent" then
+        return "Connect to parent node"
+    elseif reason == "parent_nil" then
+        return "Parent node returns nil"
+    elseif reason == "type_error" then
+        return "Parent returns unexpected type"
+    else
+        return "Connect to parent node"
+    end
+end
+
+function Helpers.render_disconnected_titlebar(node, reason)
     imnodes.begin_node_titlebar()
-    local pos_for_debug = imgui.get_cursor_pos()
     imnodes.begin_input_attribute(node.input_attr)
     
-    -- Show operation type with Disconnected status
-    local operation_name = "Unknown"
-    if node.operation == 0 then
-        operation_name = "Method"
-    elseif node.operation == 1 then
-        operation_name = "Field"
-    elseif node.operation == 2 then
-        operation_name = "Array"
-    end
+    local operation_name = Helpers.get_operation_name(node.operation)
     imgui.text(operation_name .. " (Disconnected)")
     
     imnodes.end_input_attribute()
     imnodes.end_node_titlebar()
+end
 
-    -- Show appropriate message based on disconnection reason
-    local message = "Connect to parent node"
-    if reason == "no_parent" then
-        message = "Connect to parent node"
-    elseif reason == "parent_nil" then
-        message = "Parent node returns nil"
-    elseif reason == "type_error" then
-        message = "Parent returns unexpected type"
-    end
-    
-    imgui.text_colored(
-        message,
-        0xFFFFFF00
-    )
-
+function Helpers.render_disconnected_message(reason)
+    local message = Helpers.get_disconnection_message(reason)
+    imgui.text_colored(message, Constants.COLOR_TEXT_WARNING)
     imgui.spacing()
+end
 
-    -- Create placeholder attributes for links to reconnect
+function Helpers.render_disconnected_attributes(node)
     -- Output attribute - always render if it exists (from config or created)
     if node.output_attr then
         imnodes.begin_output_attribute(node.output_attr)
@@ -1192,16 +1301,14 @@ function Helpers.render_disconnected_operation_node(node, reason)
     end
 
     -- Field value input attribute for Set operations
-    if node.operation == 1 and node.action_type == 1 then -- Field Set operation
+    if node.operation == Constants.OPERATION_FIELD and node.action_type == Constants.ACTION_SET then
         imnodes.begin_input_attribute(node.value_input_attr)
         imgui.text("Value (Disconnected)")
         imnodes.end_input_attribute()
     end
+end
 
-    if imgui.button("- Remove Node") then
-        Helpers.remove_operation_node(node)
-    end
-    -- Debug info: Node ID, attributes, and connected Link IDs
+function Helpers.render_disconnected_debug_info(node)
     -- Collect all input attributes (main + params)
     local input_attrs = {}
     if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
@@ -1211,6 +1318,7 @@ function Helpers.render_disconnected_operation_node(node, reason)
             if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
         end
     end
+    
     -- Find input and output links, showing pin/attr and link id
     local input_links, output_links = {}, {}
     for _, link in ipairs(State.all_links) do
@@ -1221,6 +1329,7 @@ function Helpers.render_disconnected_operation_node(node, reason)
             table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
         end
     end
+    
     local debug_info = string.format(
         "Node ID: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
         tostring(node.node_id),
@@ -1229,16 +1338,33 @@ function Helpers.render_disconnected_operation_node(node, reason)
         #input_links > 0 and table.concat(input_links, ", ") or "None",
         #output_links > 0 and table.concat(output_links, ", ") or "None"
     )
-    -- Code to align debug info to the top right of the node using stored pos
-    local text_width = imgui.calc_text_size("[?]").x
-    local node_width = imnodes.get_node_dimensions(node.node_id).x
-    pos_for_debug.x = pos_for_debug.x + node_width - text_width - 16
+    
+    -- Align debug info to the top right of the node
+    local pos_for_debug = Helpers.get_top_right_cursor_pos(node.node_id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
-    imgui.text_colored("[?]", 0xFFDADADA)
+    imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
+    
     if imgui.is_item_hovered() then
         imgui.set_tooltip(debug_info)
     end
+end
 
+function Helpers.render_disconnected_operation_node(node, reason)
+    -- Ensure all pin IDs exist before rendering
+    Helpers.ensure_node_pin_ids(node)
+    
+    imnodes.begin_node(node.node_id)
+    
+    Helpers.render_disconnected_titlebar(node, reason)
+    Helpers.render_disconnected_message(reason)
+    Helpers.render_disconnected_attributes(node)
+    
+    if imgui.button("- Remove Node") then
+        Helpers.remove_operation_node(node)
+    end
+    
+    Helpers.render_disconnected_debug_info(node)
+    
     imnodes.end_node()
 end
 
