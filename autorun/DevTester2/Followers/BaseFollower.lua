@@ -250,6 +250,18 @@ function BaseFollower.render_output_attribute(node, result, can_continue)
                 end
             end
         end
+    else
+        -- Display "nil" when result is nil
+        local display_value = "nil"
+        local output_display = display_value .. " (?)"
+        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+        imgui.set_cursor_pos(pos)
+        imgui.text(display_value)
+        imgui.same_line()
+        imgui.text("(?)")
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("nil")
+        end
     end
     
     if should_show_output_pin then

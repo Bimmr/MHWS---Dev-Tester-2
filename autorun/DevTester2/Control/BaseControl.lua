@@ -40,7 +40,7 @@ end
 function BaseControl.render_action_buttons(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_starter_node(node)  -- Control nodes use the same removal logic as other nodes
+        Nodes.remove_operation_node(node)  -- Control nodes are stored in all_nodes like operations
     end
 
     -- Control nodes typically don't add child nodes since they're control flow providers

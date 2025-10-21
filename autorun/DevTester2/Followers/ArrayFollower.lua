@@ -97,17 +97,49 @@ function ArrayFollower.render(node)
         end
     end
     
-    -- Array navigation controls
-    imgui.push_id("array_nav")
+    -- Determine which index to use for display: connected value takes priority over manual input, which takes priority over dropdown
+    local display_index = node.selected_element_index -- Default from dropdown
+    local has_index_input = false
     
-    -- Left arrow button (disabled if at first element or array is empty)
-    local left_disabled = node.selected_element_index <= 0 or array_size == 0
+    -- Check for connected index value
+    if Nodes.is_array_index_connected(node) then
+        local connected_index = Nodes.get_connected_array_index_value(node)
+        if connected_index ~= nil then
+            -- Try to convert to number
+            local num_index = tonumber(connected_index)
+            if num_index then
+                display_index = math.floor(num_index)
+                has_index_input = true
+            end
+        end
+    -- Check for manual index input
+    elseif node.index_manual_value and node.index_manual_value ~= "" then
+        local num_index = tonumber(node.index_manual_value)
+        if num_index then
+            display_index = math.floor(num_index)
+            has_index_input = true
+        end
+    end
+    
+    -- Ensure display index is within bounds for the dropdown
+    if display_index < 0 then
+        display_index = 0
+    elseif display_index >= array_size and array_size > 0 then
+        display_index = array_size - 1
+    end
+    
+    -- Display current index and navigation controls within input attribute
+    local index_pin_id = Nodes.get_array_index_pin_id(node)
+    imnodes.begin_input_attribute(index_pin_id)
+        
+    -- Left arrow button (disabled if at first element, array is empty, or index input is provided)
+    local left_disabled = display_index <= 0 or array_size == 0 or has_index_input
     if left_disabled then
         imgui.begin_disabled()
     end
     if imgui.arrow_button("left", 0) then -- 0 = Left
-        if node.selected_element_index > 0 then
-            node.selected_element_index = node.selected_element_index - 1
+        if display_index > 0 then
+            node.selected_element_index = display_index - 1
             State.mark_as_modified()
         end
     end
@@ -116,32 +148,48 @@ function ArrayFollower.render(node)
     end
     
     imgui.same_line()
+    local width = imgui.calc_item_width()
+    imgui.set_next_item_width(width - 24)
     
-    -- Element dropdown (1-based for imgui combo)
-    local dropdown_changed, new_selection = imgui.combo("Element", node.selected_element_index + 1, dropdown_options)
-    if dropdown_changed then
+    -- Element dropdown (1-based for imgui combo, disabled when index input is provided)
+    if has_index_input then
+        imgui.begin_disabled()
+    end
+    local dropdown_changed, new_selection = imgui.combo("##Element", display_index + 1, dropdown_options)
+    if dropdown_changed and not has_index_input then
         node.selected_element_index = new_selection - 1 -- Convert back to 0-based
         State.mark_as_modified()
+    end
+    if has_index_input then
+        imgui.end_disabled()
     end
     
     imgui.same_line()
     
-    -- Right arrow button (disabled if at last element or array is empty)
-    local right_disabled = node.selected_element_index >= array_size - 1 or array_size == 0
+    -- Right arrow button (disabled if at last element, array is empty, or index input is provided)
+    local right_disabled = display_index >= array_size - 1 or array_size == 0 or has_index_input
     if right_disabled then
         imgui.begin_disabled()
     end
     if imgui.arrow_button("right", 1) then -- 1 = Right
-        if node.selected_element_index < array_size - 1 then
-            node.selected_element_index = node.selected_element_index + 1
+        if display_index < array_size - 1 then
+            node.selected_element_index = display_index + 1
             State.mark_as_modified()
         end
     end
     if right_disabled then
         imgui.end_disabled()
     end
+    if has_index_input then
+        imgui.begin_disabled()
+    end
+    imgui.same_line()
+    imgui.text("Element")
+    if has_index_input then
+        imgui.end_disabled()
+    end
     
-    imgui.pop_id()
+    imnodes.end_input_attribute()
 
     imgui.spacing()
     
@@ -193,16 +241,37 @@ function ArrayFollower.execute(node, parent_value)
         return nil
     end
     
+    -- Determine which index to use: connected value takes priority over manual input, which takes priority over dropdown
+    local selected_index = node.selected_element_index -- Default from dropdown
+    
+    -- Check for connected index value
+    if Nodes.is_array_index_connected(node) then
+        local connected_index = Nodes.get_connected_array_index_value(node)
+        if connected_index ~= nil then
+            -- Try to convert to number
+            local num_index = tonumber(connected_index)
+            if num_index then
+                selected_index = math.floor(num_index)
+            end
+        end
+    -- Check for manual index input
+    elseif node.index_manual_value and node.index_manual_value ~= "" then
+        local num_index = tonumber(node.index_manual_value)
+        if num_index then
+            selected_index = math.floor(num_index)
+        end
+    end
+    
     -- Validate index is within bounds
-    if node.selected_element_index < 0 or node.selected_element_index >= array_size then
+    if selected_index < 0 or selected_index >= array_size then
         node.status = string.format("Error: Index %d out of bounds (0-%d)", 
-            node.selected_element_index, array_size - 1)
+            selected_index, array_size - 1)
         return nil
     end
     
     -- Get the element at the selected index
     local success, result = pcall(function()
-        return parent_value:get_element(node.selected_element_index)
+        return parent_value:get_element(selected_index)
     end)
     
     if not success then

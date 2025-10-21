@@ -65,6 +65,8 @@ function Nodes.reset_operation_data(node)
     
     -- Clear array-specific data
     node.selected_element_index = 0
+    node.index_connection = nil
+    node.index_manual_value = ""
     
     -- Clear common data that might be operation-specific
     node.starting_value = nil
@@ -138,6 +140,9 @@ function Nodes.create_follower_node(position)
         value_input_attr = nil,
         -- Array-specific
         selected_element_index = 0,
+        index_connection = nil,
+        index_manual_value = "",
+        index_input_attr = nil,
         -- Common
         starting_value = nil,
         ending_value = nil,
@@ -619,6 +624,10 @@ function Nodes.handle_link_created(start_pin, end_pin)
         -- Field value connection
         local link = Nodes.create_link("value", from_node, start_pin, to_node, end_pin)
         to_node.value_connection = from_node.id
+    elseif to_pin_type == "array_index_input" then
+        -- Array index connection
+        local link = Nodes.create_link("array_index", from_node, start_pin, to_node, end_pin)
+        to_node.index_connection = from_node.id
     elseif to_pin_type == "operation_input1" then
         -- Operation input 1 connection
         local link = Nodes.create_link("operation_input1", from_node, start_pin, to_node, end_pin)
@@ -656,6 +665,8 @@ function Nodes.handle_link_destroyed(link_id)
                     to_node.param_connections[link.parameter_index] = nil
                 elseif link.connection_type == "value" then
                     to_node.value_connection = nil
+                elseif link.connection_type == "array_index" then
+                    to_node.index_connection = nil
                 elseif link.connection_type == "operation_input1" then
                     to_node.input1_connection = nil
                 elseif link.connection_type == "operation_input2" then
@@ -728,6 +739,10 @@ function Nodes.find_node_by_pin(pin_id)
             -- Check value pin
             if node.value_input_attr == pin_id then
                 return node, "value_input"
+            end
+            -- Check array index pin
+            if node.index_input_attr == pin_id then
+                return node, "array_index_input"
             end
         end
     end
@@ -1221,6 +1236,31 @@ function Nodes.get_field_value_pin_id(node)
     return node.value_input_attr
 end
 
+function Nodes.get_array_index_pin_id(node)
+    if not node.index_input_attr then
+        node.index_input_attr = State.next_pin_id()
+    end
+    
+    return node.index_input_attr
+end
+
+function Nodes.is_array_index_connected(node)
+    return node.index_connection ~= nil
+end
+
+function Nodes.get_connected_array_index_value(node)
+    if not node.index_connection then
+        return nil
+    end
+    
+    local connected_node = Nodes.find_node_by_id(node.index_connection)
+    if connected_node then
+        return connected_node.ending_value
+    end
+    
+    return nil
+end
+
 function Nodes.ensure_node_pin_ids(node)
     -- Ensure main input attribute exists
     if not node.input_attr then
@@ -1243,6 +1283,13 @@ function Nodes.ensure_node_pin_ids(node)
     if node.type == Constants.FOLLOWER_TYPE_FIELD and node.action_type == Constants.ACTION_SET then
         if not node.value_input_attr then
             node.value_input_attr = State.next_pin_id()
+        end
+    end
+    
+    -- Ensure array index input attribute exists for Array followers
+    if node.type == Constants.FOLLOWER_TYPE_ARRAY then
+        if not node.index_input_attr then
+            node.index_input_attr = State.next_pin_id()
         end
     end
 end
