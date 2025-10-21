@@ -17,6 +17,12 @@ State.starter_nodes = {}
 State.data_nodes = {}
 State.all_links = {}
 
+-- Variable storage (shared across all Variable nodes)
+State.variables = {}  -- variable_name -> {value = value, persistent = boolean}
+
+-- Reset tracking (prevents variable updates during reset frame)
+State.reset_variables = {}  -- variable_name -> true (reset this frame)
+
 -- Hash maps for fast lookups
 State.node_map = {}  -- node_id -> node
 State.link_map = {}  -- link_id -> link

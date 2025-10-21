@@ -25,6 +25,7 @@ Constants.STARTER_TYPE_NATIVE = 3
 -- Data Node Types
 Constants.DATA_TYPE_ENUM = 1
 Constants.DATA_TYPE_PRIMITIVE = 2
+Constants.DATA_TYPE_VARIABLE = 3
 
 -- Follower Node Types
 Constants.FOLLOWER_TYPE_METHOD = 1
@@ -74,23 +75,32 @@ Constants.ACTION_SET = 1
 Constants.NODE_COLOR_STARTER_MANAGED = 0xFF4CAF50       -- Green
 Constants.NODE_COLOR_STARTER_HOOK = 0xFF2196F3          -- Blue
 Constants.NODE_COLOR_STARTER_NATIVE = 0xFFFF9800        -- Orange
+
 Constants.NODE_COLOR_DATA_PRIMITIVE = 0xFF0097A7        -- Dark Cyan
 Constants.NODE_COLOR_DATA_ENUM = 0xFFE91E63             -- Magenta
+Constants.NODE_COLOR_DATA_VARIABLE = 0xFF3F51B5         -- Indigo
 
 Constants.NODE_COLOR_FOLLOWER_METHOD = 0xFFFFC107       -- Yellow
 Constants.NODE_COLOR_FOLLOWER_FIELD = 0xFF8BC34A        -- Lime
 Constants.NODE_COLOR_FOLLOWER_ARRAY = 0xFFFF5722        -- Deep Orange
+
 Constants.NODE_COLOR_OPERATIONS = 0xFF9C27B0            -- Purple
 Constants.NODE_COLOR_CONTROL_SELECT = 0xFF9C27B0        -- Purple
+
 Constants.NODE_COLOR_DEFAULT_HOVER = 0xFF3C3C3C         -- Dark Gray
 Constants.NODE_COLOR_DEFAULT_SELECTED = 0xFF3C3C3C      -- Dark Gray
 
 -- ========================================
 -- Node-Specific Widths (Nodes need to have a field to have a width set)
 -- ========================================
-Constants.NODE_WIDTH_DATA_PRIMITIVE = 150
 Constants.NODE_WIDTH_CONTROL = 200
+
 Constants.NODE_WIDTH_OPERATIONS = 200
+Constants.NODE_WIDTH_OPERATIONS_INVERT = 150
+
+Constants.NODE_WIDTH_DATA = 200
+Constants.NODE_WIDTH_DATA_ENUM = 300
+Constants.NODE_WIDTH_DATA_PRIMITIVE = 150
 
 -- ========================================
 -- UI Dimensions

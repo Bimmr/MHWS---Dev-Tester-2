@@ -122,6 +122,8 @@ function Utils.parse_category_and_type(category, type)
             return "DATA", "PRIMITIVE"
         elseif type == Constants.DATA_TYPE_ENUM then
             return "DATA", "ENUM"
+        elseif type == Constants.DATA_TYPE_VARIABLE then
+            return "DATA", "VARIABLE"
         end
     elseif category == Constants.NODE_CATEGORY_FOLLOWER then
         if type == Constants.FOLLOWER_TYPE_METHOD then

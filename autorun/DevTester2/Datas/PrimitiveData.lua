@@ -10,6 +10,9 @@ local PrimitiveData = {}
 
 function PrimitiveData.render(node)
     
+    -- Execute the node to update ending_value
+    PrimitiveData.execute(node)
+    
     imnodes.begin_node(node.node_id)
     
     imnodes.begin_node_titlebar()
@@ -50,6 +53,11 @@ function PrimitiveData.render(node)
 
     imnodes.end_node()
     
+end
+
+function PrimitiveData.execute(node)
+    -- Parse the value to set ending_value
+    node.ending_value = Utils.parse_primitive_value(node.value)
 end
 
 return PrimitiveData

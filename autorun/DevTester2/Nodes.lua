@@ -106,6 +106,12 @@ function Nodes.create_starter_node(category, node_type)
     }
     
     if category == Constants.NODE_CATEGORY_DATA then
+        -- Data nodes that need inputs (like Variable) get input attributes
+        if node_type == Constants.DATA_TYPE_VARIABLE then
+            node.input_attr = State.next_pin_id()
+            node.input_connection = nil
+            node.input_manual_value = ""
+        end
         table.insert(State.data_nodes, node)
     else
         table.insert(State.starter_nodes, node)
@@ -652,6 +658,10 @@ function Nodes.handle_link_created(start_pin, end_pin)
         -- Return override connection
         local link = Nodes.create_link("return_override", from_node, start_pin, to_node, end_pin)
         to_node.return_override_connection = from_node.id
+    elseif to_pin_type == "data_input" then
+        -- Data node input connection (for Variable nodes)
+        local link = Nodes.create_link("data_input", from_node, start_pin, to_node, end_pin)
+        to_node.input_connection = from_node.id
     end
 end
 
@@ -679,6 +689,8 @@ function Nodes.handle_link_destroyed(link_id)
                     to_node.false_connection = nil
                 elseif link.connection_type == "return_override" then
                     to_node.return_override_connection = nil
+                elseif link.connection_type == "data_input" then
+                    to_node.input_connection = nil
                 elseif link.connection_type == "main" then
                     to_node.parent_node_id = nil
                 end
@@ -706,6 +718,8 @@ function Nodes.find_node_by_pin(pin_id)
     for _, node in ipairs(State.data_nodes) do
         if node.output_attr == pin_id then
             return node, "output"
+        elseif node.input_attr == pin_id then
+            return node, "data_input"
         elseif node.return_override_attr == pin_id then
             return node, "return_override_input"
         end
@@ -915,6 +929,14 @@ function Nodes.is_field_value_connected(node)
     return node.value_connection ~= nil
 end
 
+function Nodes.is_output_connected(node)
+    for _, link in ipairs(State.all_links) do
+        if link.from_node == node.id and link.from_pin == node.output_attr then
+            return true
+        end
+    end
+    return false
+end
 
 -- ========================================
 -- Cache Management
@@ -1337,6 +1359,10 @@ function Nodes.validate_and_restore_starter_node(node)
         elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
             -- Restore the value as ending_value
             node.ending_value = node.value
+            node.status = "Ready"
+        elseif node.type == Constants.DATA_TYPE_VARIABLE then
+            -- For variables, ending_value will be determined by the VariableData.get_variable_value function
+            node.ending_value = nil  -- Will be set during execution
             node.status = "Ready"
         end
     end

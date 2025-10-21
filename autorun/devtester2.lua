@@ -15,6 +15,7 @@ local HookStarter = require("DevTester2.Starters.HookStarter")
 local NativeStarter = require("DevTester2.Starters.NativeStarter")
 local EnumData = require("DevTester2.Datas.EnumData")
 local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
+local VariableData = require("DevTester2.Datas.VariableData")
 local MethodFollower = require("DevTester2.Followers.MethodFollower")
 local FieldFollower = require("DevTester2.Followers.FieldFollower")
 local ArrayFollower = require("DevTester2.Followers.ArrayFollower")
@@ -44,6 +45,9 @@ end
 
 -- Main draw function
 re.on_draw_ui(function()
+
+    -- Clear reset tracking at the start of each frame
+    State.reset_variables = {}
 
     -- Load Data.json on first draw to restore window state
     if not initialized then
@@ -178,6 +182,13 @@ function render_menu_bar()
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create an Enum node for enumerated values")
             end
+            
+            if imgui.menu_item("Variable") then
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_VARIABLE) -- Variable
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Variable node for storing and retrieving values across the node graph")
+            end
             imgui.end_menu()
         end
         
@@ -292,6 +303,8 @@ function render_node_editor()
                 EnumData.render(node)
             elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
                 PrimitiveData.render(node)
+            elseif node.type == Constants.DATA_TYPE_VARIABLE then
+                VariableData.render(node)
             end
 
             imgui.pop_item_width()

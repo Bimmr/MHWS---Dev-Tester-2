@@ -34,6 +34,9 @@ end
 
 function EnumData.render(node)
     
+    -- Execute the node to update ending_value
+    EnumData.execute(node)
+    
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
@@ -113,10 +116,9 @@ function EnumData.render(node)
             imgui.set_cursor_pos(pos)
             imgui.text(display)
             imnodes.end_output_attribute()
-            node.ending_value = node.enum_names[original_index]  -- Output enum name instead of value
+            -- node.ending_value = node.enum_names[original_index]  -- Moved to execute function
         else
-            node.ending_value = nil
-            imgui.text_colored("No enum values found", 0xFFFF0000)
+            imgui.text_colored("No enum values found", Constants.COLOR_TEXT_WARNING)
         end
     end
 
@@ -128,6 +130,21 @@ function EnumData.render(node)
     
     -- Reset appearance
     Nodes.reset_node_titlebar_color()
+end
+
+function EnumData.execute(node)
+    -- Set ending_value based on selected enum
+    if node.enum_names and node.enum_values and node.selected_enum_index and 
+       node.sorted_to_original_index and node.selected_enum_index <= #node.sorted_to_original_index then
+        local original_index = node.sorted_to_original_index[node.selected_enum_index]
+        if original_index and node.enum_names[original_index] then
+            node.ending_value = node.enum_names[original_index]  -- Output enum name instead of value
+        else
+            node.ending_value = nil
+        end
+    else
+        node.ending_value = nil
+    end
 end
 
 return EnumData

@@ -108,12 +108,25 @@ function Config.serialize_node(node)
             data.return_override_attr = node.return_override_attr
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
+        elseif node.type == Constants.STARTER_TYPE_NATIVE then
+            data.method_name = node.method_name
+            data.selected_method_combo = node.selected_method_combo
+            data.method_group_index = node.method_group_index
+            data.method_index = node.method_index
+            data.native_method_result = node.native_method_result
         elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_PRIMITIVE then
             data.value = node.value
         elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_ENUM then
             data.selected_enum_index = node.selected_enum_index
             data.enum_names = node.enum_names
             data.enum_values = node.enum_values
+        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_VARIABLE then
+            data.variable_name = node.variable_name
+            data.default_value = node.default_value
+            data.persistent = node.persistent
+            data.input_connection = node.input_connection
+            data.input_manual_value = node.input_manual_value
+            data.pending_reset = node.pending_reset
         end
     elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
         data.category = node.category
@@ -124,6 +137,9 @@ function Config.serialize_node(node)
         data.input2_attr = node.input2_attr  -- For math operations
         data.output_attr = node.output_attr
         data.selected_operation = node.selected_operation  -- For math operations
+        -- Manual values
+        data.input1_manual_value = node.input1_manual_value
+        data.input2_manual_value = node.input2_manual_value
     elseif node.category == Constants.NODE_CATEGORY_CONTROL then
         data.category = node.category
         data.type = node.type
@@ -132,6 +148,10 @@ function Config.serialize_node(node)
         data.true_attr = node.true_attr
         data.false_attr = node.false_attr
         data.output_attr = node.output_attr
+        -- Manual values
+        data.condition_manual_value = node.condition_manual_value
+        data.true_manual_value = node.true_manual_value
+        data.false_manual_value = node.false_manual_value
     elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
         data.category = node.category
         data.type = node.type
@@ -399,12 +419,21 @@ function Config.deserialize_node(data)
             return_override_attr = data.return_override_attr,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
+            -- Native-specific
+            native_method_result = data.native_method_result,
             -- Enum-specific
             selected_enum_index = data.selected_enum_index or 1,
             enum_names = data.enum_names,
             enum_values = data.enum_values,
             -- Value-specific
-            value = data.value or ""
+            value = data.value or "",
+            -- Variable-specific
+            variable_name = data.variable_name or "",
+            default_value = data.default_value or "",
+            persistent = data.persistent or false,
+            input_connection = data.input_connection,
+            input_manual_value = data.input_manual_value or "",
+            pending_reset = data.pending_reset or false
         }
         
         -- Validate and restore result
@@ -423,7 +452,10 @@ function Config.deserialize_node(data)
             output_attr = data.output_attr,
             selected_operation = data.selected_operation or Constants.MATH_OPERATION_ADD,  -- For math operations
             ending_value = nil,
-            status = nil
+            status = nil,
+            -- Manual values
+            input1_manual_value = data.input1_manual_value or "",
+            input2_manual_value = data.input2_manual_value or ""
         }
         
     elseif data.category == Constants.NODE_CATEGORY_CONTROL then
@@ -438,7 +470,11 @@ function Config.deserialize_node(data)
             false_attr = data.false_attr,
             output_attr = data.output_attr,
             ending_value = nil,
-            status = nil
+            status = nil,
+            -- Manual values
+            condition_manual_value = data.condition_manual_value or "",
+            true_manual_value = data.true_manual_value or "",
+            false_manual_value = data.false_manual_value or ""
         }
         
     elseif data.category == Constants.NODE_CATEGORY_FOLLOWER then
@@ -518,6 +554,8 @@ function Config.deserialize_link(data, node_map)
         to_node.param_connections[data.parameter_index] = from_node.id
     elseif data.connection_type == "value" then
         to_node.value_connection = from_node.id
+    elseif data.connection_type == "data_input" then
+        to_node.input_connection = from_node.id
     elseif data.connection_type == "main" then
         to_node.parent_node_id = from_node.id
     end
