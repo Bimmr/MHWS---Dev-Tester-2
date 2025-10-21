@@ -63,6 +63,7 @@ re.on_draw_ui(function()
     imgui.push_id("DevTester2")
 
     -- Main window
+    imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 0.9) -- Window transparency
     imgui.push_style_var(imgui.ImGuiStyleVar.WindowRounding, Constants.WINDOW_ROUNDING) -- Window rounded corners
     imgui.push_style_var(imgui.ImGuiStyleVar.FrameRounding, Constants.FRAME_ROUNDING) -- Frame rounded corners
     imgui.push_style_var(imgui.ImGuiStyleVar.FramePadding, Constants.FRAME_PADDING) -- Frame padding
@@ -70,6 +71,7 @@ re.on_draw_ui(function()
     -- Static window title to preserve window position/size
     local window_title = "DevTester v2.0"
     
+
     -- Begin window with flags (1024 includes menu bar)
     State.window_open = imgui.begin_window(window_title, State.window_open, 1024)
     
@@ -85,7 +87,7 @@ re.on_draw_ui(function()
 
     Dialogs.render()
     
-    imgui.pop_style_var(3)
+    imgui.pop_style_var(4)
     imgui.pop_id()
     
 end)
