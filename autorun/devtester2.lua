@@ -45,10 +45,15 @@ end
 -- Main draw function
 re.on_draw_ui(function()
 
-
-    -- Toggle button in main menu
+    -- Load Data.json on first draw to restore window state
+    if not initialized then
+        Config.load_data_config()
+        initialized = true
+    end
     if imgui.button("DevTester v2.0") then
         State.window_open = not State.window_open
+        -- Save window state to Data.json
+        Config.save_data_config()
     end
     
     if not State.window_open then
@@ -73,7 +78,13 @@ re.on_draw_ui(function()
     
 
     -- Begin window with flags (1024 includes menu bar)
+    local was_open = State.window_open
     State.window_open = imgui.begin_window(window_title, State.window_open, 1024)
+    
+    -- Save window state if it changed (closed via X button)
+    if was_open and not State.window_open then
+        Config.save_data_config()
+    end
     
     if State.window_open then
         -- Menu bar

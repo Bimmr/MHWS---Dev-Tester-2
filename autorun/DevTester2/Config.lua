@@ -547,6 +547,9 @@ function Config.is_valid_filename(name)
     -- Check for path traversal
     if name:match('%.%.') then return false end
     
+    -- Prevent "Data" as a config name (reserved for Data.json)
+    if name:lower() == "data" then return false end
+    
     return true
 end
 
@@ -557,4 +560,42 @@ function Config.validate_config_data(config)
     if not config.links or type(config.links) ~= "table" then return false end
     return true
 end
+
+-- ========================================
+-- Data.json Implementation
+-- ========================================
+
+function Config.save_data_config()
+    local data = {
+        window_open = State.window_open
+    }
+    
+    local file_path = Config.get_config_directory() .. "Data.json"
+    local success = json.dump_file(file_path, data)
+    
+    if success then
+        return true, nil
+    else
+        return false, "Failed to write Data.json"
+    end
+end
+
+function Config.load_data_config()
+    local file_path = Config.get_config_directory() .. "Data.json"
+    
+    -- Load using REFramework's json.load_file (same as regular configs)
+    local data = json.load_file(file_path)
+    
+    if not data then
+        return false, "Failed to read Data.json or parse JSON"
+    end
+    
+    -- Restore window state
+    if data.window_open ~= nil then
+        State.window_open = data.window_open
+    end
+    
+    return true, nil
+end
+
 return Config
