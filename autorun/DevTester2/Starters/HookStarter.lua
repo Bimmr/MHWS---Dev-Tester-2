@@ -1,6 +1,8 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local BaseStarter = require("DevTester2.Starters.BaseStarter")
+local Constants = require("DevTester2.Constants")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -30,6 +32,7 @@ local function convert_ptr(arg, td_name)
 end
 
 function HookStarter.render(node)
+
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
@@ -40,7 +43,7 @@ function HookStarter.render(node)
         imgui.begin_disabled()
     end
     -- Path input - disable if node has children
-    local has_children = Helpers.has_children(node)
+    local has_children = Nodes.has_children(node)
     if has_children then
         imgui.begin_disabled()
     end
@@ -51,7 +54,7 @@ function HookStarter.render(node)
         node.selected_method_combo = nil
         node.method_group_index = nil
         node.method_index = nil
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
     if has_children then
         imgui.end_disabled()
@@ -65,7 +68,7 @@ function HookStarter.render(node)
         end)
         if success_type and type_def then
             local success_methods, methods = pcall(function() 
-                return Helpers.get_methods_for_combo(type_def) 
+                return Nodes.get_methods_for_combo(type_def) 
             end)
             if success_methods and methods and #methods > 0 then
                 -- Reconstruct selected_method_combo from saved method indices if needed
@@ -87,7 +90,7 @@ function HookStarter.render(node)
                 end
                 
                 -- Method selection - disable if node has children
-                local has_children = Helpers.has_children(node)
+                local has_children = Nodes.has_children(node)
                 if has_children then
                     imgui.begin_disabled()
                 end
@@ -102,7 +105,7 @@ function HookStarter.render(node)
                             node.method_group_index = tonumber(group_index)
                             node.method_index = tonumber(method_index)
                             local success_get, selected_method = pcall(function()
-                                return Helpers.get_method_by_group_and_index(type_def, 
+                                return Nodes.get_method_by_group_and_index(type_def, 
                                     node.method_group_index, node.method_index)
                             end)
                             if success_get and selected_method then
@@ -120,7 +123,7 @@ function HookStarter.render(node)
                         node.method_index = nil
                         node.method_name = ""
                     end
-                    Helpers.mark_as_modified()
+                    State.mark_as_modified()
                 end
                 if has_children then
                     imgui.end_disabled()
@@ -149,7 +152,7 @@ function HookStarter.render(node)
     local result_changed, new_option_index = imgui.combo("Pre-hook Result", current_option_index, pre_hook_options)
     if result_changed then
         node.pre_hook_result = pre_hook_options[new_option_index]
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
     
     imgui.spacing()
@@ -177,14 +180,14 @@ function HookStarter.render(node)
             end
         end
         imgui.same_line()
-        local pos = Helpers.get_right_cursor_pos(node.node_id, "Last call: " .. time_since_call)
+        local pos = Utils.get_right_cursor_pos(node.node_id, "Last call: " .. time_since_call)
         imgui.set_cursor_pos(pos)
         imgui.text("Last call: " .. time_since_call)
         imgui.spacing()
         imgui.spacing()
         if node.ending_value then
             if not node.output_attr then
-                node.output_attr = Helpers.next_pin_id()
+                node.output_attr = State.next_pin_id()
             end
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
@@ -202,7 +205,7 @@ function HookStarter.render(node)
                 display_value = tostring(node.ending_value)
             end
             local display = display_value .. " (?)"
-            local pos = Helpers.get_right_cursor_pos(node.node_id, display)
+            local pos = Utils.get_right_cursor_pos(node.node_id, display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -226,10 +229,10 @@ function HookStarter.render(node)
                 end
             if type(node.ending_value) == "userdata" then
                 imgui.spacing()
-                local button_pos = Helpers.get_right_cursor_pos(node.node_id, "+ Add Child to Output")
+                local button_pos = Utils.get_right_cursor_pos(node.node_id, "+ Add Child to Output")
                 imgui.set_cursor_pos(button_pos)
                 if imgui.button("+ Add Child to Output") then
-                    Helpers.add_child_node(node)
+                    Nodes.add_child_node(node)
                 end
             end
             imnodes.end_output_attribute()
@@ -243,13 +246,13 @@ function HookStarter.render(node)
         if node.return_type_name and node.last_hook_time then
             -- Return override input
             if not node.return_override_attr then
-                node.return_override_attr = Helpers.next_pin_id()
+                node.return_override_attr = State.next_pin_id()
             end
             imnodes.begin_input_attribute(node.return_override_attr)
-            local has_return_override_connection = Helpers.is_param_connected_for_return_override(node)
+            local has_return_override_connection = Nodes.is_param_connected_for_return_override(node)
             local return_override_label = "Return Override"
             if has_return_override_connection then
-                local connected_value = Helpers.get_connected_return_override_value(node)
+                local connected_value = Nodes.get_connected_return_override_value(node)
                 -- Display simplified value without address
                 local display_value = "Object"
                 if type(connected_value) == "userdata" then
@@ -271,7 +274,7 @@ function HookStarter.render(node)
                 local input_changed, new_value = imgui.input_text(return_override_label, node.return_override_manual)
                 if input_changed then
                     node.return_override_manual = new_value
-                    Helpers.mark_as_modified()
+                    State.mark_as_modified()
                 end
                 if imgui.is_item_hovered() then
                     imgui.set_tooltip("Return override value (manual input)")
@@ -280,7 +283,7 @@ function HookStarter.render(node)
             imnodes.end_input_attribute()
             
             if not node.return_attr then
-                node.return_attr = Helpers.next_pin_id()
+                node.return_attr = State.next_pin_id()
             end
             imgui.spacing()
             local return_type = type(node.return_value)
@@ -304,7 +307,7 @@ function HookStarter.render(node)
                 display_value = tostring(node.return_value)
             end
             local return_display = display_value .. " (?)"
-            local return_pos = Helpers.get_right_cursor_pos(node.node_id, return_display)
+            local return_pos = Utils.get_right_cursor_pos(node.node_id, return_display)
             imgui.set_cursor_pos(return_pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -386,10 +389,10 @@ function HookStarter.render(node)
             if node.return_value ~= nil and type(node.return_value) == "userdata" then
                 imgui.spacing()
                 local return_button_text = "+ Add Child to Return"
-                local return_button_pos = Helpers.get_right_cursor_pos(node.node_id, return_button_text)
+                local return_button_pos = Utils.get_right_cursor_pos(node.node_id, return_button_text)
                 imgui.set_cursor_pos(return_button_pos)
                 if imgui.button(return_button_text) then
-                    Helpers.add_child_node_to_return(node)
+                    Nodes.add_child_node_to_return(node)
                 end
             end
             
@@ -405,7 +408,7 @@ function HookStarter.render(node)
             -- The hook will remain active until the game restarts
             -- sdk.hook_remove(node.hook_id) -- Not supported
         end
-        Helpers.remove_starter_node(node)
+        Nodes.remove_starter_node(node)
     end
     BaseStarter.render_debug_info(node)
     imnodes.end_node()
@@ -413,27 +416,27 @@ end
 
 function HookStarter.initialize_hook(node)
     if not node.path or node.path == "" then
-        Helpers.show_error("Path is required")
+        Utils.show_error("Path is required")
         return
     end
     if not node.method_name or node.method_name == "" then
-        Helpers.show_error("Method is required")
+        Utils.show_error("Method is required")
         return
     end
     local type_def = sdk.find_type_definition(node.path)
     if not type_def then
-        Helpers.show_error("Type not found: " .. node.path)
+        Utils.show_error("Type not found: " .. node.path)
         return
     end
     local method = nil
     if node.method_group_index and node.method_index then
-        method = Helpers.get_method_by_group_and_index(type_def, 
+        method = Nodes.get_method_by_group_and_index(type_def, 
             node.method_group_index, node.method_index)
     else
         method = type_def:get_method(node.method_name)
     end
     if not method then
-        Helpers.show_error("Method not found: " .. node.method_name .. " (group:" .. tostring(node.method_group_index) .. ", index:" .. tostring(node.method_index) .. ")")
+        Utils.show_error("Method not found: " .. node.method_name .. " (group:" .. tostring(node.method_group_index) .. ", index:" .. tostring(node.method_index) .. ")")
         return
     end
     node.last_hook_time = nil
@@ -477,10 +480,10 @@ function HookStarter.initialize_hook(node)
             
             -- Check for return override
             local override_value = nil
-            if Helpers.is_param_connected_for_return_override(node) then
-                override_value = Helpers.get_connected_return_override_value(node)
+            if Nodes.is_param_connected_for_return_override(node) then
+                override_value = Nodes.get_connected_return_override_value(node)
             elseif node.return_override_manual and node.return_override_manual ~= "" then
-                override_value = Helpers.parse_value_for_type(node.return_override_manual, ret_type)
+                override_value = Utils.parse_value_for_type(node.return_override_manual, ret_type)
             end
             
             if override_value ~= nil then
@@ -498,9 +501,9 @@ function HookStarter.initialize_hook(node)
     if success then
         node.hook_id = method  -- Store the method itself since we can't unhook anyway
         node.is_initialized = true
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     else
-        Helpers.show_error("Failed to initialize hook: " .. tostring(result))
+        Utils.show_error("Failed to initialize hook: " .. tostring(result))
     end
 end
 

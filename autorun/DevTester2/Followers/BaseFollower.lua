@@ -1,34 +1,35 @@
--- DevTester v2.0 - Base Operation
--- Common functionality for all operation nodes
+-- DevTester v2.0 - Base Follower
+-- Common functionality for all follower nodes
 
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local BaseOperation = {}
+local BaseFollower = {}
 
 -- ========================================
 -- Common Rendering Functions
 -- ========================================
 
-function BaseOperation.check_parent_connection(node)
-    local parent_value = Helpers.get_parent_value(node)
+function BaseFollower.check_parent_connection(node)
+    local parent_value = Nodes.get_parent_value(node)
 
     if not node.parent_node_id then
-        Helpers.render_disconnected_operation_node(node, "no_parent")
+        Nodes.render_disconnected_operation_node(node, "no_parent")
         return nil
     elseif parent_value == nil then
-        Helpers.render_disconnected_operation_node(node, "parent_nil")
+        Nodes.render_disconnected_operation_node(node, "parent_nil")
         return nil
     end
 
     return parent_value
 end
 
-function BaseOperation.get_parent_type(parent_value)
+function BaseFollower.get_parent_type(parent_value)
     local success, parent_type = pcall(function()
         return parent_value:get_type_definition()
     end)
@@ -40,12 +41,12 @@ function BaseOperation.get_parent_type(parent_value)
     return parent_type
 end
 
-function BaseOperation.render_title_bar(node, parent_type, custom_title)
+function BaseFollower.render_title_bar(node, parent_type, custom_title)
     imnodes.begin_node_titlebar()
 
     -- Main input pin with type name inside
     if not node.input_attr then
-        node.input_attr = Helpers.next_pin_id()
+        node.input_attr = State.next_pin_id()
     end
 
     imnodes.begin_input_attribute(node.input_attr)
@@ -64,28 +65,28 @@ function BaseOperation.render_title_bar(node, parent_type, custom_title)
     imnodes.end_node_titlebar()
 end
 
-function BaseOperation.render_operation_dropdown(node, parent_value)
+function BaseFollower.render_operation_dropdown(node, parent_value)
     -- Operation dropdown
     -- Note: imgui.combo uses 1-based indexing
-    local has_children = Helpers.has_children(node)
+    local has_children = Nodes.has_children(node)
     if has_children then
         imgui.begin_disabled()
     end
 
     -- Build operation options dynamically based on parent value type
     local operation_options = {"Method", "Field"}
-    local operation_values = {Constants.OPERATION_METHOD, Constants.OPERATION_FIELD}
+    local operation_values = {Constants.FOLLOWER_TYPE_METHOD, Constants.FOLLOWER_TYPE_FIELD}
 
     -- Only add Array option if parent value is an array
-    if parent_value and Helpers.is_array(parent_value) then
+    if parent_value and Utils.is_array(parent_value) then
         table.insert(operation_options, "Array")
-        table.insert(operation_values, Constants.OPERATION_ARRAY)
+        table.insert(operation_values, Constants.FOLLOWER_TYPE_ARRAY)
     end
 
     -- If current operation is not available, reset to first available option
     local current_option_index = 1
     for i, op_value in ipairs(operation_values) do
-        if op_value == node.operation then
+        if op_value == node.type then
             current_option_index = i
             break
         end
@@ -93,9 +94,9 @@ function BaseOperation.render_operation_dropdown(node, parent_value)
 
     local op_changed, new_option_index = imgui.combo("Operation", current_option_index, operation_options)
     if op_changed then
-        node.operation = operation_values[new_option_index]
-        Helpers.reset_operation_data(node)
-        Helpers.mark_as_modified()
+        node.type = operation_values[new_option_index]
+        Nodes.reset_operation_data(node)
+        State.mark_as_modified()
     end
 
     if has_children then
@@ -106,12 +107,12 @@ function BaseOperation.render_operation_dropdown(node, parent_value)
     end
 end
 
-function BaseOperation.render_action_type_dropdown(node, action_options)
+function BaseFollower.render_action_type_dropdown(node, action_options)
     if not node.action_type then
         node.action_type = Constants.ACTION_GET -- Default to Get
     end
 
-    local has_children = Helpers.has_children(node)
+    local has_children = Nodes.has_children(node)
     if has_children then
         imgui.begin_disabled()
     end
@@ -124,7 +125,7 @@ function BaseOperation.render_action_type_dropdown(node, action_options)
         node.ending_value = nil
         node.status = nil
         node.last_call_time = nil  -- Reset call timer when changing modes
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
 
     if has_children then
@@ -135,13 +136,13 @@ function BaseOperation.render_action_type_dropdown(node, action_options)
     end
 end
 
-function BaseOperation.render_debug_info(node)
+function BaseFollower.render_debug_info(node)
     -- Collect all input attributes (main + params)
     local input_attrs = {}
     if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
     if node.param_manual_values then
         for i = 1, #(node.param_manual_values) do
-            local param_pin_id = Helpers.get_param_pin_id(node, i)
+            local param_pin_id = Nodes.get_param_pin_id(node, i)
             if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
         end
     end
@@ -167,7 +168,7 @@ function BaseOperation.render_debug_info(node)
     )
 
     -- Align debug info to the top right of the node
-    local pos_for_debug = Helpers.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
 
@@ -176,11 +177,11 @@ function BaseOperation.render_debug_info(node)
     end
 end
 
-function BaseOperation.render_action_buttons(node, can_add_child)
+function BaseFollower.render_action_buttons(node, can_add_child)
     imgui.spacing()
     local pos = imgui.get_cursor_pos()
     if imgui.button("- Remove Node") then
-        Helpers.remove_operation_node(node)
+        Nodes.remove_operation_node(node)
     end
     
     -- Show Add Child Node if condition is met (can_add_child can be a function or boolean)
@@ -198,18 +199,18 @@ function BaseOperation.render_action_buttons(node, can_add_child)
         pos.x = pos.x + node_width - display_width - 20
         imgui.set_cursor_pos(pos)
         if imgui.button("+ Add Child Node") then
-            Helpers.add_child_node(node)
+            Nodes.add_child_node(node)
         end
     end
 end
 
-function BaseOperation.render_output_attribute(node, result, can_continue)
+function BaseFollower.render_output_attribute(node, result, can_continue)
     -- Create output attribute only if we should show the pin
     local should_show_output_pin = result ~= nil or node.output_attr
     
     if should_show_output_pin then
         if not node.output_attr then
-            node.output_attr = Helpers.next_pin_id()
+            node.output_attr = State.next_pin_id()
         end
         imgui.spacing()
         imnodes.begin_output_attribute(node.output_attr)
@@ -229,7 +230,7 @@ function BaseOperation.render_output_attribute(node, result, can_continue)
             display_value = tostring(result)
         end
         local output_display = display_value .. " (?)"
-        local pos = Helpers.get_right_cursor_pos(node.node_id, output_display)
+        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
         imgui.set_cursor_pos(pos)
         imgui.text(display_value)
         if can_continue then
@@ -256,4 +257,4 @@ function BaseOperation.render_output_attribute(node, result, can_continue)
     end
 end
 
-return BaseOperation
+return BaseFollower

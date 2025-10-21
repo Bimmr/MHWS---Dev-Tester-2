@@ -1,6 +1,8 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Utils = require("DevTester2.Utils")
+local Nodes = require("DevTester2.Nodes")
 local BaseStarter = require("DevTester2.Starters.BaseStarter")
+local Constants = require("DevTester2.Constants")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -8,6 +10,7 @@ local sdk = sdk
 local NativeStarter = {}
 
 function NativeStarter.render(node)
+    
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
@@ -15,7 +18,7 @@ function NativeStarter.render(node)
     imnodes.end_node_titlebar()
     
     -- Path input - disable if node has children
-    local has_children = Helpers.has_children(node)
+    local has_children = Nodes.has_children(node)
     if has_children then
         imgui.begin_disabled()
     end
@@ -27,7 +30,7 @@ function NativeStarter.render(node)
         node.method_group_index = nil
         node.method_index = nil
         node.native_method_result = nil
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
     if has_children then
         imgui.end_disabled()
@@ -41,7 +44,7 @@ function NativeStarter.render(node)
         type_def = sdk.find_type_definition(node.path)
         if type_def then
             local success_methods, methods = pcall(function() 
-                return Helpers.get_methods_for_combo(type_def) 
+                return Nodes.get_methods_for_combo(type_def) 
             end)
             if success_methods and methods and #methods > 0 then
                 if not node.selected_method_combo then
@@ -49,7 +52,7 @@ function NativeStarter.render(node)
                 end
                 
                 -- Method selection - disable if node has children
-                local has_children = Helpers.has_children(node)
+                local has_children = Nodes.has_children(node)
                 if has_children then
                     imgui.begin_disabled()
                 end
@@ -64,7 +67,7 @@ function NativeStarter.render(node)
                             node.method_group_index = tonumber(group_index)
                             node.method_index = tonumber(method_index)
                             local success_get, selected_method = pcall(function()
-                                return Helpers.get_method_by_group_and_index(type_def, 
+                                return Nodes.get_method_by_group_and_index(type_def, 
                                     node.method_group_index, node.method_index)
                             end)
                             if success_get and selected_method then
@@ -83,7 +86,7 @@ function NativeStarter.render(node)
                         node.method_name = ""
                     end
                     node.native_method_result = nil
-                    Helpers.mark_as_modified()
+                    State.mark_as_modified()
                 end
                 if has_children then
                     imgui.end_disabled()
@@ -101,7 +104,7 @@ function NativeStarter.render(node)
         local selected_method = nil
         if node.method_group_index and node.method_index then
             local success_get, method = pcall(function()
-                return Helpers.get_method_by_group_and_index(type_def, 
+                return Nodes.get_method_by_group_and_index(type_def, 
                     node.method_group_index, node.method_index)
             end)
             if success_get and method then
@@ -128,12 +131,12 @@ function NativeStarter.render(node)
                     local param_type_name = param_type:get_name()
                     
                     -- Parameter input pin
-                    local param_pin_id = Helpers.get_param_pin_id(node, i)
+                    local param_pin_id = Nodes.get_param_pin_id(node, i)
                     imnodes.begin_input_attribute(param_pin_id)
-                    local has_connection = Helpers.is_param_connected(node, i)
+                    local has_connection = Nodes.is_param_connected(node, i)
                     local label = string.format("Arg %d(%s)", i, param_type:get_name())
                     if has_connection then
-                        local connected_value = Helpers.get_connected_param_value(node, i)
+                        local connected_value = Nodes.get_connected_param_value(node, i)
                         -- Display simplified value without address
                         local display_value = "Object"
                         if type(connected_value) == "userdata" then
@@ -153,10 +156,10 @@ function NativeStarter.render(node)
                         local input_changed, new_value = imgui.input_text(label, node.param_manual_values[i])
                         if input_changed then
                             node.param_manual_values[i] = new_value
-                            Helpers.mark_as_modified()
+                            State.mark_as_modified()
                         end
                         -- Parse the parameter value
-                        local param_value = Helpers.parse_value_for_type(node.param_manual_values[i], param_type)
+                        local param_value = Utils.parse_value_for_type(node.param_manual_values[i], param_type)
                         table.insert(param_values, param_value)
                     end
                     imnodes.end_input_attribute()
@@ -190,7 +193,7 @@ function NativeStarter.render(node)
         -- Only create output attribute if result is not nil
         if node.native_method_result ~= nil then
             if not node.output_attr then
-                node.output_attr = Helpers.next_pin_id()
+                node.output_attr = State.next_pin_id()
             end
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
@@ -199,13 +202,13 @@ function NativeStarter.render(node)
             if can_continue then
                 local success, type_info = pcall(function() return node.native_method_result:get_type_definition() end)
                 if success and type_info then
-                    display_value = Helpers.get_type_display_name(type_info)
+                    display_value = Utils.get_type_display_name(type_info)
                 end
             else
                 display_value = tostring(node.native_method_result)
             end
             local output_display = display_value .. " (?)"
-            local pos = Helpers.get_right_cursor_pos(node.node_id, output_display)
+            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             if can_continue then

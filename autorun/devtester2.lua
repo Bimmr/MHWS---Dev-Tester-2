@@ -4,9 +4,25 @@
 -- Dependencies
 local Config = require("DevTester2.Config")
 local Nodes = require("DevTester2.Nodes")
-local Helpers = require("DevTester2.Helpers")
+local Utils = require("DevTester2.Utils")
 local State = require("DevTester2.State")
 local Constants = require("DevTester2.Constants")
+local Dialogs = require("DevTester2.Dialogs")
+
+-- Node type modules
+local ManagedStarter = require("DevTester2.Starters.ManagedStarter")
+local HookStarter = require("DevTester2.Starters.HookStarter")
+local NativeStarter = require("DevTester2.Starters.NativeStarter")
+local EnumData = require("DevTester2.Datas.EnumData")
+local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
+local MethodFollower = require("DevTester2.Followers.MethodFollower")
+local FieldFollower = require("DevTester2.Followers.FieldFollower")
+local ArrayFollower = require("DevTester2.Followers.ArrayFollower")
+local InvertOperation = require("DevTester2.Operations.InvertOperation")
+local MathOperation = require("DevTester2.Operations.MathOperation")
+local LogicOperation = require("DevTester2.Operations.LogicOperation")
+local CompareOperation = require("DevTester2.Operations.CompareOperation")
+local SelectControl = require("DevTester2.Control.SelectControl")
 
 -- Local references
 local re = re
@@ -66,6 +82,8 @@ re.on_draw_ui(function()
         
         imgui.end_window()
     end
+
+    Dialogs.render()
     
     imgui.pop_style_var(3)
     imgui.pop_id()
@@ -112,19 +130,19 @@ function render_menu_bar()
         -- Create Starter dropdown menu
         if imgui.begin_menu("+ Create Starter  ▼") then
             if imgui.menu_item("Managed") then
-                Helpers.create_starter_node(Constants.NODE_TYPE_MANAGED) -- Managed
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_MANAGED) -- Managed
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
             end
             if imgui.menu_item("Native") then
-                Helpers.create_starter_node(Constants.NODE_TYPE_NATIVE) -- Native
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_NATIVE) -- Native
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
             end
             if imgui.menu_item("Hook") then
-                Helpers.create_starter_node(Constants.NODE_TYPE_HOOK) -- Hook
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_HOOK) -- Hook
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Hook node to hook native functions")
@@ -132,20 +150,65 @@ function render_menu_bar()
             imgui.end_menu()
         end
         
-        -- Create Primitive button
-        if imgui.menu_item("+ Primitive") then
-            Helpers.create_starter_node(Constants.NODE_TYPE_PRIMITIVE) -- Primitive
-        end
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
+        -- Create Data dropdown menu
+        if imgui.begin_menu("+ Create Data  ▼") then
+            if imgui.menu_item("Primitive") then
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_PRIMITIVE) -- Primitive
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
+            end
+            
+            if imgui.menu_item("Enum") then
+                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_ENUM) -- Enum
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create an Enum node for enumerated values")
+            end
+            imgui.end_menu()
         end
         
-        -- Create Enum button
-        if imgui.menu_item("+ Enum") then
-            Helpers.create_starter_node(Constants.NODE_TYPE_ENUM) -- Enum
+        -- Create Operations dropdown menu
+        if imgui.begin_menu("+ Create Operations  ▼") then
+            if imgui.menu_item("Invert") then
+                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_INVERT) -- Invert
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create an Invert node that inverts boolean values")
+            end
+            
+            if imgui.menu_item("Math") then
+                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_MATH) -- Math
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Math node that performs mathematical operations on two numbers")
+            end
+            
+            if imgui.menu_item("Logic") then
+                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_LOGIC) -- Logic
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Logic node that performs boolean logic operations (AND/OR/NAND/NOR)")
+            end
+            
+            if imgui.menu_item("Compare") then
+                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_COMPARE) -- Compare
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Compare node that performs comparison operations (Equals/Not Equals/Greater/Less)")
+            end
+            imgui.end_menu()
         end
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Create an Enum node for enumerated values")
+        
+        -- Create Control dropdown menu
+        if imgui.begin_menu("+ Create Control  ▼") then
+            if imgui.menu_item("Select") then
+                Nodes.create_operations_node(Constants.NODE_CATEGORY_CONTROL, Constants.CONTROL_TYPE_SELECT) -- Select
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
+            end
+            imgui.end_menu()
         end
         
         imgui.end_menu_bar()
@@ -162,19 +225,113 @@ function render_node_editor()
     -- Add some styling for the node editor
     imgui.push_style_color(21, Constants.COLOR_BUTTON_NORMAL)
     imgui.push_style_color(22, Constants.COLOR_BUTTON_HOVER)
-    imnodes.push_color_style(1, Constants.COLOR_NODE_HOVER)
-    imnodes.push_color_style(2, Constants.COLOR_NODE_SELECTED)
+    imnodes.push_color_style(1, Constants.NODE_COLOR_DEFAULT_HOVER)
+    imnodes.push_color_style(2, Constants.NODE_COLOR_DEFAULT_SELECTED)
 
     imnodes.begin_node_editor()
     
     -- Set node width
-    imgui.push_item_width(State.NODE_WIDTH)
+    imgui.push_item_width(Constants.NODE_WIDTH)
     
-    -- Render all starter nodes
+    -- Create combined list of all nodes for unified rendering
+    local all_nodes_to_render = {}
+    
+    -- Add starter nodes
     for _, node in ipairs(State.starter_nodes) do
-        Nodes.render_starter_node(node)
+        table.insert(all_nodes_to_render, node)
+    end
+    
+    -- Add data nodes
+    for _, node in ipairs(State.data_nodes) do
+        table.insert(all_nodes_to_render, node)
+    end
+    
+    -- Add operation/follower/control nodes
+    for _, node in ipairs(State.all_nodes) do
+        table.insert(all_nodes_to_render, node)
+    end
+    
+    -- Unified rendering loop for all nodes
+    for _, node in ipairs(all_nodes_to_render) do
+        -- Render based on category
+        if node.category == Constants.NODE_CATEGORY_STARTER then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.STARTER_TYPE_MANAGED then
+                ManagedStarter.render(node)
+            elseif node.type == Constants.STARTER_TYPE_HOOK then
+                HookStarter.render(node)
+            elseif node.type == Constants.STARTER_TYPE_NATIVE then
+                NativeStarter.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+            
+        elseif node.category == Constants.NODE_CATEGORY_DATA then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.DATA_TYPE_ENUM then
+                EnumData.render(node)
+            elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
+                PrimitiveData.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+            
+        elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.FOLLOWER_TYPE_METHOD then
+                MethodFollower.render(node)
+            elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
+                FieldFollower.render(node)
+            elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
+                ArrayFollower.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+            
+        elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.OPERATIONS_TYPE_INVERT then
+                InvertOperation.render(node)
+            elseif node.type == Constants.OPERATIONS_TYPE_MATH then
+                MathOperation.render(node)
+            elseif node.type == Constants.OPERATIONS_TYPE_LOGIC then
+                LogicOperation.render(node)
+            elseif node.type == Constants.OPERATIONS_TYPE_COMPARE then
+                CompareOperation.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+            
+        elseif node.category == Constants.NODE_CATEGORY_CONTROL then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.CONTROL_TYPE_SELECT then
+                SelectControl.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+        end
         
-        -- Position the starter node if it hasn't been positioned yet
+        -- Unified positioning logic for all nodes
         if not State.nodes_positioned[node.node_id] then
             if node.position then
                 imnodes.set_node_editor_space_pos(node.node_id, node.position.x, node.position.y)
@@ -182,7 +339,7 @@ function render_node_editor()
             State.nodes_positioned[node.node_id] = true
         end
         
-        -- Update stored position for starter nodes
+        -- Update stored position for all nodes
         if not node.position then
             node.position = {}
         end
@@ -191,36 +348,13 @@ function render_node_editor()
         node.position.y = current_pos.y
     end
     
-    -- Render all operation nodes
-    for _, node in ipairs(State.all_nodes) do
-        if node.node_category == "operation" then
-            Nodes.render_operation_node(node)
-            
-            -- Position the node if it hasn't been positioned yet
-            if not State.nodes_positioned[node.node_id] then
-                if node.position then
-                    imnodes.set_node_editor_space_pos(node.node_id, node.position.x, node.position.y)
-                end
-                State.nodes_positioned[node.node_id] = true
-            end
-            
-            -- Update stored position
-            if not node.position then
-                node.position = {}
-            end
-            local current_pos = imnodes.get_node_editor_space_pos(node.node_id)
-            node.position.x = current_pos.x
-            node.position.y = current_pos.y
-        end
-    end
-    
     -- Pop node width
     imgui.pop_item_width()
     
     -- Render all links
     for _, link in ipairs(State.all_links) do
         -- Check if the target node is paused
-        local target_node = Helpers.get_node_by_id(link.to_node)
+        local target_node = Nodes.find_node_by_id(link.to_node)
         if target_node and target_node.is_paused then
             -- Render paused link in dark red
             imnodes.push_color_style(7, Constants.COLOR_DISABLED) -- Link color
@@ -243,7 +377,7 @@ function render_node_editor()
     -- Handle link creation
     local link_created, start_node_id, start_pin, end_node_id, end_pin = imnodes.is_link_created()
     if link_created then
-        Helpers.handle_link_created(start_pin, end_pin)
+        Nodes.handle_link_created(start_pin, end_pin)
     end
     
     -- Handle link destruction
@@ -251,24 +385,23 @@ function render_node_editor()
     
     if link_destroyed then
         log.debug("Link destroyed: " .. tostring(link_id))
-        Helpers.handle_link_destroyed(link_id)
+        Nodes.handle_link_destroyed(link_id)
     end
     
     -- Handle delete key for selected links
     if imgui.is_key_pressed(imgui.ImGuiKey.Key_Delete) then
         local selected_links = imnodes.get_selected_links()
         for _, link_id in ipairs(selected_links) do
-            -- Check if this link is connected to a title input attribute (main input pin)
-            local link = Helpers.get_link_by_id(link_id)
+            local link = Nodes.get_link_by_id(link_id)
             if link then
-                local to_node = Helpers.get_node_by_id(link.to_node)
-                if to_node and to_node.node_category == "operation" then
+                local to_node = Nodes.find_node_by_id(link.to_node)
+                if to_node and to_node.category == Constants.NODE_CATEGORY_FOLLOWER then
                     -- Check if the target pin is not the main input attribute (title input)
                     if link.to_pin ~= to_node.input_attr then
-                        Helpers.handle_link_destroyed(link_id)
+                        Nodes.handle_link_destroyed(link_id)
                     end
                 else
-                    Helpers.handle_link_destroyed(link_id)
+                    Nodes.handle_link_destroyed(link_id)
                 end
             end
         end
@@ -337,7 +470,7 @@ function render_load_menu()
             if config then
                 handle_load(config.path)
             else
-                re.msg("Error trying to load configuration @ index " .. (State.selected_config_index ))
+                Utils.show_error("Error trying to load configuration @ index " .. (State.selected_config_index ))
             end
         end
     else
@@ -351,7 +484,7 @@ end
 function handle_save(name, description)
     local success, error_msg = Config.save_configuration(name, description)
     if success then
-        Helpers.show_success("Configuration saved successfully")
+        Utils.show_info("Configuration saved successfully")
         State.save_description_input = "" -- Clear description
         -- Refresh config list after save
         State.available_configs = Config.scan_available_configs()
@@ -364,7 +497,7 @@ function handle_save(name, description)
         end
         -- Keep name for easy re-save
     else
-        Helpers.show_error(error_msg or "Failed to save configuration")
+        Utils.show_error(error_msg or "Failed to save configuration")
     end
 end
 
@@ -373,35 +506,57 @@ function handle_load(config_path)
     -- Extract and display the config name
     local config_name = Config.get_filename_without_extension(config_path)
     
-    if Helpers.has_unsaved_changes() then
-        Helpers.show_info("Loading '" .. config_name .. "' (unsaved changes will be lost)")
+    local function perform_load()
+        local success, error_msg = Config.load_configuration(config_path)
+        if success then
+            Utils.show_info("Configuration '" .. config_name .. "' loaded successfully")
+            State.available_configs = {} -- Reset to force re-scan next time
+        else
+            Utils.show_error(error_msg or "Failed to load configuration")
+        end
     end
     
-    local success, error_msg = Config.load_configuration(config_path)
-    if success then
-        Helpers.show_success("Configuration '" .. config_name .. "' loaded successfully")
-        State.available_configs = {} -- Reset to force re-scan next time
+    if State.has_unsaved_changes() then
+        Dialogs.show_confirmation(
+            "Load Configuration",
+            "Loading '" .. config_name .. "' will discard unsaved changes. Are you sure?",
+            perform_load
+        )
     else
-        Helpers.show_error(error_msg or "Failed to load configuration")
+        perform_load()
     end
 end
 
 -- Handle clear nodes
 function handle_clear_nodes()
-    if Helpers.get_node_count() == 0 then
+    if Nodes.get_node_count() == 0 then
         return
     end
     
-    if Helpers.has_unsaved_changes() then
-        Helpers.show_info("Clearing all nodes (unsaved changes will be lost)")
+    local function perform_clear()
+        Nodes.clear_all_nodes()
+        -- Reset node positioning state so nodes are repositioned after clear
+        for k in pairs(State.nodes_positioned) do
+            State.nodes_positioned[k] = nil
+        end
+        State.current_config_name = nil
+        State.mark_as_saved()
+        Utils.show_info("All nodes cleared")
     end
     
-    Helpers.clear_all_nodes()
-    -- Reset node positioning state so nodes are repositioned after clear
-    for k in pairs(State.nodes_positioned) do
-        State.nodes_positioned[k] = nil
+    if State.has_unsaved_changes() then
+        log.debug("Prompting confirmation to clear nodes with unsaved changes")
+        Dialogs.show_confirmation(
+            "Clear All Nodes",
+            "Are you sure you want to clear all nodes?\nUnsaved changes will be lost.",
+            function() log.debug("Clearing all nodes confirmed by user") perform_clear() end,
+            function() log.debug("Clear nodes cancelled by user") end
+        )
+    else
+        perform_clear()
     end
-    State.current_config_name = nil
-    Helpers.mark_as_saved()
-    Helpers.show_info("All nodes cleared")
+end
+
+function handle_context_menu()
+
 end

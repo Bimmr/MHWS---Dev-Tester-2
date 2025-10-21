@@ -2,7 +2,9 @@
 -- Save/Load functionality for node graphs
 
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Constants = require("DevTester2.Constants")
+local Utils = require("DevTester2.Utils")
 local json = json
 local fs = fs
 local sdk = sdk
@@ -23,7 +25,7 @@ end
 
 function Config.save_configuration(name, description)
     -- Validate name
-    if not Helpers.is_valid_filename(name) then
+    if not Config.is_valid_filename(name) then
         return false, "Invalid filename"
     end
     
@@ -44,7 +46,7 @@ function Config.save_configuration(name, description)
     
     if success then
         State.current_config_name = name
-        Helpers.mark_as_saved()
+        State.mark_as_saved()
         return true, nil
     else
         return false, "Failed to write file"
@@ -56,6 +58,11 @@ function Config.serialize_all_nodes()
     
     -- Serialize starter nodes
     for _, node in ipairs(State.starter_nodes) do
+        table.insert(nodes, Config.serialize_node(node))
+    end
+    
+    -- Serialize data nodes
+    for _, node in ipairs(State.data_nodes) do
         table.insert(nodes, Config.serialize_node(node))
     end
     
@@ -71,22 +78,23 @@ function Config.serialize_node(node)
     local data = {
         id = node.id,
         node_id = node.node_id,
-        node_category = node.node_category,
+        category = node.category,
         position = {x = node.position.x, y = node.position.y},
         input_attr = node.input_attr,
         output_attr = node.output_attr
     }
     
     -- Add type-specific data
-    if node.node_category == "starter" then
+    if node.category == Constants.NODE_CATEGORY_STARTER or node.category == Constants.NODE_CATEGORY_DATA then
+        data.category = node.category
         data.type = node.type
         data.path = node.path
         -- Parameter support for starters that need it (like Native)
         data.param_connections = node.param_connections
         data.param_input_attrs = node.param_input_attrs
         data.param_manual_values = node.param_manual_values
-        
-        if node.type == 2 then -- Hook
+
+        if node.type == Constants.STARTER_TYPE_HOOK then
             data.method_name = node.method_name
             data.selected_method_combo = node.selected_method_combo
             data.method_group_index = node.method_group_index
@@ -100,29 +108,51 @@ function Config.serialize_node(node)
             data.return_override_attr = node.return_override_attr
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
-        elseif node.type == 5 then -- Primitive
+        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_PRIMITIVE then
             data.value = node.value
+        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_ENUM then
+            data.selected_enum_index = node.selected_enum_index
+            data.enum_names = node.enum_names
+            data.enum_values = node.enum_values
         end
-    elseif node.node_category == "operation" then
+    elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
+        data.category = node.category
+        data.type = node.type
+        -- Operations nodes have input/output attributes
+        data.input_attr = node.input_attr
+        data.input1_attr = node.input1_attr  -- For math operations
+        data.input2_attr = node.input2_attr  -- For math operations
+        data.output_attr = node.output_attr
+        data.selected_operation = node.selected_operation  -- For math operations
+    elseif node.category == Constants.NODE_CATEGORY_CONTROL then
+        data.category = node.category
+        data.type = node.type
+        -- Control nodes have multiple input/output attributes
+        data.condition_attr = node.condition_attr
+        data.true_attr = node.true_attr
+        data.false_attr = node.false_attr
+        data.output_attr = node.output_attr
+    elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
+        data.category = node.category
+        data.type = node.type
         data.parent_node_id = node.parent_node_id
-        data.operation = node.operation
         data.action_type = node.action_type
-        
-        if node.operation == 0 then -- Method
+
+        if node.type == Constants.FOLLOWER_TYPE_METHOD then
             data.selected_method_combo = node.selected_method_combo
             data.method_group_index = node.method_group_index
             data.method_index = node.method_index
             if node.action_type == 1 and node.param_manual_values then -- Call
                 data.param_manual_values = node.param_manual_values
             end
-        elseif node.operation == 1 then -- Field
+        elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
             data.selected_field_combo = node.selected_field_combo
             data.field_group_index = node.field_group_index
             data.field_index = node.field_index
             if node.action_type == 1 and node.value_manual_input then -- Set
                 data.value_manual_input = node.value_manual_input
             end
-        elseif node.operation == 2 then -- Array
+        elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
             data.selected_element_index = node.selected_element_index
         end
     end
@@ -220,12 +250,12 @@ function Config.load_configuration(config_path)
     end
     
     -- Validate config data
-    if not Helpers.validate_config_data(config) then
+    if not Config.validate_config_data(config) then
         return false, "Invalid configuration file"
     end
     
     -- Clear existing nodes
-    Helpers.clear_all_nodes()
+    Nodes.clear_all_nodes()
     
     -- Restore ID counters from config BEFORE creating nodes
     State.next_node_id = config.next_node_id or 1
@@ -264,6 +294,16 @@ function Config.load_configuration(config_path)
                 end
             end
         end
+        -- Check control node pins
+        if node_data.condition_attr and node_data.condition_attr > max_pin_id then
+            max_pin_id = node_data.condition_attr
+        end
+        if node_data.true_attr and node_data.true_attr > max_pin_id then
+            max_pin_id = node_data.true_attr
+        end
+        if node_data.false_attr and node_data.false_attr > max_pin_id then
+            max_pin_id = node_data.false_attr
+        end
     end
     State.next_pin_id = max_pin_id + 1
     
@@ -273,23 +313,26 @@ function Config.load_configuration(config_path)
         local node = Config.deserialize_node(node_data)
         if node then
             -- Ensure all pin IDs exist for proper link restoration
-            Helpers.ensure_node_pin_ids(node)
+            Nodes.ensure_node_pin_ids(node)
             
             -- Special handling for operations: if the config data indicates this node should have an output
             -- (either from saved output_attr or from operation type), ensure it exists
-            if node.node_category == "operation" and not node.output_attr then
+            if node.category == Constants.NODE_CATEGORY_FOLLOWER and not node.output_attr then
                 -- Check if this operation type should have output
-                if node.operation == 0 or node.operation == 2 or (node.operation == 1 and node.action_type == 0) then
-                    node.output_attr = Helpers.next_pin_id()
+                if node.type == Constants.FOLLOWER_TYPE_METHOD or node.type == Constants.FOLLOWER_TYPE_ARRAY or (node.type == Constants.FOLLOWER_TYPE_FIELD and node.action_type == 0) then
+                    node.output_attr = State.next_pin_id()
                 end
             end
             
             node_map[node_data.id] = node
             -- Add node to appropriate state array
-            if node.node_category == "starter" then
+            if node.category == Constants.NODE_CATEGORY_STARTER or node.category == Constants.NODE_CATEGORY_DATA then
                 table.insert(State.starter_nodes, node)
                 State.node_map[node.node_id] = node  -- Add to hash map
-            elseif node.node_category == "operation" then
+            elseif node.category == Constants.NODE_CATEGORY_OPERATIONS or node.category == Constants.NODE_CATEGORY_CONTROL then
+                table.insert(State.all_nodes, node)
+                State.node_map[node.node_id] = node  -- Add to hash map
+            elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
                 table.insert(State.all_nodes, node)
                 State.node_map[node.node_id] = node  -- Add to hash map
             end
@@ -315,7 +358,7 @@ function Config.load_configuration(config_path)
     -- Update state
     State.current_config_name = config.name
     State.current_config_description = config.description or ""
-    Helpers.mark_as_saved()
+    State.mark_as_saved()
     
     return true, nil
 end
@@ -323,11 +366,11 @@ end
 function Config.deserialize_node(data)
     local node
     
-    if data.node_category == "starter" then
+    if data.category == Constants.NODE_CATEGORY_STARTER or data.category == Constants.NODE_CATEGORY_DATA then
         node = {
             id = data.id,
             node_id = data.node_id or data.id,
-            node_category = "starter",
+            category = data.category,
             type = data.type,
             path = data.path,
             position = data.position or {x = 0, y = 0},
@@ -354,23 +397,58 @@ function Config.deserialize_node(data)
             return_override_attr = data.return_override_attr,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
+            -- Enum-specific
+            selected_enum_index = data.selected_enum_index or 1,
+            enum_names = data.enum_names,
+            enum_values = data.enum_values,
             -- Value-specific
             value = data.value or ""
         }
         
         -- Validate and restore result
-        Helpers.validate_and_restore_starter_node(node)
+        Nodes.validate_and_restore_starter_node(node)
         
-    elseif data.node_category == "operation" then
+    elseif data.category == Constants.NODE_CATEGORY_OPERATIONS then
         node = {
             id = data.id,
             node_id = data.node_id or data.id,
-            node_category = "operation",
+            category = data.category,
+            type = data.type,
+            position = data.position or {x = 0, y = 0},
+            input_attr = data.input_attr,
+            input1_attr = data.input1_attr,  -- For math operations
+            input2_attr = data.input2_attr,  -- For math operations
+            output_attr = data.output_attr,
+            selected_operation = data.selected_operation or Constants.MATH_OPERATION_ADD,  -- For math operations
+            ending_value = nil,
+            status = nil
+        }
+        
+    elseif data.category == Constants.NODE_CATEGORY_CONTROL then
+        node = {
+            id = data.id,
+            node_id = data.node_id or data.id,
+            category = data.category,
+            type = data.type,
+            position = data.position or {x = 0, y = 0},
+            condition_attr = data.condition_attr,
+            true_attr = data.true_attr,
+            false_attr = data.false_attr,
+            output_attr = data.output_attr,
+            ending_value = nil,
+            status = nil
+        }
+        
+    elseif data.category == Constants.NODE_CATEGORY_FOLLOWER then
+        node = {
+            id = data.id,
+            node_id = data.node_id or data.id,
+            category = data.category,
+            type = data.type or Constants.FOLLOWER_TYPE_METHOD,
             position = data.position or {x = 0, y = 0},
             input_attr = data.input_attr,
             output_attr = data.output_attr,
             parent_node_id = data.parent_node_id,
-            operation = data.operation,
             action_type = data.action_type,
             -- Method-specific
             selected_method_combo = data.selected_method_combo or 1,
@@ -401,9 +479,11 @@ function Config.deserialize_node(data)
 end
 
 function Config.add_node_to_graph(node)
-    if node.node_category == "starter" then
+    if node.category == Constants.NODE_CATEGORY_STARTER then
         table.insert(State.starter_nodes, node)
-    elseif node.node_category == "operation" then
+    elseif node.category == Constants.NODE_CATEGORY_DATA then
+        table.insert(State.data_nodes, node)
+    elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
         table.insert(State.all_nodes, node)
     end
 end
@@ -413,13 +493,13 @@ function Config.deserialize_link(data, node_map)
     local to_node = node_map[data.to_node]
     
     if not from_node or not to_node then
-        Helpers.show_info("Skipping link: nodes not found")
+        Utils.show_info("Skipping link: nodes not found")
         return
     end
     
     -- Create link
     local link = {
-        id = Helpers.next_link_id(),
+        id = State.next_link_id(),
         connection_type = data.connection_type,
         from_node = from_node.id,
         from_pin = data.from_pin,
@@ -454,4 +534,27 @@ function Config.get_filename_without_extension(path)
     return name:match("(.+)%..+$") or name
 end
 
+-- ========================================
+-- Validation
+-- ========================================
+
+function Config.is_valid_filename(name)
+    if not name or name == "" then return false end
+    
+    -- Check for invalid characters
+    if name:match('[<>:"/\\|?*]') then return false end
+    
+    -- Check for path traversal
+    if name:match('%.%.') then return false end
+    
+    return true
+end
+
+function Config.validate_config_data(config)
+    if not config then return false end
+    if not config.name or config.name == "" then return false end
+    if not config.nodes or type(config.nodes) ~= "table" then return false end
+    if not config.links or type(config.links) ~= "table" then return false end
+    return true
+end
 return Config

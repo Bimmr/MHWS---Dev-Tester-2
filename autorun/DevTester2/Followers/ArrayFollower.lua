@@ -1,24 +1,25 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
-local BaseOperation = require("DevTester2.Nodes.BaseOperation")
+local BaseFollower = require("DevTester2.Followers.BaseFollower")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local ArrayOperation = {}
+local ArrayFollower = {}
 
 -- ========================================
--- Array Operation Node
+-- Array Follower Node
 -- ========================================
 
-function ArrayOperation.render(node)
-    local parent_value = BaseOperation.check_parent_connection(node)
+function ArrayFollower.render(node)
+    local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then return end
 
     -- Verify it's an array by trying to get size
-    if not Helpers.is_array(parent_value) then
-        Helpers.render_disconnected_operation_node(node, "type_error")
+    if not Utils.is_array(parent_value) then
+        Nodes.render_disconnected_operation_node(node, "type_error")
         return
     end
 
@@ -34,9 +35,9 @@ function ArrayOperation.render(node)
     end
 
     local custom_title = string.format("%s [%d]", parent_value:get_type_definition():get_full_name(), display_size)
-    BaseOperation.render_title_bar(node, nil, custom_title)
+    BaseFollower.render_title_bar(node, nil, custom_title)
 
-    BaseOperation.render_operation_dropdown(node, parent_value)
+    BaseFollower.render_operation_dropdown(node, parent_value)
 
     -- Array navigation
     imgui.spacing()
@@ -77,7 +78,7 @@ function ArrayOperation.render(node)
                     -- Try to get type name for objects
                     local type_success, type_info = pcall(function() return element:get_type_definition() end)
                     if type_success and type_info then
-                        value_name = Helpers.get_type_display_name(type_info)
+                        value_name = Utils.get_type_display_name(type_info)
                     else
                         value_name = "Object"
                     end
@@ -107,7 +108,7 @@ function ArrayOperation.render(node)
     if imgui.arrow_button("left", 0) then -- 0 = Left
         if node.selected_element_index > 0 then
             node.selected_element_index = node.selected_element_index - 1
-            Helpers.mark_as_modified()
+            State.mark_as_modified()
         end
     end
     if left_disabled then
@@ -120,7 +121,7 @@ function ArrayOperation.render(node)
     local dropdown_changed, new_selection = imgui.combo("Element", node.selected_element_index + 1, dropdown_options)
     if dropdown_changed then
         node.selected_element_index = new_selection - 1 -- Convert back to 0-based
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
     
     imgui.same_line()
@@ -133,7 +134,7 @@ function ArrayOperation.render(node)
     if imgui.arrow_button("right", 1) then -- 1 = Right
         if node.selected_element_index < array_size - 1 then
             node.selected_element_index = node.selected_element_index + 1
-            Helpers.mark_as_modified()
+            State.mark_as_modified()
         end
     end
     if right_disabled then
@@ -145,7 +146,7 @@ function ArrayOperation.render(node)
     imgui.spacing()
     
     -- Execute and show output
-    local result = ArrayOperation.execute(node, parent_value)
+    local result = ArrayFollower.execute(node, parent_value)
     
     -- Always store result, even if nil
     node.ending_value = result
@@ -161,21 +162,21 @@ function ArrayOperation.render(node)
         if success and result_type then
             local result_type_name = result_type:get_full_name()
             -- Try to unpause children if the type matches their expectations
-            -- Helpers.unpause_child_nodes(node, result_type_name)
+            -- Nodes.unpause_child_nodes(node, result_type_name)
         end
     end
     
-    BaseOperation.render_output_attribute(node, result, can_continue)
+    BaseFollower.render_output_attribute(node, result, can_continue)
     
     -- Action buttons
-    BaseOperation.render_action_buttons(node, type(node.ending_value) == "userdata")
+    BaseFollower.render_action_buttons(node, type(node.ending_value) == "userdata")
 
-    BaseOperation.render_debug_info(node)
+    BaseFollower.render_debug_info(node)
     
     imnodes.end_node()
 end
 
-function ArrayOperation.execute(node, parent_value)
+function ArrayFollower.execute(node, parent_value)
     if not parent_value then
         return nil
     end
@@ -213,4 +214,4 @@ function ArrayOperation.execute(node, parent_value)
     end
 end
 
-return ArrayOperation
+return ArrayFollower

@@ -1,11 +1,13 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
-local BaseStarter = require("DevTester2.Starters.BaseStarter")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
+local Constants = require("DevTester2.Constants")
+local BaseData = require("DevTester2.Datas.BaseData")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local EnumStarter = {}
+local EnumData = {}
 
 local function generate_enum(typename)
     local t = sdk.find_type_definition(typename)
@@ -30,11 +32,12 @@ local function generate_enum(typename)
     return enum
 end
 
-function EnumStarter.render(node)
+function EnumData.render(node)
+    
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
-    imgui.text("Enum Starter")
+    imgui.text("Enum Data")
     imnodes.end_node_titlebar()
 
     local path_changed, new_path = imgui.input_text("Path", node.path or "")
@@ -45,7 +48,7 @@ function EnumStarter.render(node)
         node.enum_values = nil
         node.enum_display_strings = nil
         node.sorted_to_original_index = nil
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
     end
     if node.path and node.path ~= "" then
         if not node.enum_names or not node.enum_values or not node.enum_display_strings then
@@ -96,17 +99,17 @@ function EnumStarter.render(node)
             local changed, new_index = imgui.combo("Value", node.selected_enum_index, node.enum_display_strings)
             if changed then
                 node.selected_enum_index = new_index
-                Helpers.mark_as_modified()
+                State.mark_as_modified()
             end
             if not node.output_attr then
-                node.output_attr = Helpers.next_pin_id()
+                node.output_attr = State.next_pin_id()
             end
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
             -- Get the original index for the selected sorted item
             local original_index = node.sorted_to_original_index[node.selected_enum_index]
             local display = node.enum_names[original_index] .. " = " .. tostring(node.enum_values[original_index])
-            local pos = Helpers.get_right_cursor_pos(node.node_id, display)
+            local pos = Utils.get_right_cursor_pos(node.node_id, display)
             imgui.set_cursor_pos(pos)
             imgui.text(display)
             imnodes.end_output_attribute()
@@ -119,9 +122,12 @@ function EnumStarter.render(node)
 
     imgui.spacing()
     
-    BaseStarter.render_action_buttons(node)
-    BaseStarter.render_debug_info(node)
+    BaseData.render_action_buttons(node)
+    BaseData.render_debug_info(node)
     imnodes.end_node()
+    
+    -- Reset appearance
+    Nodes.reset_node_titlebar_color()
 end
 
-return EnumStarter
+return EnumData

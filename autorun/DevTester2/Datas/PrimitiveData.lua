@@ -1,16 +1,19 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
-local BaseStarter = require("DevTester2.Starters.BaseStarter")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
+local Constants = require("DevTester2.Constants")
+local BaseData = require("DevTester2.Datas.BaseData")
 local imgui = imgui
 local imnodes = imnodes
 
-local ValueStarter = {}
+local PrimitiveData = {}
 
-function ValueStarter.render(node)
+function PrimitiveData.render(node)
+    
     imnodes.begin_node(node.node_id)
     
     imnodes.begin_node_titlebar()
-    imgui.text("Primitive Starter")
+    imgui.text("Primitive Data")
     imnodes.end_node_titlebar()
 
     -- Value input as text
@@ -20,9 +23,9 @@ function ValueStarter.render(node)
     local changed, new_value = imgui.input_text("Value", node.value)
     if changed then
         node.value = new_value
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
         -- Only update ending_value when value changes
-        node.ending_value = Helpers.parse_primitive_value(node.value)
+        node.ending_value = Utils.parse_primitive_value(node.value)
     end
 
     -- Create tooltip for output
@@ -40,12 +43,13 @@ function ValueStarter.render(node)
         tooltip_text = string.format("Primitive Value\nType: %s\nValue: %s", type_description, tostring(node.ending_value))
     end
 
-    BaseStarter.render_output_attribute(node, tostring(node.value), tooltip_text)
+    BaseData.render_output_attribute(node, tostring(node.value), tooltip_text)
 
-    BaseStarter.render_action_buttons(node)
-    BaseStarter.render_debug_info(node)
+    BaseData.render_action_buttons(node)
+    BaseData.render_debug_info(node)
 
     imnodes.end_node()
+    
 end
 
-return ValueStarter
+return PrimitiveData

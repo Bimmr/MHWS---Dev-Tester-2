@@ -1,38 +1,39 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
-local BaseOperation = require("DevTester2.Nodes.BaseOperation")
+local BaseFollower = require("DevTester2.Followers.BaseFollower")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local MethodOperation = {}
+local MethodFollower = {}
 
 -- ========================================
--- Method Operation Node
+-- Method Follower Node
 -- ========================================
 
-function MethodOperation.render(node)
-    local parent_value = BaseOperation.check_parent_connection(node)
+function MethodFollower.render(node)
+    local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then return end
 
-    local parent_type = BaseOperation.get_parent_type(parent_value)
+    local parent_type = BaseFollower.get_parent_type(parent_value)
     if not parent_type then
-        Helpers.render_disconnected_operation_node(node, "type_error")
+        Nodes.render_disconnected_operation_node(node, "type_error")
         return
     end
 
     imnodes.begin_node(node.node_id)
 
-    BaseOperation.render_title_bar(node, parent_type)
+    BaseFollower.render_title_bar(node, parent_type)
 
-    BaseOperation.render_operation_dropdown(node, parent_value)
+    BaseFollower.render_operation_dropdown(node, parent_value)
 
     -- Type dropdown (Run/Call)
-    BaseOperation.render_action_type_dropdown(node, {"Run", "Call"})
+    BaseFollower.render_action_type_dropdown(node, {"Run", "Call"})
 
     -- Method selection
-    local methods = Helpers.get_methods_for_combo(parent_type)
+    local methods = Nodes.get_methods_for_combo(parent_type)
     local returns_void = false  -- Declare at higher scope
     if #methods > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
@@ -40,7 +41,7 @@ function MethodOperation.render(node)
             node.selected_method_combo = 1
         end
 
-        local has_children = Helpers.has_children(node)
+        local has_children = Nodes.has_children(node)
         if has_children then
             imgui.begin_disabled()
         end
@@ -70,7 +71,7 @@ function MethodOperation.render(node)
 
             -- Check if selected method returns void, if so switch to Call mode
             if node.method_group_index and node.method_index then
-                local current_method = Helpers.get_method_by_group_and_index(parent_type,
+                local current_method = Nodes.get_method_by_group_and_index(parent_type,
                     node.method_group_index, node.method_index)
                 if current_method then
                     local success_return, return_type = pcall(function()
@@ -92,14 +93,14 @@ function MethodOperation.render(node)
                         -- Remove links for parameter pins beyond the new count
                         for i = new_param_count + 1, 100 do -- Arbitrary high number to cover old params
                             if node.param_input_attrs and node.param_input_attrs[i] then
-                                Helpers.remove_links_for_pin(node.param_input_attrs[i])
+                                Nodes.remove_links_for_pin(node.param_input_attrs[i])
                             end
                         end
                     else
                         -- No parameters, remove all param links
                         if node.param_input_attrs then
                             for i, pin_id in pairs(node.param_input_attrs) do
-                                Helpers.remove_links_for_pin(pin_id)
+                                Nodes.remove_links_for_pin(pin_id)
                             end
                         end
                     end
@@ -108,12 +109,12 @@ function MethodOperation.render(node)
                 -- No method selected, remove all param links
                 if node.param_input_attrs then
                     for i, pin_id in pairs(node.param_input_attrs) do
-                        Helpers.remove_links_for_pin(pin_id)
+                        Nodes.remove_links_for_pin(pin_id)
                     end
                 end
             end
 
-            Helpers.mark_as_modified()
+            State.mark_as_modified()
         end
         if has_children then
             imgui.end_disabled()
@@ -124,7 +125,7 @@ function MethodOperation.render(node)
         
         local selected_method = nil
         if node.method_group_index and node.method_index then
-            selected_method = Helpers.get_method_by_group_and_index(parent_type, 
+            selected_method = Nodes.get_method_by_group_and_index(parent_type, 
                 node.method_group_index, node.method_index)
         end
 
@@ -146,18 +147,18 @@ function MethodOperation.render(node)
                     local param_type_name = param_type:get_name()
                     
                     -- Parameter input pin
-                    local param_pin_id = Helpers.get_param_pin_id(node, i)
+                    local param_pin_id = Nodes.get_param_pin_id(node, i)
                     imnodes.begin_input_attribute(param_pin_id)
-                    local has_connection = Helpers.is_param_connected(node, i)
+                    local has_connection = Nodes.is_param_connected(node, i)
                     local label = string.format("Arg %d(%s)", i, param_type:get_name())
                     if has_connection then
-                        local connected_value = Helpers.get_connected_param_value(node, i)
+                        local connected_value = Nodes.get_connected_param_value(node, i)
                         -- Display simplified value without address
                         local display_value = "Object"
                         if type(connected_value) == "userdata" then
                             local success, type_info = pcall(function() return connected_value:get_type_definition() end)
                             if success and type_info then
-                                display_value = Helpers.get_type_display_name(type_info)
+                                display_value = Utils.get_type_display_name(type_info)
                             end
                         else
                             display_value = tostring(connected_value)
@@ -173,7 +174,7 @@ function MethodOperation.render(node)
                         local input_changed, new_value = imgui.input_text(label, node.param_manual_values[i])
                         if input_changed then
                             node.param_manual_values[i] = new_value
-                            Helpers.mark_as_modified()
+                            State.mark_as_modified()
                         end
                         if imgui.is_item_hovered() then
                             imgui.set_tooltip(param_type:get_full_name())
@@ -201,11 +202,11 @@ function MethodOperation.render(node)
         end
         
         if node.action_type == 0 then -- Run - auto execute
-            result = MethodOperation.execute(node, parent_value, selected_method)
+            result = MethodFollower.execute(node, parent_value, selected_method)
         elseif node.action_type == 1 then -- Call - manual button
             -- Show Call Method button
             if imgui.button("Call Method") then
-                result = MethodOperation.execute(node, parent_value, selected_method)
+                result = MethodFollower.execute(node, parent_value, selected_method)
                 node.last_call_time = os.clock()  -- Record call time with high precision
             else
                 -- Keep previous result if button not clicked
@@ -226,7 +227,7 @@ function MethodOperation.render(node)
             if success and result_type then
                 local result_type_name = result_type:get_full_name()
                 -- Try to unpause children if the type matches their expectations
-                -- Helpers.unpause_child_nodes(node, result_type_name)
+                -- Nodes.unpause_child_nodes(node, result_type_name)
             end
         end
         -- Create output attribute only if we should show the pin
@@ -234,7 +235,7 @@ function MethodOperation.render(node)
         
         if should_show_output_pin then
             if not node.output_attr then
-                node.output_attr = Helpers.next_pin_id()
+                node.output_attr = State.next_pin_id()
             end
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
@@ -254,7 +255,7 @@ function MethodOperation.render(node)
                 display_value = tostring(result)
             end
             local output_display = display_value .. " (?)"
-            local pos = Helpers.get_right_cursor_pos(node.node_id, output_display)
+            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -284,7 +285,7 @@ function MethodOperation.render(node)
                     time_since_call = string.format("%.1fs ago", elapsed)
                 end
                 local executed_text = "Executed | Last call: " .. time_since_call
-                local pos = Helpers.get_right_cursor_pos(node.node_id, executed_text)
+                local pos = Utils.get_right_cursor_pos(node.node_id, executed_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(executed_text)
                 if imgui.is_item_hovered() then
@@ -300,14 +301,14 @@ function MethodOperation.render(node)
             else
                 -- Show ready status for void methods that haven't been called
                 local ready_text = "Ready"
-                local pos = Helpers.get_right_cursor_pos(node.node_id, ready_text)
+                local pos = Utils.get_right_cursor_pos(node.node_id, ready_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(ready_text)
             end
         else
             -- Show nil state
             local output_text = "nil"
-            local pos = Helpers.get_right_cursor_pos(node.node_id, output_text)
+            local pos = Utils.get_right_cursor_pos(node.node_id, output_text)
             imgui.set_cursor_pos(pos)
             imgui.text(output_text)
         end
@@ -320,26 +321,26 @@ function MethodOperation.render(node)
     end
 
     -- Action buttons
-    BaseOperation.render_action_buttons(node, function(node) 
+    BaseFollower.render_action_buttons(node, function(node) 
         return type(node.ending_value) == "userdata" and not returns_void 
     end)
 
     -- Debug info
-    BaseOperation.render_debug_info(node)
+    BaseFollower.render_debug_info(node)
 
     imnodes.end_node()
 end
 
-function MethodOperation.execute(node, parent_value, selected_method)
+function MethodFollower.execute(node, parent_value, selected_method)
     if not selected_method then
         return nil
     end
 
     -- Resolve parameters
-    local params = MethodOperation.resolve_method_parameters(node, selected_method)
+    local params = MethodFollower.resolve_method_parameters(node, selected_method)
     if params and #params > 0 then
         -- Output all the params for debugging
-        log.debug(node.node_id.." MethodOperation: Executing method with params:".. json.dump_string(params))
+        log.debug(node.node_id.." MethodFollower: Executing method with params:".. json.dump_string(params))
     end
     -- Execute method based on type
     local success, result
@@ -362,7 +363,7 @@ function MethodOperation.execute(node, parent_value, selected_method)
     end
 end
 
-function MethodOperation.resolve_method_parameters(node, selected_method)
+function MethodFollower.resolve_method_parameters(node, selected_method)
     local params = {}
 
     -- Get method param types
@@ -373,16 +374,16 @@ function MethodOperation.resolve_method_parameters(node, selected_method)
 
     for i, param_type in ipairs(param_types) do
         -- Check if parameter is connected
-        if Helpers.is_param_connected(node, i) then
+        if Nodes.is_param_connected(node, i) then
             -- Use connected value
-            local connected_value = Helpers.get_connected_param_value(node, i)
+            local connected_value = Nodes.get_connected_param_value(node, i)
             table.insert(params, connected_value)
         else
             -- Use manual input
             local manual_value = node.param_manual_values[i] or ""
             if manual_value ~= "" then
                 -- Try to parse the value
-                local parsed_value = Helpers.parse_value_for_type(manual_value, param_type)
+                local parsed_value = Utils.parse_value_for_type(manual_value, param_type)
                 table.insert(params, parsed_value)
             else
                 -- Use nil as default
@@ -394,4 +395,4 @@ function MethodOperation.resolve_method_parameters(node, selected_method)
     return params
 end
 
-return MethodOperation
+return MethodFollower

@@ -1,5 +1,6 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local BaseStarter = require("DevTester2.Starters.BaseStarter")
 local Constants = require("DevTester2.Constants")
 local imgui = imgui
@@ -9,6 +10,7 @@ local sdk = sdk
 local ManagedStarter = {}
 
 function ManagedStarter.render(node)
+
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
@@ -16,14 +18,14 @@ function ManagedStarter.render(node)
     imnodes.end_node_titlebar()
 
     -- Path input - disable if node has children
-    local has_children = Helpers.has_children(node)
+    local has_children = Nodes.has_children(node)
     if has_children then
         imgui.begin_disabled()
     end
     local path_changed, new_path = imgui.input_text("Path", node.path)
     if path_changed then
         node.path = new_path
-        Helpers.mark_as_modified()
+        State.mark_as_modified()
         -- Only update ending_value when path changes
         if node.path and node.path ~= "" then
             local managed_obj = sdk.get_managed_singleton(node.path)
@@ -51,7 +53,7 @@ function ManagedStarter.render(node)
         local display_value = "Object"
         local type_info = node.ending_value:get_type_definition()
         if type_info then
-            display_value = Helpers.get_type_display_name(type_info)
+            display_value = Utils.get_type_display_name(type_info)
         end
 
         local tooltip_text = string.format(

@@ -5,9 +5,6 @@ local Constants = require("DevTester2.Constants")
 
 local State = {}
 
--- Constants
-State.NODE_WIDTH = Constants.NODE_WIDTH
-
 -- Window state
 State.window_open = false
 State.current_config_name = nil
@@ -16,8 +13,9 @@ State.is_modified = false
 
 -- Node storage
 State.all_nodes = {}
-State.all_links = {}
 State.starter_nodes = {}
+State.data_nodes = {}
+State.all_links = {}
 
 -- Hash maps for fast lookups
 State.node_map = {}  -- node_id -> node
@@ -28,9 +26,9 @@ State.type_cache = {}  -- type_full_name -> {methods = {...}, fields = {...}, la
 State.combo_cache = {}  -- cache_key -> combo_items
 
 -- ID counters
-State.next_node_id = 1
-State.next_link_id = 1
-State.next_pin_id = 1
+State.node_id_counter = 1
+State.link_id_counter = 1
+State.pin_id_counter = 1
 
 -- UI state
 State.show_save_menu = false
@@ -42,5 +40,73 @@ State.selected_config_index = 0
 
 -- Track which nodes have been positioned in the node editor (UI)
 State.nodes_positioned = {}
+
+-- ========================================
+-- State Management
+-- ========================================
+
+function State.mark_as_modified()
+    State.is_modified = true
+end
+
+function State.mark_as_saved()
+    State.is_modified = false
+end
+
+function State.has_unsaved_changes()
+    return State.is_modified
+end
+
+
+-- ========================================
+-- ID Generation
+-- ========================================
+
+function State.next_node_id()
+    local id = State.node_id_counter
+    State.node_id_counter = State.node_id_counter + 1
+    return id
+end
+
+function State.next_link_id()
+    local id = State.link_id_counter
+    State.link_id_counter = State.link_id_counter + 1
+    return id
+end
+
+function State.next_pin_id()
+    local id = State.pin_id_counter
+    State.pin_id_counter = State.pin_id_counter + 1
+    return id
+end
+
+-- ========================================
+-- Reset Functions
+-- ========================================
+function State.reset_nodes()
+    State.starter_nodes = {}
+    State.data_nodes = {}
+    State.all_nodes = {}
+end
+
+function State.reset_links()
+    State.all_links = {}
+end
+
+function State.reset_id_counters()
+    State.node_id_counter = 1
+    State.link_id_counter = 1
+    State.pin_id_counter = 1
+end
+
+function State.reset_maps()
+    State.node_map = {}
+    State.link_map = {}
+    State.pin_map = {}
+end
+
+function State.reset_positioning()
+    State.nodes_positioned = {}
+end
 
 return State

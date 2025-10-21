@@ -1,53 +1,54 @@
 local State = require("DevTester2.State")
-local Helpers = require("DevTester2.Helpers")
+local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
-local BaseOperation = require("DevTester2.Nodes.BaseOperation")
+local BaseFollower = require("DevTester2.Followers.BaseFollower")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local FieldOperation = {}
+local FieldFollower = {}
 
 -- ========================================
--- Field Operation Node
+-- Field Follower Node
 -- ========================================
 
-function FieldOperation.render(node)
-    local parent_value = BaseOperation.check_parent_connection(node)
+function FieldFollower.render(node)
+    local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then return end
 
-    local parent_type = BaseOperation.get_parent_type(parent_value)
+    local parent_type = BaseFollower.get_parent_type(parent_value)
     if not parent_type then
-        Helpers.render_disconnected_operation_node(node, "type_error")
+        Nodes.render_disconnected_operation_node(node, "type_error")
         return
     end
 
     imnodes.begin_node(node.node_id)
 
-    BaseOperation.render_title_bar(node, parent_type)
-    local has_children = Helpers.has_children(node)
+    BaseFollower.render_title_bar(node, parent_type)
+    local has_children = Nodes.has_children(node)
 
-    BaseOperation.render_operation_dropdown(node, parent_value)
+    BaseFollower.render_operation_dropdown(node, parent_value)
 
     -- Type dropdown (Get/Set)
-    local type_changed = BaseOperation.render_action_type_dropdown(node, {"Get", "Set"})
+    local type_changed = BaseFollower.render_action_type_dropdown(node, {"Get", "Set"})
     if type_changed then
         -- If switching to Get, disconnect value input links
         if node.action_type == 0 then
-            local value_pin = Helpers.get_field_value_pin_id(node)
-            Helpers.remove_links_for_pin(value_pin)
+            local value_pin = Nodes.get_field_value_pin_id(node)
+            Nodes.remove_links_for_pin(value_pin)
         end
     end
 
     -- Build field list
-    local fields = Helpers.get_fields_for_combo(parent_type)
+    local fields = Nodes.get_fields_for_combo(parent_type)
     if #fields > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
         if not node.selected_field_combo then
             node.selected_field_combo = 1
         end
         
-        local has_children = Helpers.has_children(node)
+        local has_children = Nodes.has_children(node)
         if has_children then
             imgui.begin_disabled()
         end
@@ -76,12 +77,12 @@ function FieldOperation.render(node)
             node.value_manual_input = "" -- Reset value
             
             -- Disconnect value input links since field type may have changed
-            local value_pin = Helpers.get_field_value_pin_id(node)
-            Helpers.remove_links_for_pin(value_pin)
+            local value_pin = Nodes.get_field_value_pin_id(node)
+            Nodes.remove_links_for_pin(value_pin)
             
             -- If we have a valid field selection, initialize manual input with current value
             if node.field_group_index and node.field_index then
-                local current_field = Helpers.get_field_by_group_and_index(parent_type, 
+                local current_field = Nodes.get_field_by_group_and_index(parent_type, 
                     node.field_group_index, node.field_index)
                 if current_field then
                     local success, current_value = pcall(function()
@@ -93,7 +94,7 @@ function FieldOperation.render(node)
                 end
             end
             
-            Helpers.mark_as_modified()
+            State.mark_as_modified()
         end
         if has_children then
             imgui.end_disabled()
@@ -104,7 +105,7 @@ function FieldOperation.render(node)
         
         local selected_field = nil
         if node.field_group_index and node.field_index then
-            selected_field = Helpers.get_field_by_group_and_index(parent_type, 
+            selected_field = Nodes.get_field_by_group_and_index(parent_type, 
                 node.field_group_index, node.field_index)
         end
         
@@ -113,11 +114,11 @@ function FieldOperation.render(node)
             imgui.spacing()
             local field_type = selected_field:get_type()
             -- Value input pin
-            local value_pin_id = Helpers.get_field_value_pin_id(node)
+            local value_pin_id = Nodes.get_field_value_pin_id(node)
             imnodes.begin_input_attribute(value_pin_id)
-            local has_connection = Helpers.is_field_value_connected(node)
+            local has_connection = Nodes.is_field_value_connected(node)
             if has_connection then
-                local connected_value = Helpers.get_connected_field_value(node)
+                local connected_value = Nodes.get_connected_field_value(node)
                 -- Display simplified value without address
                 local display_value = "Object"
                 if type(connected_value) == "userdata" then
@@ -139,7 +140,7 @@ function FieldOperation.render(node)
                 local input_changed, new_value = imgui.input_text("Value (" .. field_type:get_name() .. ")", node.value_manual_input)
                 if input_changed then
                     node.value_manual_input = new_value
-                    Helpers.mark_as_modified()
+                    State.mark_as_modified()
                 end
                 if imgui.is_item_hovered() then
                     imgui.set_tooltip(field_type:get_full_name())
@@ -151,14 +152,14 @@ function FieldOperation.render(node)
             local active_changed, new_active = imgui.checkbox("Active", node.set_active)
             if active_changed then
                 node.set_active = new_active
-                Helpers.mark_as_modified()
+                State.mark_as_modified()
             end
         end
         
         imgui.spacing()
         
         -- Execute and show output
-        local result = FieldOperation.execute(node, parent_value, selected_field)
+        local result = FieldFollower.execute(node, parent_value, selected_field)
         
         -- Always store result, even if nil
         node.ending_value = result
@@ -174,25 +175,25 @@ function FieldOperation.render(node)
             if success and result_type then
                 local result_type_name = result_type:get_full_name()
                 -- Try to unpause children if the type matches their expectations
-                -- Helpers.unpause_child_nodes(node, result_type_name)
+                -- Nodes.unpause_child_nodes(node, result_type_name)
             end
         end
         
-        BaseOperation.render_output_attribute(node, result, can_continue)
+        BaseFollower.render_output_attribute(node, result, can_continue)
     else
         imgui.text("No fields available")
     end
 
     -- Action buttons
-    BaseOperation.render_action_buttons(node, type(node.ending_value) == "userdata")
+    BaseFollower.render_action_buttons(node, type(node.ending_value) == "userdata")
 
     -- Debug info
-    BaseOperation.render_debug_info(node)
+    BaseFollower.render_debug_info(node)
 
     imnodes.end_node()
 end
 
-function FieldOperation.execute(node, parent_value, selected_field)
+function FieldFollower.execute(node, parent_value, selected_field)
     if not selected_field then
         return nil
     end
@@ -218,7 +219,7 @@ function FieldOperation.execute(node, parent_value, selected_field)
                 for _, link in ipairs(State.all_links) do
                     if link.to_pin == node.value_input_attr then
                         -- Find the source node
-                        local source_node = Helpers.find_node_by_id(link.from_node)
+                        local source_node = Nodes.find_node_by_id(link.from_node)
                         if source_node and source_node.ending_value ~= nil then
                             set_value = source_node.ending_value
                             break
@@ -231,7 +232,7 @@ function FieldOperation.execute(node, parent_value, selected_field)
             if set_value == nil then
                 local manual_input = node.value_manual_input or ""
                 if manual_input ~= "" then
-                    set_value = Helpers.parse_primitive_value(manual_input)
+                    set_value = Utils.parse_primitive_value(manual_input)
                 else
                     -- Use current field value
                     set_value = selected_field:get_data(parent_value)
@@ -256,4 +257,4 @@ function FieldOperation.execute(node, parent_value, selected_field)
     end
 end
 
-return FieldOperation
+return FieldFollower
