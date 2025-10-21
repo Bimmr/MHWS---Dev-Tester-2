@@ -36,8 +36,8 @@ function Config.save_configuration(name, description)
         saved_date = os.date("%Y-%m-%d %H:%M:%S"),
         nodes = Config.serialize_all_nodes(),
         links = Config.serialize_all_links(),
-        next_node_id = State.next_node_id,
-        next_link_id = State.next_link_id
+        node_id_counter = State.node_id_counter,
+        link_id_counter = State.link_id_counter
     }
     
     -- Save using REFramework's json.dump_file
@@ -258,9 +258,9 @@ function Config.load_configuration(config_path)
     Nodes.clear_all_nodes()
     
     -- Restore ID counters from config BEFORE creating nodes
-    State.next_node_id = config.next_node_id or 1
-    State.next_link_id = config.next_link_id or 1
-    
+    State.node_id_counter = config.node_id_counter or 1
+    State.link_id_counter = config.link_id_counter or 1
+
     -- Calculate the correct next pin ID value based on the highest pin ID used in the config
     local max_pin_id = 0
     for _, node_data in ipairs(config.nodes or {}) do
@@ -305,7 +305,7 @@ function Config.load_configuration(config_path)
             max_pin_id = node_data.false_attr
         end
     end
-    State.next_pin_id = max_pin_id + 1
+    State.pin_id_counter = max_pin_id + 1
     
     -- Deserialize nodes
     local node_map = {} -- Map old IDs to new node instances
