@@ -191,46 +191,48 @@ function Config.scan_available_configs()
     local configs = {}
     for _, file_path in ipairs(files) do
         local name = Config.get_filename_without_extension(file_path)
-        
-        -- Load the JSON file to get the description
-        local description = ""
-        local success, config_data = pcall(function() 
-            return json.load_file(file_path) 
-        end)
-        if success and config_data and config_data.description then
-            description = config_data.description
-        end
-        
-        -- Line wrap description at 60 chars, only at spaces
-        local function wrap_text_space(text, max_len)
-            local out = ""
-            local line = ""
-            for word in text:gmatch("%S+") do
-                if #line + #word + 1 > max_len then
-                    out = out .. line .. "\n"
-                    line = word
-                else
-                    if #line > 0 then
-                        line = line .. " " .. word
-                    else
+        if name ~= "Data" then
+
+            -- Load the JSON file to get the description
+            local description = ""
+            local success, config_data = pcall(function() 
+                return json.load_file(file_path) 
+            end)
+            if success and config_data and config_data.description then
+                description = config_data.description
+            end
+            
+            -- Line wrap description at 60 chars, only at spaces
+            local function wrap_text_space(text, max_len)
+                local out = ""
+                local line = ""
+                for word in text:gmatch("%S+") do
+                    if #line + #word + 1 > max_len then
+                        out = out .. line .. "\n"
                         line = word
+                    else
+                        if #line > 0 then
+                            line = line .. " " .. word
+                        else
+                            line = word
+                        end
                     end
                 end
+                if #line > 0 then
+                    out = out .. line
+                end
+                return out
             end
-            if #line > 0 then
-                out = out .. line
-            end
-            return out
+            local wrapped_desc = wrap_text_space(description, 60)
+            -- Format display with title, newline, wrapped description, and 2 newlines
+            local display = name .. "\n" .. wrapped_desc .. "\n\n"
+            
+            table.insert(configs, {
+                name = name,
+                path = file_path,
+                display = display
+            })
         end
-        local wrapped_desc = wrap_text_space(description, 60)
-        -- Format display with title, newline, wrapped description, and 2 newlines
-        local display = name .. "\n" .. wrapped_desc .. "\n\n"
-        
-        table.insert(configs, {
-            name = name,
-            path = file_path,
-            display = display
-        })
     end
     
     -- Sort alphabetically
