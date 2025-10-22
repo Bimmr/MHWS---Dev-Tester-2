@@ -138,7 +138,7 @@ function EnumData.execute(node)
        node.sorted_to_original_index and node.selected_enum_index <= #node.sorted_to_original_index then
         local original_index = node.sorted_to_original_index[node.selected_enum_index]
         if original_index and node.enum_names[original_index] then
-            node.ending_value = node.enum_names[original_index]  -- Output enum name instead of value
+            node.ending_value = node.enum_values[original_index]  -- Output enum value instead of name
         else
             node.ending_value = nil
         end
