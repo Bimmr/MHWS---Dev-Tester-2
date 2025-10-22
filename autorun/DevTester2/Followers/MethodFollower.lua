@@ -276,7 +276,22 @@ function MethodFollower.render(node)
             end
         elseif returns_void then
             -- For void methods, show execution status
-            if node.last_call_time then
+            if node.action_type == 0 then -- Run mode - always executing
+                local executing_text = "Executing"
+                local pos = Utils.get_right_cursor_pos(node.node_id, executing_text)
+                imgui.set_cursor_pos(pos)
+                imgui.text(executing_text)
+                if imgui.is_item_hovered() then
+                    -- Show tooltip with method info
+                    local method_name = selected_method:get_name()
+                    local return_type_name = "void"
+                    local tooltip_text = string.format(
+                        "Method: %s\nReturn Type: %s\nStatus: Executing (Run mode)",
+                        method_name, return_type_name
+                    )
+                    imgui.set_tooltip(tooltip_text)
+                end
+            elseif node.last_call_time then
                 local elapsed = os.clock() - node.last_call_time
                 local time_since_call
                 if elapsed < 1 then
