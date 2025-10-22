@@ -72,7 +72,7 @@ re.on_draw_ui(function()
     imgui.push_id("DevTester2")
 
     -- Main window
-    imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 0.9) -- Window transparency
+    imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 0.75) -- Window transparency
     imgui.push_style_var(imgui.ImGuiStyleVar.WindowRounding, Constants.WINDOW_ROUNDING) -- Window rounded corners
     imgui.push_style_var(imgui.ImGuiStyleVar.FrameRounding, Constants.FRAME_ROUNDING) -- Frame rounded corners
     imgui.push_style_var(imgui.ImGuiStyleVar.FramePadding, Constants.FRAME_PADDING) -- Frame padding
@@ -91,8 +91,11 @@ re.on_draw_ui(function()
     end
     
     if State.window_open then
+        
+        imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 0.9) -- Window transparency
         -- Menu bar
         render_menu_bar()
+        imgui.pop_style_var()
         
         -- ImNode editor
         render_node_editor()
@@ -251,6 +254,8 @@ function render_node_editor()
     imgui.push_style_color(22, Constants.COLOR_BUTTON_HOVER)
     imnodes.push_color_style(1, Constants.NODE_COLOR_DEFAULT_HOVER)
     imnodes.push_color_style(2, Constants.NODE_COLOR_DEFAULT_SELECTED)
+    
+    imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 1) -- Node transparency
 
     imnodes.begin_node_editor()
     
@@ -391,6 +396,8 @@ function render_node_editor()
             imnodes.link(link.id, link.from_pin, link.to_pin)
         end
     end
+
+    imgui.pop_style_var()
     
     imnodes.minimap(Constants.MINIMAP_SIZE, Constants.MINIMAP_POSITION) -- Size and position
     
