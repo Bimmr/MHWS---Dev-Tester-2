@@ -57,7 +57,7 @@ function VariableData.render(node)
             elseif value_type == "string" then
                 type_description = "String"
             end
-            tooltip_text = string.format("Variable Value\nName: %s\nType: %s\nValue: %s",
+            tooltip_text = string.format("Name: %s\nType: %s\nValue: %s",
                 node.variable_name or "None",
                 type_description,
                 tostring(current_value))
@@ -140,7 +140,10 @@ function VariableData.render(node)
             display_value = tostring(connected_node.ending_value)
         end
         imgui.begin_disabled()
-        imgui.input_text("Value", display_value)
+        imgui.input_text("Value", display_value) 
+        if imgui.is_item_hovered(1024) and tooltip_text then
+            imgui.set_tooltip(tooltip_text)
+        end
         imgui.end_disabled()
         
         imnodes.end_input_attribute()
