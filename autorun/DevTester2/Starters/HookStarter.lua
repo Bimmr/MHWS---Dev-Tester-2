@@ -216,12 +216,12 @@ function HookStarter.render(node)
                         if success and type_info then
                             local address = string.format("0x%X", node.ending_value:get_address())
                             local tooltip_text = string.format(
-                                "Hooked object instance (this)\nType: %s\nAddress: %s",
+                                "Type: %s\nAddress: %s",
                                 type_info:get_full_name(), address
                             )
                             imgui.set_tooltip(tooltip_text)
                         else
-                            imgui.set_tooltip("Hooked object instance (this)\n(ValueType or native pointer)")
+                            imgui.set_tooltip("(ValueType or native pointer)")
                         end
                     else
                         imgui.set_tooltip("Return value: " .. tostring(node.ending_value))
@@ -313,76 +313,41 @@ function HookStarter.render(node)
             imgui.same_line()
             imgui.text("(?)")
             if imgui.is_item_hovered() then
-                local tooltip_text
-                if node.is_return_overridden then
-                    tooltip_text = "Method return value (OVERRIDDEN)"
-                    if type(node.return_value) == "userdata" then
-                        local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
+                -- Build consistent tooltip format
+                local tooltip_text = string.format("Type: %s", node.return_type_full_name or node.return_type_name)
+                
+                -- Always show the original value if available
+                if node.actual_return_value ~= nil then
+                    if type(node.actual_return_value) == "userdata" then
+                        local success, type_info = pcall(function() return node.actual_return_value:get_type_definition() end)
                         if success and type_info then
-                            local address = string.format("0x%X", node.return_value:get_address())
-                            tooltip_text = string.format(
-                                "Method return value (OVERRIDDEN)\nOverride Type: %s\nOverride Address: %s",
-                                type_info:get_full_name(), address
-                            )
+                            local address = string.format("0x%X", node.actual_return_value:get_address())
+                            tooltip_text = tooltip_text .. string.format("\nValue: %s @ %s", type_info:get_name(), address)
                         else
-                            tooltip_text = string.format(
-                                "Method return value (OVERRIDDEN)\nOverride Type: %s\n(ValueType or native pointer)",
-                                node.return_type_full_name or node.return_type_name
-                            )
+                            tooltip_text = tooltip_text .. "\nValue: (ValueType or native pointer)"
                         end
                     else
-                        tooltip_text = string.format(
-                            "Method return value (OVERRIDDEN)\nOverride Type: %s\nOverride Value: %s",
-                            node.return_type_full_name or node.return_type_name, tostring(node.return_value)
-                        )
-                    end
-                    
-                    -- Add actual return value info
-                    if node.actual_return_value ~= nil then
-                        if type(node.actual_return_value) == "userdata" then
-                            local success, type_info = pcall(function() return node.actual_return_value:get_type_definition() end)
-                            if success and type_info then
-                                local actual_address = string.format("0x%X", node.actual_return_value:get_address())
-                                tooltip_text = tooltip_text .. string.format(
-                                    "\n\nActual return value:\nType: %s\nAddress: %s",
-                                    type_info:get_full_name(), actual_address
-                                )
-                            else
-                                tooltip_text = tooltip_text .. string.format(
-                                    "\n\nActual return value:\nType: %s\n(ValueType or native pointer)",
-                                    node.return_type_full_name or node.return_type_name
-                                )
-                            end
-                        else
-                            tooltip_text = tooltip_text .. string.format(
-                                "\n\nActual return value:\nType: %s\nValue: %s",
-                                node.return_type_full_name or node.return_type_name, tostring(node.actual_return_value)
-                            )
-                        end
+                        tooltip_text = tooltip_text .. string.format("\nValue: %s", tostring(node.actual_return_value))
                     end
                 else
-                    tooltip_text = "Method return value"
+                    tooltip_text = tooltip_text .. "\nValue: (not yet called)"
+                end
+                
+                -- Show override value only if overridden
+                if node.is_return_overridden then
                     if type(node.return_value) == "userdata" then
                         local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
                         if success and type_info then
                             local address = string.format("0x%X", node.return_value:get_address())
-                            tooltip_text = string.format(
-                                "Method return value\nType: %s\nAddress: %s",
-                                type_info:get_full_name(), address
-                            )
+                            tooltip_text = tooltip_text .. string.format("\nOverride Value: %s @ %s", type_info:get_name(), address)
                         else
-                            tooltip_text = string.format(
-                                "Method return value\nType: %s\n(ValueType or native pointer)",
-                                node.return_type_full_name or node.return_type_name
-                            )
+                            tooltip_text = tooltip_text .. "\nOverride Value: (ValueType or native pointer)"
                         end
                     else
-                        tooltip_text = string.format(
-                            "Method return value\nType: %s\nValue: %s",
-                            node.return_type_full_name or node.return_type_name, tostring(node.return_value)
-                        )
+                        tooltip_text = tooltip_text .. string.format("\nOverride Value: %s", tostring(node.return_value))
                     end
                 end
+                
                 imgui.set_tooltip(tooltip_text)
             end
             
@@ -488,7 +453,7 @@ function HookStarter.initialize_hook(node)
             
             if override_value ~= nil then
                 node.status = "Hook: Post-hook called (return overridden)"
-                node.return_value = convert_ptr(override_value, node.retval_vtypename)
+                node.return_value = override_value  -- Use the parsed override value directly
                 node.is_return_overridden = true
                 return sdk.to_ptr(override_value)
             else
