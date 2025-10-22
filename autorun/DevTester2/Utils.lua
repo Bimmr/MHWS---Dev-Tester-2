@@ -1,4 +1,5 @@
 local Constants = require("DevTester2.Constants")
+local State = require("DevTester2.State")
 
 local imgui = imgui
 local imnodes = imnodes
@@ -6,7 +7,6 @@ local re = re
 
 
 local Utils = {}
-
 
 -- ========================================
 -- imGUI Cursor alignment Helpers
@@ -255,6 +255,212 @@ function Utils.parse_value_for_type(text_value, param_type)
         -- For unknown types, try primitive parsing
         return Utils.parse_primitive_value(text_value)
     end
+end
+
+-- ========================================
+-- UI Components
+-- ========================================
+
+function Utils.hybrid_combo(label, current_index, items)
+    -- Hybrid combo that combines input_text with popup window
+    -- Returns: changed (boolean), new_index (number)
+    -- API matches imgui.combo exactly
+
+    if not items or #items == 0 then
+        return false, current_index
+    end
+
+    -- Ensure current_index is valid (allow 0 for empty state)
+    if not current_index or current_index < 0 or current_index > #items then
+        current_index = 0
+    end
+
+    local current_text = ""
+    if current_index > 0 and current_index <= #items then
+        current_text = items[current_index] or ""
+    end
+
+    local changed = false
+    local new_index = current_index
+
+    -- Push unique ID for this combo to avoid conflicts
+    imgui.push_id("hybrid-"..label)
+
+    -- Create unique ID for the popup (relative to the pushed ID)
+    local popup_id = "hybrid-"..label
+
+    -- Initialize persistent filter storage for this combo (separate from selected text)
+    if not State.hybrid_combo_text[label] then
+        State.hybrid_combo_text[label] = ""
+    end
+
+    -- Input text field shows selected item (read-only display)
+    local cursor_pos = imgui.get_cursor_pos()
+    imgui.set_next_item_width(imgui.calc_item_width()-imgui.calc_text_size("▼").x-5)
+    local input_changed, new_text = imgui.input_text("##"..label, current_text, 128) -- Read-only flag
+
+    -- Calculate popup width based on input field
+    local input_width = imgui.calc_item_width()
+    local label_width = imgui.calc_text_size(label).x
+    local popup_width = input_width + label_width + 10
+
+    -- Check if popup should open from input field
+    local should_open_popup = false
+    if imgui.is_item_active() then
+        should_open_popup = true
+    end
+
+    -- Clear filter text when popup opens
+    local popup_was_open = imgui.is_popup_open(popup_id)
+    if should_open_popup and not popup_was_open then
+        State.hybrid_combo_text[label] = ""
+    end
+
+    -- Position arrow button next to input text
+    imgui.same_line()
+    cursor_pos.x = cursor_pos.x + imgui.calc_item_width() - imgui.calc_text_size("▼").x -5
+    imgui.set_cursor_pos(cursor_pos)
+
+    -- Draw arrow button
+    local popup_open = imgui.is_popup_open(popup_id)
+    local arrow_clicked = imgui.arrow_button("arrow", 3) 
+
+    imgui.same_line()
+    local pos = imgui.get_cursor_pos()
+    imgui.set_cursor_pos(Vector2f.new(pos.x - 2, pos.y))
+    imgui.text(label)
+
+    -- Handle popup opening/closing from arrow button
+    if arrow_clicked then
+        if popup_open then
+            imgui.close_current_popup()
+            should_open_popup = false
+        else
+            should_open_popup = true
+        end
+    end
+
+    -- -- Position popup relative to input field
+    local cursor_pos = imgui.get_cursor_screen_pos()
+    imgui.set_next_window_pos(Vector2f.new(cursor_pos.x, cursor_pos.y), 1, nil)
+
+    -- -- Set popup size constraints
+    local popup_height = math.min(200, #items * 20 + 40) -- Item height + padding for filter
+    imgui.set_next_window_size(Vector2f.new(popup_width, popup_height), nil)
+
+    -- Popup window with styled buttons
+    if imgui.begin_popup_context_item(popup_id, 4096) then
+        -- Create table with scrollable body and fixed header
+        imgui.begin_table("combo_table_"..label, 1, imgui.TableFlags.ScrollY)
+
+        -- Setup column with no visible header
+        imgui.table_setup_column("Search", 16 + 4096, popup_width - 20)
+        imgui.table_setup_scroll_freeze(0, 1)
+        imgui.table_next_row(2) -- 2 = ImGuiTableRowFlags_Headers
+        imgui.table_set_column_index(0)
+
+        -- Filter input in header
+        imgui.push_style_var(imgui.ImGuiStyleVar.FramePadding, Vector2f.new(10, 5))
+        local filter_pos = imgui.get_cursor_pos()
+        imgui.set_next_item_width(popup_width ) -- Fill column
+        local filter_changed, filter_text = imgui.input_text("##Filter", State.hybrid_combo_text[label])
+        if filter_text == nil or filter_text == "" and not imgui.is_item_active() then
+            imgui.set_cursor_pos(Vector2f.new(filter_pos.x + 10, filter_pos.y + 5))
+            imgui.text_colored("Enter text to Filter...", 0xAA888888)
+        end
+        if filter_changed then
+            State.hybrid_combo_text[label] = filter_text
+        end
+        imgui.pop_style_var()
+
+
+        -- Apply button styling
+        imgui.push_style_var(imgui.ImGuiStyleVar.FramePadding, Vector2f.new(3, 0))
+        imgui.push_style_var(imgui.ImGuiStyleVar.ItemSpacing, Vector2f.new(0, 0))
+        imgui.push_style_var(imgui.ImGuiStyleVar.CellPadding, Vector2f.new(0, 1))
+        imgui.push_style_var(imgui.ImGuiStyleVar.ItemInnerSpacing, Vector2f.new(0, 0))
+        imgui.push_style_var(imgui.ImGuiStyleVar.ButtonTextAlign, Vector2f.new(0, 0.5))
+        imgui.push_style_var(imgui.ImGuiStyleVar.FrameRounding, 0.0)
+
+        imgui.push_style_color(21, 0x00714A29) -- Button color
+        imgui.push_style_color(22, 0xFF5c5c5c) -- Button hover color
+
+        for i, item in ipairs(items) do
+            if item ~= "" then
+                -- Filter items based on current input text (case-insensitive)
+                -- Section titles (containing \n) are always shown
+                local show_item = true
+                if filter_text and filter_text ~= "" then
+                    -- Always show section titles (items containing \n)
+                    if item:find("\n") then
+                        show_item = true
+                    else
+                        local item_lower = item:lower()
+                        local text_lower = filter_text:lower()
+                        show_item = item_lower:find(text_lower, 1, true) ~= nil
+                    end
+                end
+
+                if show_item then
+
+                    
+                    imgui.table_next_row()
+                    imgui.table_set_column_index(0)
+
+                    -- Push ID for each button to ensure uniqueness
+                    imgui.push_id(i)
+
+                    -- Highlight current selection by changing button color
+                    if i == current_index then
+                        imgui.push_style_color(21, 0xFF5c5c5c) -- Selection hover color
+                    end
+
+                    -- Create button for each item
+                    local button_height = imgui.calc_text_size(item).y + 4 -- Small padding
+                    if imgui.button(item, Vector2f.new(popup_width, button_height)) then
+                        new_index = i
+                        changed = true
+                        imgui.close_current_popup()
+                    end
+
+                    -- Add tooltip for items that are wider than popup
+                    local item_width = imgui.calc_text_size(item).x
+                    if item_width > (popup_width - 40) and imgui.is_item_hovered() then
+                        imgui.begin_tooltip()
+                        imgui.text(item)
+                        imgui.end_tooltip()
+                    end
+
+                    -- Pop the selection color if it was pushed
+                    if i == current_index then
+                        imgui.pop_style_color()
+                    end
+
+                    imgui.pop_id() -- Pop button ID
+                end
+            end
+        end
+
+        -- Pop the styling
+        imgui.pop_style_color(2)
+        imgui.pop_style_var(6)
+
+        imgui.end_table()
+        -- set whole table background to
+        imgui.table_set_bg_color(0, 0x00714A29, 0)
+
+
+        imgui.end_popup()
+    end
+
+     -- Open popup if needed
+    if should_open_popup then
+        imgui.open_popup(popup_id)
+    end
+
+    imgui.pop_id() -- Pop combo ID
+
+    return changed, new_index
 end
 
 return Utils

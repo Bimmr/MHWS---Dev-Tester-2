@@ -56,7 +56,7 @@ function NativeStarter.render(node)
                 if has_children then
                     imgui.begin_disabled()
                 end
-                local method_changed, new_combo_index = imgui.combo("Method", 
+                local method_changed, new_combo_index = Utils.hybrid_combo("Method", 
                     node.selected_method_combo, methods)
                 if method_changed then
                     node.selected_method_combo = new_combo_index

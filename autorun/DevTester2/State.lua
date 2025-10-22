@@ -44,6 +44,10 @@ State.save_description_input = ""
 State.available_configs = {}
 State.selected_config_index = 0
 
+
+-- Storage for hybrid combo text
+State.hybrid_combo_text = {}
+
 -- Track which nodes have been positioned in the node editor (UI)
 State.nodes_positioned = {}
 

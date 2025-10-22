@@ -52,7 +52,7 @@ function FieldFollower.render(node)
         if has_children then
             imgui.begin_disabled()
         end
-        local field_changed, new_combo_index = imgui.combo("Fields", 
+        local field_changed, new_combo_index = Utils.hybrid_combo("Fields", 
             node.selected_field_combo, fields)
         if field_changed then
             node.selected_field_combo = new_combo_index
