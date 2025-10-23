@@ -29,7 +29,6 @@ function Dialogs.render()
        imgui.open_popup("dev_confirmation", 64)
     end
     if imgui.begin_popup_context_item("dev_confirmation") then
-        log.debug("Showing confirmation popup")
         imgui.text_colored(Dialogs.confirmation.title, Constants.COLOR_TEXT_ERROR)
         imgui.spacing()
        
