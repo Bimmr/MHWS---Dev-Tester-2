@@ -1,3 +1,17 @@
+-- ArrayFollower Node Properties:
+-- This node accesses elements of array/collection objects by index.
+-- The following properties define the state and configuration of an ArrayFollower node:
+--
+-- Array Navigation:
+-- - selected_element_index: Number - Index of the currently selected array element (0-based)
+-- - index_manual_value: String - Manual text input for the array index
+-- - index_input_attr: Number - Pin ID for the index input attribute (for connected index values)
+--
+-- Runtime Values:
+-- - ending_value: Any - The value of the selected array element
+--
+-- Inherits all BaseFollower properties (input_attr, output_attr, type, status, etc.)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
@@ -198,6 +212,9 @@ function ArrayFollower.render(node)
     
     -- Always store result, even if nil
     node.ending_value = result
+    if result and result:get_type_definition() then
+        node.ending_value_full_name = result:get_type_definition():get_full_name()
+    end
     
     -- Check if result is userdata (can continue to child nodes)
     local can_continue = type(result) == "userdata"

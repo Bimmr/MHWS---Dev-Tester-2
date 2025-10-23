@@ -1,6 +1,31 @@
 -- DevTester v2.0 - Select Control
 -- Control node that selects between two values based on a condition
 
+-- SelectControl Node Properties:
+-- This node selects between two values based on a boolean condition.
+-- The following properties define the state and configuration of a SelectControl node:
+--
+-- Input/Output Pins:
+-- - condition_attr: Number - Pin ID for the condition input attribute (boolean)
+-- - true_attr: Number - Pin ID for the "true" value input attribute
+-- - false_attr: Number - Pin ID for the "false" value input attribute
+-- - output_attr: Number - Pin ID for the output attribute (provides selected result)
+--
+-- Input Connections:
+-- - condition_connection: NodeID - ID of the node connected to condition input
+-- - true_connection: NodeID - ID of the node connected to true value input
+-- - false_connection: NodeID - ID of the node connected to false value input
+--
+-- Manual Input Values:
+-- - condition_manual_value: String - Manual text input for condition when not connected
+-- - true_manual_value: String - Manual text input for true value when not connected
+-- - false_manual_value: String - Manual text input for false value when not connected
+--
+-- Runtime Values:
+-- - ending_value: Any - The selected value (true_value if condition is true, false_value if false)
+--
+-- Inherits status property from BaseControl for debugging
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")

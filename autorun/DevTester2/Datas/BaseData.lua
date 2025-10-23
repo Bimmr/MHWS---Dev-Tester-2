@@ -1,3 +1,13 @@
+-- BaseData Node Properties:
+-- This is the base class for all data nodes, providing common rendering and utility functions.
+-- Data nodes inherit from BaseData but don't have their own specific properties beyond:
+--
+-- Common Properties (inherited by all data nodes):
+-- - output_attr: Number - Pin ID for the output attribute (provides the node's data value)
+-- - ending_value: Any - The current output value of the node
+-- - status: String - Current status message for debugging
+-- - node_id: Number - Unique identifier for the node in the graph
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

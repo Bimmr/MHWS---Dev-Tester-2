@@ -40,12 +40,20 @@ function Config.save_configuration(name, description)
         link_id_counter = State.link_id_counter
     }
     
+    -- Save variables as simple key-value pairs since all are persistent
+    local variables = {}
+    for var_name, var_data in pairs(State.variables) do
+        variables[var_name] = var_data.value
+    end
+    config.variables = variables
+    
     -- Save using REFramework's json.dump_file
     local file_path = Config.get_config_directory() .. name .. ".json"
     local success = json.dump_file(file_path, config)
     
     if success then
         State.current_config_name = name
+        State.current_config_description = description or ""
         State.mark_as_saved()
         return true, nil
     else
@@ -85,7 +93,7 @@ function Config.serialize_node(node)
     }
     
     -- Add type-specific data
-    if node.category == Constants.NODE_CATEGORY_STARTER or node.category == Constants.NODE_CATEGORY_DATA then
+    if node.category == Constants.NODE_CATEGORY_STARTER then
         data.category = node.category
         data.type = node.type
         data.path = node.path
@@ -114,16 +122,21 @@ function Config.serialize_node(node)
             data.method_group_index = node.method_group_index
             data.method_index = node.method_index
             data.native_method_result = node.native_method_result
-        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_PRIMITIVE then
+        end
+    elseif node.category == Constants.NODE_CATEGORY_DATA then
+        data.category = node.category
+        data.type = node.type
+
+        if node.type == Constants.DATA_TYPE_PRIMITIVE then
             data.value = node.value
-        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_ENUM then
+        elseif node.type == Constants.DATA_TYPE_ENUM then
+            data.path = node.path
             data.selected_enum_index = node.selected_enum_index
-            data.enum_names = node.enum_names
-            data.enum_values = node.enum_values
-        elseif node.category == Constants.NODE_CATEGORY_DATA and node.type == Constants.DATA_TYPE_VARIABLE then
+            data.input_connection = node.input_connection
+            data.input_attr = node.input_attr
+        elseif node.type == Constants.DATA_TYPE_VARIABLE then
             data.variable_name = node.variable_name
             data.default_value = node.default_value
-            data.persistent = node.persistent
             data.input_connection = node.input_connection
             data.input_manual_value = node.input_manual_value
             data.pending_reset = node.pending_reset
@@ -337,6 +350,9 @@ function Config.load_configuration(config_path)
             -- Ensure all pin IDs exist for proper link restoration
             Nodes.ensure_node_pin_ids(node)
             
+            -- Validate and restore node state (especially for starters that need to reconnect to managed objects)
+            Nodes.validate_and_restore_starter_node(node)
+            
             -- Special handling for operations: if the config data indicates this node should have an output
             -- (either from saved output_attr or from operation type), ensure it exists
             if node.category == Constants.NODE_CATEGORY_FOLLOWER and not node.output_attr then
@@ -348,8 +364,11 @@ function Config.load_configuration(config_path)
             
             node_map[node_data.id] = node
             -- Add node to appropriate state array
-            if node.category == Constants.NODE_CATEGORY_STARTER or node.category == Constants.NODE_CATEGORY_DATA then
+            if node.category == Constants.NODE_CATEGORY_STARTER then
                 table.insert(State.starter_nodes, node)
+                State.node_map[node.node_id] = node  -- Add to hash map
+            elseif node.category == Constants.NODE_CATEGORY_DATA then
+                table.insert(State.data_nodes, node)
                 State.node_map[node.node_id] = node  -- Add to hash map
             elseif node.category == Constants.NODE_CATEGORY_OPERATIONS or node.category == Constants.NODE_CATEGORY_CONTROL then
                 table.insert(State.all_nodes, node)
@@ -380,6 +399,14 @@ function Config.load_configuration(config_path)
     -- Update state
     State.current_config_name = config.name
     State.current_config_description = config.description or ""
+    
+    -- Load variables as simple key-value pairs, convert to internal format
+    local variables = config.variables or {}
+    State.variables = {}
+    for var_name, var_value in pairs(variables) do
+        State.variables[var_name] = {value = var_value, persistent = true}
+    end
+    
     State.mark_as_saved()
     
     return true, nil
@@ -388,7 +415,7 @@ end
 function Config.deserialize_node(data)
     local node
     
-    if data.category == Constants.NODE_CATEGORY_STARTER or data.category == Constants.NODE_CATEGORY_DATA then
+    if data.category == Constants.NODE_CATEGORY_STARTER then
         node = {
             id = data.id,
             node_id = data.node_id or data.id,
@@ -420,25 +447,31 @@ function Config.deserialize_node(data)
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
             -- Native-specific
-            native_method_result = data.native_method_result,
+            native_method_result = data.native_method_result
+        }
+    elseif data.category == Constants.NODE_CATEGORY_DATA then
+        node = {
+            id = data.id,
+            node_id = data.node_id or data.id,
+            category = data.category,
+            type = data.type,
+            path = data.path or "",
+            position = data.position or {x = 0, y = 0},
+            input_attr = data.input_attr,
+            output_attr = data.output_attr,
+            ending_value = nil,
+            status = nil,
             -- Enum-specific
             selected_enum_index = data.selected_enum_index or 1,
-            enum_names = data.enum_names,
-            enum_values = data.enum_values,
             -- Value-specific
             value = data.value or "",
             -- Variable-specific
             variable_name = data.variable_name or "",
             default_value = data.default_value or "",
-            persistent = data.persistent or false,
             input_connection = data.input_connection,
             input_manual_value = data.input_manual_value or "",
             pending_reset = data.pending_reset or false
         }
-        
-        -- Validate and restore result
-        Nodes.validate_and_restore_starter_node(node)
-        
     elseif data.category == Constants.NODE_CATEGORY_OPERATIONS then
         node = {
             id = data.id,
@@ -596,8 +629,8 @@ end
 function Config.validate_config_data(config)
     if not config then return false end
     if not config.name or config.name == "" then return false end
-    if not config.nodes or type(config.nodes) ~= "table" then return false end
-    if not config.links or type(config.links) ~= "table" then return false end
+    if config.nodes and type(config.nodes) ~= "table" then return false end
+    if config.links and type(config.links) ~= "table" then return false end
     return true
 end
 

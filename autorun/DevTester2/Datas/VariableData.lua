@@ -1,3 +1,24 @@
+-- VariableData Node Properties:
+-- This node provides access to persistent variables that can be set, get, or reset.
+-- The following properties define the state and configuration of a VariableData node:
+--
+-- Configuration:
+-- - variable_name: String - Name of the variable in the global variables store
+-- - default_value: String - Default value as string (parsed to primitive when used)
+--
+-- Input/Output Pins:
+-- - input_attr: Number - Pin ID for the input attribute (receives values to set the variable)
+-- - output_attr: Number - Pin ID for the output attribute (provides current variable value)
+--
+-- Connections:
+-- - input_connection: NodeID - ID of the connected input node (for setting variable values)
+--
+-- State:
+-- - pending_reset: Boolean - Whether a reset operation was requested this frame
+--
+-- Runtime Values:
+-- - ending_value: Any - Current value of the variable (or default if not set)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
@@ -22,18 +43,40 @@ function VariableData.render(node)
     if not node.variable_name then
         node.variable_name = ""
     end
-    local changed, new_name = imgui.input_text("Name", node.variable_name)
+    
+    -- Collect existing variable names for the combo
+    local items = {}
+    for name, _ in pairs(State.variables) do
+        table.insert(items, name)
+    end
+    
+    -- Find current index
+    local current_index = 0
+    for i, name in ipairs(items) do
+        if name == node.variable_name then
+            current_index = i
+            break
+        end
+    end
+    
+   local changed, new_index, new_items = Utils.hybrid_combo_with_add("Name", current_index, items)
     if changed then
-        node.variable_name = new_name
+        items = new_items
+
+        -- Remove variables from State.variables that are no longer in items
+        local item_set = {}
+        for _, name in ipairs(items) do
+            item_set[name] = true
+        end
+        for name, _ in pairs(State.variables) do
+            if not item_set[name] then
+            State.variables[name] = nil
+            end
+        end
+        node.variable_name = items[new_index] or ""
+        State.variables[node.variable_name] = State.variables[node.variable_name] or {value = nil, persistent = true}
         State.mark_as_modified()
     end
-
-    -- Persistent checkbox (hidden for now)
-    -- local persistent_changed, new_persistent = imgui.checkbox("Persistent", node.persistent or false)
-    -- if persistent_changed then
-    --     node.persistent = new_persistent
-    --     State.mark_as_modified()
-    -- end
 
     -- Check connection states
     local input_connected = node.input_connection ~= nil
@@ -151,13 +194,24 @@ function VariableData.render(node)
     if neutral_mode or get_mode then
         -- Reset button
         imgui.same_line()
-        if imgui.button("Reset") then
-            -- Set reset flag instead of immediately resetting
-            node.pending_reset = true
-            State.mark_as_modified()
-        end
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Reset variable to default value")
+        if node.default_value and node.ending_value == nil then
+            if imgui.button("Set") then
+                -- Set variable to default value
+                local default_parsed = Utils.parse_primitive_value(node.default_value)
+                VariableData.set_variable_value(node.variable_name, default_parsed, node.persistent)
+                State.mark_as_modified()
+                -- Update ending_value
+                node.ending_value = default_parsed
+            end
+        else
+            if imgui.button("Reset") then
+                -- Set reset flag instead of immediately resetting
+                node.pending_reset = true
+                State.mark_as_modified()
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Reset variable to default value")
+            end
         end
     end
 
@@ -188,7 +242,7 @@ function VariableData.get_variable_value(variable_name, default_value)
     end
 end
 
-function VariableData.set_variable_value(variable_name, value, persistent)
+function VariableData.set_variable_value(variable_name, value)
     if not variable_name or variable_name == "" then
         return -- No variable name, ignore
     end
@@ -196,7 +250,7 @@ function VariableData.set_variable_value(variable_name, value, persistent)
     -- Store in variables table
     State.variables[variable_name] = {
         value = value,
-        persistent = persistent or false
+        persistent = true
     }
 end
 
@@ -208,9 +262,8 @@ function VariableData.reset_to_default(node)
     -- Mark this variable as reset this frame to prevent updates
     State.reset_variables[node.variable_name] = true
     
-    -- Remove the variable from State.variables to reset it to default state
-    -- This allows all nodes sharing this variable name to fall back to their individual default_value
-    State.variables[node.variable_name] = nil
+    -- Reset the variable to nothing (nil)
+    State.variables[node.variable_name] = {value = node.default_value, persistent = true}
 end
 
 function VariableData.update_from_input(node, input_value)
@@ -223,7 +276,7 @@ function VariableData.update_from_input(node, input_value)
         end
         
         -- Set input overwrites the variable
-        VariableData.set_variable_value(node.variable_name, input_value, node.persistent)
+        VariableData.set_variable_value(node.variable_name, input_value, true)
     end
     -- Return current value (either the input that was just set, or existing value)
     return VariableData.get_variable_value(node.variable_name, node.default_value)

@@ -1,3 +1,16 @@
+-- ManagedStarter Node Properties:
+-- This node retrieves a managed singleton object from the game's memory.
+-- The following properties define the state and configuration of a ManagedStarter node:
+--
+-- Configuration:
+-- - path: String - The full type path (e.g., "app.SomeClass") of the managed singleton to retrieve
+--
+-- Runtime Values:
+-- - ending_value: Object - The managed singleton object retrieved from the specified path
+--
+-- UI/Debug:
+-- - status: String - Current status message ("Success", "Managed singleton not found", "Enter a path")
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

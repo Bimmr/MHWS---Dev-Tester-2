@@ -1,6 +1,18 @@
 -- DevTester v2.0 - Compare Operation
 -- Operations node that performs comparison operations on two values
 
+-- CompareOperation Node Properties:
+-- This node performs comparison operations on two inputs and returns boolean results.
+-- The following properties define the state and configuration of a CompareOperation node:
+--
+-- Inherits all BaseOperation properties (selected_operation, input/output pins, connections, manual values, ending_value, status)
+--
+-- Operation Types (selected_operation values):
+-- - Constants.COMPARE_OPERATION_EQUALS: Equality check (==)
+-- - Constants.COMPARE_OPERATION_NOT_EQUALS: Inequality check (!=)
+-- - Constants.COMPARE_OPERATION_GREATER: Greater than (>) - requires numeric inputs
+-- - Constants.COMPARE_OPERATION_LESS: Less than (<) - requires numeric inputs
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")

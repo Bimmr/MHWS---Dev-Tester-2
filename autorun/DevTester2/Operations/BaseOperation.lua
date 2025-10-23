@@ -1,6 +1,33 @@
 -- DevTester v2.0 - Base Operation
 -- Base module for operation nodes providing common rendering functionality
 
+-- BaseOperation Node Properties:
+-- This is the base class for all operation nodes (Math, Compare, Logic, Invert).
+-- Operation nodes perform computations on input values and provide results.
+-- The following properties define the state and configuration of operation nodes:
+--
+-- Operation Selection:
+-- - selected_operation: Number - The currently selected operation type (varies by operation node)
+--
+-- Input/Output Pins:
+-- - input1_attr: Number - Pin ID for the first input attribute
+-- - input2_attr: Number - Pin ID for the second input attribute (not used by InvertOperation)
+-- - output_attr: Number - Pin ID for the output attribute (provides operation result)
+--
+-- Input Connections:
+-- - input1_connection: NodeID - ID of the node connected to input1
+-- - input2_connection: NodeID - ID of the node connected to input2
+--
+-- Manual Input Values:
+-- - input1_manual_value: String - Manual text input for input1 when not connected
+-- - input2_manual_value: String - Manual text input for input2 when not connected
+--
+-- Runtime Values:
+-- - ending_value: Any - The result of the operation (number, boolean, etc.)
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

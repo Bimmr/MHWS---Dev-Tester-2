@@ -1,3 +1,16 @@
+-- PrimitiveData Node Properties:
+-- This node provides primitive values (numbers, booleans, strings) that can be entered manually.
+-- The following properties define the state and configuration of a PrimitiveData node:
+--
+-- Configuration:
+-- - value: String - The text input value that gets parsed into a primitive
+--
+-- Output Pins:
+-- - output_attr: Number - Pin ID for the output attribute (provides parsed primitive value)
+--
+-- Runtime Values:
+-- - ending_value: Any - The parsed primitive value (number, boolean, or string)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

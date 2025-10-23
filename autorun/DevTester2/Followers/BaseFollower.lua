@@ -1,6 +1,30 @@
 -- DevTester v2.0 - Base Follower
 -- Common functionality for all follower nodes
 
+-- BaseFollower Node Properties:
+-- This is the base class for all follower nodes (Field, Method, Array followers).
+-- Follower nodes access properties/methods/elements of parent objects.
+-- The following properties define the state and configuration of follower nodes:
+--
+-- Core Configuration:
+-- - type: Number - Operation type (Constants.FOLLOWER_TYPE_METHOD, FIELD, or ARRAY)
+-- - action_type: Number - Action mode (Constants.ACTION_GET/SET for fields, ACTION_RUN/CALL for methods)
+--
+-- Input/Output Pins:
+-- - input_attr: Number - Pin ID for the main input attribute (receives parent object)
+-- - output_attr: Number - Pin ID for the output attribute (provides result value)
+--
+-- Parameters (for methods):
+-- - param_manual_values: Array - Manual text input values for method parameters (indexed by parameter position)
+-- - param_input_attrs: Array - Pin IDs for parameter input attributes
+--
+-- Runtime Values:
+-- - ending_value: Any - The result of the follower operation (field value, method return, or array element)
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+-- - last_call_time: Number - Timestamp when the operation was last executed
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

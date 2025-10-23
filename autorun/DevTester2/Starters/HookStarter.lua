@@ -1,3 +1,43 @@
+-- HookStarter Node Properties:
+-- This node represents a method hook that can intercept and modify method calls in the game.
+-- The following properties define the state and configuration of a HookStarter node:
+--
+-- Core Configuration:
+-- - path: String - The full type path (e.g., "app.SomeClass") to hook methods on
+-- - method_name: String - The name of the specific method being hooked
+-- - selected_method_combo: Number - Index for the method selection combo box UI
+-- - method_group_index: Number - Group index for organizing overloaded methods
+-- - method_index: Number - Index of the method within its overload group
+--
+-- Hook State:
+-- - is_initialized: Boolean - Whether the hook is currently active and installed
+-- - hook_id: Method object - Reference to the hooked method (used for identification)
+-- - pre_hook_result: String - Either "CALL_ORIGINAL" or "SKIP_ORIGINAL" - determines if original method runs
+--
+-- Output Pins:
+-- - output_attr: Number - Pin ID for the "Managed (this)" output (the object instance)
+-- - return_attr: Number - Pin ID for the method return value output
+--
+-- Return Override:
+-- - return_override_attr: Number - Pin ID for the return override input pin
+-- - return_override_manual: String - Manual text input for return override value
+-- - is_return_overridden: Boolean - Whether the return value was overridden on last call
+--
+-- Runtime Values:
+-- - ending_value: Object - The managed object instance from the pre-hook (args[2])
+-- - return_value: Any - The final return value (may be overridden)
+-- - actual_return_value: Any - The original return value from the method before override
+-- - last_hook_time: Number - Timestamp (os.clock()) of the last hook execution
+--
+-- Type Information:
+-- - param_types: Array - List of parameter type definitions for the hooked method
+-- - return_type_name: String - Short name of the return type (e.g., "System.Int32")
+-- - return_type_full_name: String - Full qualified name of the return type
+-- - retval_vtypename: String - Type name used for value type conversion
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
@@ -11,23 +51,38 @@ local HookStarter = {}
 
 local function convert_ptr(arg, td_name)
 	local output
-	local is_float = td_name and (td_name=="System.Single")
-	if not pcall(function()
-		local mobj = sdk.to_managed_object(arg)
-		output = (mobj and mobj:add_ref()) or (is_float and sdk.to_float(arg)) or sdk.to_int64(arg) or tostring(arg)
-	end) then
-		output = (is_float and sdk.to_float(arg)) or sdk.to_int64(arg) or tostring(arg)
+
+	-- First try to convert to managed object
+	local success, mobj = pcall(function() return sdk.to_managed_object(arg) end)
+	if success and mobj then
+		output = mobj:add_ref()
+	else
+		-- Fallback to basic conversions
+		if td_name == "System.Single" then
+			output = sdk.to_float(arg)
+		else
+			output = sdk.to_int64(arg) or tostring(arg)
+		end
 	end
-	if td_name and not is_float and tonumber(output) then
-		pcall(function()
-			local vt = sdk.to_valuetype(output, td_name)
-			if vt and vt.mValue ~= nil then
+
+	-- If we have a type name and output is numeric, try to create valuetype
+	if td_name and tonumber(output) then
+		local success, vt = pcall(function() return sdk.to_valuetype(output, td_name) end)
+		if success and vt then
+			local type_def = sdk.find_type_definition(td_name)
+			if type_def and type_def:is_a("System.Enum") then
+				-- For enums, return the valuetype directly
+				output = vt
+			elseif vt.mValue ~= nil then
+				-- For other value types, return the underlying value
 				output = vt.mValue
 			else
-				output = vt and (((vt["ToString"] and vt:call("ToString()")) or vt) or vt) or output
+				-- Fallback to the valuetype itself
+				output = vt
 			end
-		end)
+		end
 	end
+
 	return output
 end
 
@@ -139,6 +194,20 @@ function HookStarter.render(node)
         end
     end
     
+    -- Create placeholder attributes for hooks that have a method selected
+    -- This ensures attributes exist for saving/loading even if hook isn't initialized
+    if node.method_name and node.method_name ~= "" then
+        if not node.output_attr then
+            node.output_attr = State.next_pin_id()
+        end
+        if not node.return_attr then
+            node.return_attr = State.next_pin_id()
+        end
+        if not node.return_override_attr then
+            node.return_override_attr = State.next_pin_id()
+        end
+    end
+    
     if node.is_initialized then
         imgui.end_disabled()
     end
@@ -167,6 +236,32 @@ function HookStarter.render(node)
             HookStarter.initialize_hook(node)
         end
         imgui.spacing()
+        
+        -- Display placeholder attributes if they exist (created during config loading for nodes with children)
+        -- This allows follower nodes to reconnect properly when loading from config
+        if node.output_attr or node.return_attr or node.return_override_attr then
+            log.debug("Displaying placeholder attributes for uninitialized HookStarter node ID " .. tostring(node.node_id))
+            if node.output_attr then
+                imgui.spacing()
+                imnodes.begin_output_attribute(node.output_attr)
+                imgui.text("Managed (this): Not initialized")
+                imnodes.end_output_attribute()
+            end
+            
+            if node.return_override_attr then
+                imgui.spacing()
+                imnodes.begin_input_attribute(node.return_override_attr)
+                imgui.input_text("Return Override", "Not initialized")
+                imnodes.end_input_attribute()
+            end
+            
+            if node.return_attr then
+                imgui.spacing()
+                imnodes.begin_output_attribute(node.return_attr)
+                imgui.text("Return: Not initialized")
+                imnodes.end_output_attribute()
+            end
+        end
     else
         local pos = imgui.get_cursor_pos()
         imgui.text_colored("✓ Hook Active", 0xFF00FF00)
@@ -185,31 +280,29 @@ function HookStarter.render(node)
         imgui.text("Last call: " .. time_since_call)
         imgui.spacing()
         imgui.spacing()
-        if node.ending_value then
-            if not node.output_attr then
-                node.output_attr = State.next_pin_id()
-            end
+        
+        -- Show attributes if they exist (either with ending_value or as placeholders)
+        if node.output_attr then
             imgui.spacing()
             imnodes.begin_output_attribute(node.output_attr)
             local pos = imgui.get_cursor_pos()
             imgui.text("Managed (this):")
             imgui.same_line()
-            -- Display simplified value without address
-            local display_value = "Object"
-            if type(node.ending_value) == "userdata" then
-                local success, type_info = pcall(function() return node.ending_value:get_type_definition() end)
-                if success and type_info then
-                    display_value = type_info:get_name()
+            if node.ending_value then
+                -- Display simplified value without address
+                local display_value = "Object"
+                if type(node.ending_value) == "userdata" then
+                    local success, type_info = pcall(function() return node.ending_value:get_type_definition() end)
+                    if success and type_info then
+                        display_value = type_info:get_name()
+                    end
+                else
+                    display_value = tostring(node.ending_value)
                 end
-            else
-                display_value = tostring(node.ending_value)
-            end
-            local display = display_value .. " (?)"
-            local pos = Utils.get_right_cursor_pos(node.node_id, display)
-            imgui.set_cursor_pos(pos)
-            imgui.text(display_value)
-            imgui.same_line()
-            imgui.text("(?)")
+                local display = display_value .. " (?)"
+                local pos = Utils.get_right_cursor_pos(node.node_id, display)
+                imgui.set_cursor_pos(pos)
+                imgui.text(display_value)
                 if imgui.is_item_hovered() then
                     if type(node.ending_value) == "userdata" then
                         local success, type_info = pcall(function() return node.ending_value:get_type_definition() end)
@@ -227,27 +320,29 @@ function HookStarter.render(node)
                         imgui.set_tooltip("Return value: " .. tostring(node.ending_value))
                     end
                 end
-            if type(node.ending_value) == "userdata" then
-                imgui.spacing()
-                local button_pos = Utils.get_right_cursor_pos(node.node_id, "+ Add Child to Output")
-                imgui.set_cursor_pos(button_pos)
-                if imgui.button("+ Add Child to Output") then
-                    Nodes.add_child_node(node)
+                if type(node.ending_value) == "userdata" then
+                    imgui.spacing()
+                    local button_pos = Utils.get_right_cursor_pos(node.node_id, "+ Add Child to Output")
+                    imgui.set_cursor_pos(button_pos)
+                    if imgui.button("+ Add Child to Output") then
+                        Nodes.add_child_node(node)
+                    end
                 end
+            else
+                -- No ending_value - show as failed/not initialized
+                local status_text = node.is_initialized and "Failed to initialize" or "Not initialized"
+                local pos = Utils.get_right_cursor_pos(node.node_id, status_text)
+                imgui.set_cursor_pos(pos)
+                imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
             end
             imnodes.end_output_attribute()
             imgui.spacing()
             imgui.spacing()
         end
         
-        imgui.spacing()
-        imgui.spacing()
-        -- Display return value if we have return type info and the hook has been called
-        if node.return_type_name and node.last_hook_time then
-            -- Return override input
-            if not node.return_override_attr then
-                node.return_override_attr = State.next_pin_id()
-            end
+        -- Display return attributes if they exist and hook is initialized
+        if node.return_override_attr then
+            imgui.spacing()
             imnodes.begin_input_attribute(node.return_override_attr)
             local has_return_override_connection = Nodes.is_param_connected_for_return_override(node)
             local return_override_label = "Return Override"
@@ -281,86 +376,90 @@ function HookStarter.render(node)
                 end
             end
             imnodes.end_input_attribute()
-            
-            if not node.return_attr then
-                node.return_attr = State.next_pin_id()
-            end
+        end
+        
+        if node.is_initialized and node.return_attr then
             imgui.spacing()
-            local return_type = type(node.return_value)
-            local return_type_display = node.return_type_name
-
-            local pos_for_return = imgui.get_cursor_pos()
-
+            local return_type = node.return_type_name or "Unknown"
             local return_pos = imgui.get_cursor_pos()
             imnodes.begin_output_attribute(node.return_attr)
-            imgui.text("Return (" .. return_type_display .. "):")
+            imgui.text("Return (" .. return_type .. "):")
             imgui.same_line()
            
-            -- Display simplified value without address
-            local display_value = "Object"
-            if return_type == "userdata" then
-                local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
-                if success and type_info then
-                    display_value = type_info:get_name()
-                end
-            else
-                display_value = tostring(node.return_value)
-            end
-            local return_display = display_value .. " (?)"
-            local return_pos = Utils.get_right_cursor_pos(node.node_id, return_display)
-            imgui.set_cursor_pos(return_pos)
-            imgui.text(display_value)
-            imgui.same_line()
-            imgui.text("(?)")
-            if imgui.is_item_hovered() then
-                -- Build consistent tooltip format
-                local tooltip_text = string.format("Type: %s", node.return_type_full_name or node.return_type_name)
-                
-                -- Always show the original value if available
-                if node.actual_return_value ~= nil then
-                    if type(node.actual_return_value) == "userdata" then
-                        local success, type_info = pcall(function() return node.actual_return_value:get_type_definition() end)
-                        if success and type_info then
-                            local address = string.format("0x%X", node.actual_return_value:get_address())
-                            tooltip_text = tooltip_text .. string.format("\nValue: %s @ %s", type_info:get_name(), address)
-                        else
-                            tooltip_text = tooltip_text .. "\nValue: (ValueType or native pointer)"
-                        end
-                    else
-                        tooltip_text = tooltip_text .. string.format("\nValue: %s", tostring(node.actual_return_value))
+            -- Display return value if available
+            if node.return_value ~= nil and node.last_hook_time then
+                -- Display simplified value without address
+                local display_value = "Object"
+                local return_type = type(node.return_value)
+                if return_type == "userdata" then
+                    local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
+                    if success and type_info then
+                        display_value = type_info:get_name()
                     end
                 else
-                    tooltip_text = tooltip_text .. "\nValue: (not yet called)"
+                    display_value = tostring(node.return_value)
                 end
-                
-                -- Show override value only if overridden
-                if node.is_return_overridden then
-                    if type(node.return_value) == "userdata" then
-                        local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
-                        if success and type_info then
-                            local address = string.format("0x%X", node.return_value:get_address())
-                            tooltip_text = tooltip_text .. string.format("\nOverride Value: %s @ %s", type_info:get_name(), address)
+                local return_display = display_value .. " (?)"
+                local return_pos = Utils.get_right_cursor_pos(node.node_id, return_display)
+                imgui.set_cursor_pos(return_pos)
+                imgui.text(display_value)
+                imgui.same_line()
+                imgui.text("(?)")
+                if imgui.is_item_hovered() then
+                    -- Build consistent tooltip format
+                    local tooltip_text = string.format("Type: %s", node.return_type_full_name or node.return_type_name)
+                    
+                    -- Always show the original value if available
+                    if node.actual_return_value ~= nil then
+                        if type(node.actual_return_value) == "userdata" then
+                            local success, type_info = pcall(function() return node.actual_return_value:get_type_definition() end)
+                            if success and type_info then
+                                local address = string.format("0x%X", node.actual_return_value:get_address())
+                                tooltip_text = tooltip_text .. string.format("\nValue: %s @ %s", type_info:get_name(), address)
+                            else
+                                tooltip_text = tooltip_text .. "\nValue: (ValueType or native pointer)"
+                            end
                         else
-                            tooltip_text = tooltip_text .. "\nOverride Value: (ValueType or native pointer)"
+                            tooltip_text = tooltip_text .. string.format("\nValue: %s", tostring(node.actual_return_value))
                         end
                     else
-                        tooltip_text = tooltip_text .. string.format("\nOverride Value: %s", tostring(node.return_value))
+                        tooltip_text = tooltip_text .. "\nValue: (not yet called)"
                     end
+                    
+                    -- Show override value only if overridden
+                    if node.is_return_overridden then
+                        if type(node.return_value) == "userdata" then
+                            local success, type_info = pcall(function() return node.return_value:get_type_definition() end)
+                            if success and type_info then
+                                local address = string.format("0x%X", node.return_value:get_address())
+                                tooltip_text = tooltip_text .. string.format("\nOverride Value: %s @ %s", type_info:get_name(), address)
+                            else
+                                tooltip_text = tooltip_text .. "\nOverride Value: (ValueType or native pointer)"
+                            end
+                        else
+                            tooltip_text = tooltip_text .. string.format("\nOverride Value: %s", tostring(node.return_value))
+                        end
+                    end
+                    
+                    imgui.set_tooltip(tooltip_text)
                 end
                 
-                imgui.set_tooltip(tooltip_text)
-            end
-            
-            if node.return_value ~= nil and type(node.return_value) == "userdata" then
-                imgui.spacing()
-                local return_button_text = "+ Add Child to Return"
-                local return_button_pos = Utils.get_right_cursor_pos(node.node_id, return_button_text)
-                imgui.set_cursor_pos(return_button_pos)
-                if imgui.button(return_button_text) then
-                    Nodes.add_child_node_to_return(node)
+                if node.return_value ~= nil and type(node.return_value) == "userdata" then
+                    imgui.spacing()
+                    local return_button_text = "+ Add Child to Return"
+                    local return_button_pos = Utils.get_right_cursor_pos(node.node_id, return_button_text)
+                    imgui.set_cursor_pos(return_button_pos)
+                    if imgui.button(return_button_text) then
+                        Nodes.add_child_node_to_return(node)
+                    end
                 end
+            else
+                -- No return value yet
+                local status_text = "Not called yet"
+                local pos = Utils.get_right_cursor_pos(node.node_id, status_text)
+                imgui.set_cursor_pos(pos)
+                imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
             end
-            
             imnodes.end_output_attribute()
         end
         
@@ -439,7 +538,7 @@ function HookStarter.initialize_hook(node)
         end, function(retval)
             -- Convert return value to proper type if possible
             local ret_type = method:get_return_type()
-            node.retval_vtypename = node.return_type_name and ret_type:is_value_type() and not ret_type:is_a("System.Enum") and not node.return_type_name:find("System.U?Int") and node.return_type_name
+            node.retval_vtypename = node.return_type_name  -- Pass the full type name for proper conversion
             node.actual_return_value = convert_ptr(retval, node.retval_vtypename)
             node.status = "Hook: Post-hook called"
             
@@ -448,7 +547,7 @@ function HookStarter.initialize_hook(node)
             if Nodes.is_param_connected_for_return_override(node) then
                 override_value = Nodes.get_connected_return_override_value(node)
             elseif node.return_override_manual and node.return_override_manual ~= "" then
-                override_value = Utils.parse_value_for_type(node.return_override_manual, ret_type)
+                override_value = Utils.parse_primitive_value(node.return_override_manual)
             end
             
             if override_value ~= nil then

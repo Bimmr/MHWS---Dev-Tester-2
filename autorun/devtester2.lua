@@ -150,19 +150,19 @@ function render_menu_bar()
         -- Create Starter dropdown menu
         if imgui.begin_menu("+ Create Starter  ▼") then
             if imgui.menu_item("Managed") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_MANAGED) -- Managed
+                Nodes.create_starter_node(Constants.STARTER_TYPE_MANAGED) -- Managed
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
             end
             if imgui.menu_item("Native") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_NATIVE) -- Native
+                Nodes.create_starter_node(Constants.STARTER_TYPE_NATIVE) -- Native
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
             end
             if imgui.menu_item("Hook") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_STARTER, Constants.STARTER_TYPE_HOOK) -- Hook
+                Nodes.create_starter_node(Constants.STARTER_TYPE_HOOK) -- Hook
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Hook node to hook native functions")
@@ -173,21 +173,21 @@ function render_menu_bar()
         -- Create Data dropdown menu
         if imgui.begin_menu("+ Create Data  ▼") then
             if imgui.menu_item("Primitive") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_PRIMITIVE) -- Primitive
+                Nodes.create_data_node(Constants.DATA_TYPE_PRIMITIVE) -- Primitive
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
             end
             
             if imgui.menu_item("Enum") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_ENUM) -- Enum
+                Nodes.create_data_node(Constants.DATA_TYPE_ENUM) -- Enum
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create an Enum node for enumerated values")
             end
             
             if imgui.menu_item("Variable") then
-                Nodes.create_starter_node(Constants.NODE_CATEGORY_DATA, Constants.DATA_TYPE_VARIABLE) -- Variable
+                Nodes.create_data_node(Constants.DATA_TYPE_VARIABLE) -- Variable
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Variable node for storing and retrieving values across the node graph")
@@ -198,28 +198,28 @@ function render_menu_bar()
         -- Create Operations dropdown menu
         if imgui.begin_menu("+ Create Operations  ▼") then
             if imgui.menu_item("Invert") then
-                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_INVERT) -- Invert
+                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_INVERT) -- Invert
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create an Invert node that inverts boolean values")
             end
             
             if imgui.menu_item("Math") then
-                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_MATH) -- Math
+                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_MATH) -- Math
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Math node that performs mathematical operations on two numbers")
             end
             
             if imgui.menu_item("Logic") then
-                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_LOGIC) -- Logic
+                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_LOGIC) -- Logic
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Logic node that performs boolean logic operations (AND/OR/NAND/NOR)")
             end
             
             if imgui.menu_item("Compare") then
-                Nodes.create_operations_node(Constants.NODE_CATEGORY_OPERATIONS, Constants.OPERATIONS_TYPE_COMPARE) -- Compare
+                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_COMPARE) -- Compare
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Compare node that performs comparison operations (Equals/Not Equals/Greater/Less)")
@@ -230,12 +230,20 @@ function render_menu_bar()
         -- Create Control dropdown menu
         if imgui.begin_menu("+ Create Control  ▼") then
             if imgui.menu_item("Select") then
-                Nodes.create_operations_node(Constants.NODE_CATEGORY_CONTROL, Constants.CONTROL_TYPE_SELECT) -- Select
+                Nodes.create_control_node(Constants.CONTROL_TYPE_SELECT) -- Select
             end
             if imgui.is_item_hovered() then
                 imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
             end
             imgui.end_menu()
+        end
+        
+        -- Add Follower menu item
+        if imgui.menu_item("+ Add Follower") then
+            Nodes.create_follower_node({x = 100, y = 100})
+        end
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("Create a Method Follower node (Requires following another node)")
         end
         
         imgui.end_menu_bar()
@@ -459,6 +467,11 @@ function render_save_menu()
     end
     
     imgui.text("Description:")
+    -- Initialize description with current config description
+    if State.save_description_input == "" and State.current_config_description then
+        State.save_description_input = State.current_config_description
+    end
+    
     local desc_changed, new_desc = imgui.input_text("##description", 
         State.save_description_input)
     if desc_changed then

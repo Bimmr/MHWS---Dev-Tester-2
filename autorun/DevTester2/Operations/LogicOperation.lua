@@ -1,6 +1,18 @@
 -- DevTester v2.0 - Logic Operation
 -- Operations node that performs logical operations on two boolean values
 
+-- LogicOperation Node Properties:
+-- This node performs logical operations on two boolean inputs.
+-- The following properties define the state and configuration of a LogicOperation node:
+--
+-- Inherits all BaseOperation properties (selected_operation, input/output pins, connections, manual values, ending_value, status)
+--
+-- Operation Types (selected_operation values):
+-- - Constants.LOGIC_OPERATION_AND: Logical AND
+-- - Constants.LOGIC_OPERATION_OR: Logical OR
+-- - Constants.LOGIC_OPERATION_NAND: Logical NAND (NOT AND)
+-- - Constants.LOGIC_OPERATION_NOR: Logical NOR (NOT OR)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")

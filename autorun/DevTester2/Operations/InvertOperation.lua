@@ -1,6 +1,26 @@
 -- DevTester v2.0 - Invert Operation
 -- Operations node that inverts boolean values
 
+-- InvertOperation Node Properties:
+-- This node inverts boolean values (logical NOT operation).
+-- The following properties define the state and configuration of an InvertOperation node:
+--
+-- Input/Output Pins:
+-- - input1_attr: Number - Pin ID for the input attribute
+-- - output_attr: Number - Pin ID for the output attribute (provides inverted result)
+--
+-- Input Connections:
+-- - input1_connection: NodeID - ID of the node connected to input
+--
+-- Manual Input Values:
+-- - input1_manual_value: String - Manual text input for input when not connected
+--
+-- Runtime Values:
+-- - ending_value: Boolean - The inverted boolean result
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")

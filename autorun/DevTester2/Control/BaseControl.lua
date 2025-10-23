@@ -1,6 +1,20 @@
 -- DevTester v2.0 - Base Control
 -- Base module for control nodes providing common rendering functionality
 
+-- BaseControl Node Properties:
+-- This is the base class for all control nodes (Select, etc.).
+-- Control nodes make decisions based on input conditions and provide selected outputs.
+-- The following properties define the state and configuration of control nodes:
+--
+-- Output Pins:
+-- - output_attr: Number - Pin ID for the output attribute (provides selected result)
+--
+-- Runtime Values:
+-- - ending_value: Any - The selected/output value based on control logic
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")

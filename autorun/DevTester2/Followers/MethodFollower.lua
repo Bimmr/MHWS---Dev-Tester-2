@@ -1,3 +1,21 @@
+-- MethodFollower Node Properties:
+-- This node calls methods on parent objects with optional parameters.
+-- The following properties define the state and configuration of a MethodFollower node:
+--
+-- Method Selection:
+-- - selected_method_combo: Number - Index in the method selection dropdown (1-based)
+-- - method_group_index: Number - Group index for organizing overloaded methods
+-- - method_index: Number - Index of the selected method within its overload group
+--
+-- Parameters:
+-- - param_manual_values: Array - Manual text input values for method parameters (indexed by parameter position)
+-- - param_input_attrs: Array - Pin IDs for parameter input attributes
+--
+-- Runtime Values:
+-- - ending_value: Any - The return value from the method call (nil for void methods)
+--
+-- Inherits all BaseFollower properties (input_attr, output_attr, type, action_type, status, last_call_time, etc.)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
@@ -217,6 +235,9 @@ function MethodFollower.render(node)
         
         -- Always store result, even if nil
         node.ending_value = result
+        if result then
+            node.ending_value_full_name = selected_method:get_return_type():get_full_name()
+        end
         
         -- Check if result is userdata (can continue to child nodes)
         local can_continue = type(result) == "userdata"

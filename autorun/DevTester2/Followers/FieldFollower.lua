@@ -1,3 +1,23 @@
+-- FieldFollower Node Properties:
+-- This node accesses or modifies fields/properties of parent objects.
+-- The following properties define the state and configuration of a FieldFollower node:
+--
+-- Field Selection:
+-- - selected_field_combo: Number - Index in the field selection dropdown (1-based)
+-- - field_group_index: Number - Group index for organizing overloaded fields
+-- - field_index: Number - Index of the selected field within its overload group
+--
+-- Field Setting (for Set mode):
+-- - value_manual_input: String - Manual text input for the value to set
+-- - set_active: Boolean - Whether the set operation is currently active/enabled
+-- - value_input_attr: Number - Pin ID for the value input attribute (for connected set values)
+--
+-- Runtime Values:
+-- - ending_value: Any - The current field value (or the value that was just set)
+-- - ending_value_full_name: String - Full type name of the ending value
+--
+-- Inherits all BaseFollower properties (input_attr, output_attr, type, action_type, status, etc.)
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
@@ -163,7 +183,10 @@ function FieldFollower.render(node)
         
         -- Always store result, even if nil
         node.ending_value = result
-        
+        if result then
+            node.ending_value_full_name = selected_field:get_type():get_full_name()
+        end
+
         -- Check if result is userdata (can continue to child nodes)
         local can_continue = type(result) == "userdata"
         

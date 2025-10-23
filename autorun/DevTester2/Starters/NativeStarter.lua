@@ -1,3 +1,26 @@
+-- NativeStarter Node Properties:
+-- This node retrieves a native singleton object and can call methods on it.
+-- The following properties define the state and configuration of a NativeStarter node:
+--
+-- Core Configuration:
+-- - path: String - The full type path (e.g., "app.SomeClass") of the native singleton to retrieve
+-- - method_name: String - The name of the method to call on the native singleton
+-- - selected_method_combo: Number - Index for the method selection combo box UI
+-- - method_group_index: Number - Group index for organizing overloaded methods
+-- - method_index: Number - Index of the method within its overload group
+--
+-- Output:
+-- - output_attr: Number - Pin ID for the method result output attribute
+--
+-- Parameters:
+-- - param_manual_values: Array - Manual text input values for method parameters (indexed by parameter position)
+--
+-- Runtime Values:
+-- - native_method_result: Any - The result returned from calling the native method
+--
+-- UI/Debug:
+-- - status: String - Current status message ("Success", "Error calling method")
+
 local State = require("DevTester2.State")
 local Utils = require("DevTester2.Utils")
 local Nodes = require("DevTester2.Nodes")
@@ -99,6 +122,15 @@ function NativeStarter.render(node)
             end
         end
     end
+    
+    -- Create placeholder output attribute for native starters that have a method selected
+    -- This ensures the attribute exists for saving/loading even if native starter isn't executed
+    if node.method_name and node.method_name ~= "" then
+        if not node.output_attr then
+            node.output_attr = State.next_pin_id()
+        end
+    end
+    
     if native_obj and type_def and node.method_name and node.method_name ~= "" then
         -- Get the selected method to check for parameters
         local selected_method = nil
@@ -183,22 +215,14 @@ function NativeStarter.render(node)
             node.status = "Error calling method"
         end
     end
-    if node.native_method_result ~= nil then
-        -- Always store result, even if nil
-        node.ending_value = node.native_method_result
-        
-        -- Check if result is userdata (can continue to child nodes)
-        local can_continue = type(node.native_method_result) == "userdata"
-        
-        -- Only create output attribute if result is not nil
+    -- Show output attribute if it exists
+    if node.output_attr then
+        imgui.spacing()
+        imnodes.begin_output_attribute(node.output_attr)
         if node.native_method_result ~= nil then
-            if not node.output_attr then
-                node.output_attr = State.next_pin_id()
-            end
-            imgui.spacing()
-            imnodes.begin_output_attribute(node.output_attr)
             -- Display simplified value without address
             local display_value = "Object"
+            local can_continue = type(node.native_method_result) == "userdata"
             if can_continue then
                 local success, type_info = pcall(function() return node.native_method_result:get_type_definition() end)
                 if success and type_info then
@@ -228,13 +252,14 @@ function NativeStarter.render(node)
                     end
                 end
             end
-            imnodes.end_output_attribute()
+        else
+            -- No result yet
+            local status_text = "Not executed"
+            local pos = Utils.get_right_cursor_pos(node.node_id, status_text)
+            imgui.set_cursor_pos(pos)
+            imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
         end
-    else
-        node.ending_value = nil
-        if node.status == "Error calling method" then
-            imgui.text_colored("Error calling method", 0xFFFF0000)
-        end
+        imnodes.end_output_attribute()
     end
     imgui.spacing()
     

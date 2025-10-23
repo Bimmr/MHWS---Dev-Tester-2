@@ -1,6 +1,22 @@
 -- DevTester v2.0 - Math Operation
 -- Operations node that performs mathematical operations on two numbers
 
+-- MathOperation Node Properties:
+-- This node performs mathematical operations on two numeric inputs.
+-- The following properties define the state and configuration of a MathOperation node:
+--
+-- Inherits all BaseOperation properties (selected_operation, input/output pins, connections, manual values, ending_value, status)
+--
+-- Operation Types (selected_operation values):
+-- - Constants.MATH_OPERATION_ADD: Addition (+)
+-- - Constants.MATH_OPERATION_SUBTRACT: Subtraction (-)
+-- - Constants.MATH_OPERATION_MULTIPLY: Multiplication (*)
+-- - Constants.MATH_OPERATION_DIVIDE: Division (/)
+-- - Constants.MATH_OPERATION_MODULO: Modulo (%)
+-- - Constants.MATH_OPERATION_POWER: Power (^)
+-- - Constants.MATH_OPERATION_MAX: Maximum value
+-- - Constants.MATH_OPERATION_MIN: Minimum value
+
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")
