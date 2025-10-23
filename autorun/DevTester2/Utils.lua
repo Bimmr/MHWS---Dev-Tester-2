@@ -732,6 +732,27 @@ function Utils.hybrid_combo_with_add(label, current_index, items)
             end
         end
 
+        if imgui.is_key_down(imgui.ImGuiKey.Key_Enter) or imgui.is_key_down(imgui.ImGuiKey.Key_KeypadEnter) then
+            local filter_text = State.hybrid_combo_text[label] or ""
+            if filter_text ~= "" then
+                -- Check if already exists
+                local exists = false
+                for _, item in ipairs(items) do
+                    if item == filter_text then
+                        exists = true
+                        break
+                    end
+                end
+                if not exists then
+                    table.insert(items, filter_text)
+                    new_index = #items
+                    changed = true
+                    imgui.close_current_popup()
+                end
+            end
+        end
+
+
         -- Pop the styling
         imgui.pop_style_color(2)
         imgui.pop_style_var(6)
