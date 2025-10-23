@@ -120,6 +120,124 @@ re.on_script_reset(function()
     end
 end)
 
+-- Shared functions for node creation menu items
+function render_starter_menu_items(position)
+    if imgui.menu_item("Managed") then
+        Nodes.create_starter_node(Constants.STARTER_TYPE_MANAGED, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
+    end
+    if imgui.menu_item("Native") then
+        Nodes.create_starter_node(Constants.STARTER_TYPE_NATIVE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
+    end
+    if imgui.menu_item("Hook") then
+        Nodes.create_starter_node(Constants.STARTER_TYPE_HOOK, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Hook node to hook native functions")
+    end
+end
+
+function render_data_menu_items(position)
+    if imgui.menu_item("Primitive") then
+        Nodes.create_data_node(Constants.DATA_TYPE_PRIMITIVE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
+    end
+    
+    if imgui.menu_item("Enum") then
+        Nodes.create_data_node(Constants.DATA_TYPE_ENUM, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create an Enum node for enumerated values")
+    end
+    
+    if imgui.menu_item("Variable") then
+        Nodes.create_data_node(Constants.DATA_TYPE_VARIABLE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Variable node for storing and retrieving values across the node graph")
+    end
+end
+
+function render_operation_menu_items(position)
+    if imgui.menu_item("Invert") then
+        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_INVERT, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create an Invert node that inverts boolean values")
+    end
+    
+    if imgui.menu_item("Math") then
+        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_MATH, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Math node that performs mathematical operations on two numbers")
+    end
+    
+    if imgui.menu_item("Logic") then
+        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_LOGIC, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Logic node that performs boolean logic operations (AND/OR/NAND/NOR)")
+    end
+    
+    if imgui.menu_item("Compare") then
+        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_COMPARE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Compare node that performs comparison operations (Equals/Not Equals/Greater/Less)")
+    end
+end
+
+function render_control_menu_items(position)
+    if imgui.menu_item("Select") then
+        Nodes.create_control_node(Constants.CONTROL_TYPE_SELECT, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
+    end
+end
+
+function render_follower_menu_item(position)
+    if imgui.menu_item("Add Follower") then
+        Nodes.create_follower_node(position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Method Follower node (Requires following another node)")
+    end
+end
+
+-- Shared function to render node creation menus
+function render_node_creation_menu(position)
+    if imgui.begin_menu("Add Starter") then
+        render_starter_menu_items(position)
+        imgui.end_menu()
+    end
+    
+    if imgui.begin_menu("Add Data") then
+        render_data_menu_items(position)
+        imgui.end_menu()
+    end
+    
+    if imgui.begin_menu("Add Operation") then
+        render_operation_menu_items(position)
+        imgui.end_menu()
+    end
+    
+    if imgui.begin_menu("Add Control") then
+        render_control_menu_items(position)
+        imgui.end_menu()
+    end
+    
+    render_follower_menu_item(position)
+end
+
 -- Menu bar rendering
 function render_menu_bar()
     imgui.push_style_var(2, Constants.MENU_PADDING) -- Extra padding on menu bar
@@ -149,102 +267,30 @@ function render_menu_bar()
         
         -- Create Starter dropdown menu
         if imgui.begin_menu("+ Create Starter  ▼") then
-            if imgui.menu_item("Managed") then
-                Nodes.create_starter_node(Constants.STARTER_TYPE_MANAGED) -- Managed
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
-            end
-            if imgui.menu_item("Native") then
-                Nodes.create_starter_node(Constants.STARTER_TYPE_NATIVE) -- Native
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
-            end
-            if imgui.menu_item("Hook") then
-                Nodes.create_starter_node(Constants.STARTER_TYPE_HOOK) -- Hook
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Hook node to hook native functions")
-            end
+            render_starter_menu_items(nil, true)
             imgui.end_menu()
         end
         
         -- Create Data dropdown menu
         if imgui.begin_menu("+ Create Data  ▼") then
-            if imgui.menu_item("Primitive") then
-                Nodes.create_data_node(Constants.DATA_TYPE_PRIMITIVE) -- Primitive
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
-            end
-            
-            if imgui.menu_item("Enum") then
-                Nodes.create_data_node(Constants.DATA_TYPE_ENUM) -- Enum
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create an Enum node for enumerated values")
-            end
-            
-            if imgui.menu_item("Variable") then
-                Nodes.create_data_node(Constants.DATA_TYPE_VARIABLE) -- Variable
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Variable node for storing and retrieving values across the node graph")
-            end
+            render_data_menu_items(nil, true)
             imgui.end_menu()
         end
         
         -- Create Operations dropdown menu
         if imgui.begin_menu("+ Create Operations  ▼") then
-            if imgui.menu_item("Invert") then
-                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_INVERT) -- Invert
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create an Invert node that inverts boolean values")
-            end
-            
-            if imgui.menu_item("Math") then
-                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_MATH) -- Math
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Math node that performs mathematical operations on two numbers")
-            end
-            
-            if imgui.menu_item("Logic") then
-                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_LOGIC) -- Logic
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Logic node that performs boolean logic operations (AND/OR/NAND/NOR)")
-            end
-            
-            if imgui.menu_item("Compare") then
-                Nodes.create_operation_node(Constants.OPERATIONS_TYPE_COMPARE) -- Compare
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Compare node that performs comparison operations (Equals/Not Equals/Greater/Less)")
-            end
+            render_operation_menu_items(nil, true)
             imgui.end_menu()
         end
         
         -- Create Control dropdown menu
         if imgui.begin_menu("+ Create Control  ▼") then
-            if imgui.menu_item("Select") then
-                Nodes.create_control_node(Constants.CONTROL_TYPE_SELECT) -- Select
-            end
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
-            end
+            render_control_menu_items(nil, true)
             imgui.end_menu()
         end
         
         -- Add Follower menu item
-        if imgui.menu_item("+ Add Follower") then
-            Nodes.create_follower_node({x = 100, y = 100})
-        end
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Create a Method Follower node (Requires following another node)")
-        end
+        render_follower_menu_item(nil, true)
         
         imgui.end_menu_bar()
     end
@@ -410,11 +456,34 @@ function render_node_editor()
     imnodes.minimap(Constants.MINIMAP_SIZE, Constants.MINIMAP_POSITION) -- Size and position
     
     imnodes.end_node_editor()
+        
+    local window_pos = imgui.get_window_pos()
+    local window_size = imgui.get_window_size()
+    local mouse_pos = imgui.get_mouse()
+
+    local is_in_window = false
+    if window_pos.x < mouse_pos.x and window_pos.x + window_size.x > mouse_pos.x and
+       window_pos.y < mouse_pos.y and window_pos.y + window_size.y > mouse_pos.y then
+        is_in_window = true
+    end
+
+    -- Handle context menu for node creation
+    if is_in_window and imgui.is_mouse_clicked(1) and not imnodes.is_node_hovered() and not imnodes.is_link_hovered() then -- For some reason is_editor_hovered doesn't seem to work correctly
+        imgui.open_popup("node_context_menu")
+    end
+
     
-    -- Pop styles
-    imnodes.pop_color_style(2)
-    imgui.pop_style_color(2)
-    
+    if imgui.begin_popup("node_context_menu") then
+        local context_pos = imgui.get_window_pos()
+        context_pos.y = context_pos.y - imgui.get_window_size().y/2
+        local node_pos = {x = context_pos.x - window_pos.x, y = context_pos.y - window_pos.y}
+
+        render_node_creation_menu(node_pos)
+        
+        imgui.end_popup()
+    end
+
+
     -- Handle link creation
     local link_created, start_node_id, start_pin, end_node_id, end_pin = imnodes.is_link_created()
     if link_created then
@@ -425,7 +494,6 @@ function render_node_editor()
     local link_destroyed, link_id = imnodes.is_link_destroyed()
     
     if link_destroyed then
-        log.debug("Link destroyed: " .. tostring(link_id))
         Nodes.handle_link_destroyed(link_id)
     end
     
@@ -435,20 +503,16 @@ function render_node_editor()
         for _, link_id in ipairs(selected_links) do
             local link = Nodes.get_link_by_id(link_id)
             if link then
-                local to_node = Nodes.find_node_by_id(link.to_node)
-                if to_node and to_node.category == Constants.NODE_CATEGORY_FOLLOWER then
-                    -- Check if the target pin is not the main input attribute (title input)
-                    if link.to_pin ~= to_node.input_attr then
-                        Nodes.handle_link_destroyed(link_id)
-                    end
-                else
-                    Nodes.handle_link_destroyed(link_id)
-                end
+                Nodes.handle_link_destroyed(link_id)
             end
         end
         -- Clear selection after deletion
         imnodes.clear_link_selection()
     end
+    
+    -- Pop styles
+    imnodes.pop_color_style(2)
+    imgui.pop_style_color(2)
 end
 
 -- Save menu rendering
@@ -591,18 +655,11 @@ function handle_clear_nodes()
     end
     
     if State.has_unsaved_changes() then
-        log.debug("Prompting confirmation to clear nodes with unsaved changes")
         Dialogs.show_confirmation(
             "Clear All Nodes",
-            "Are you sure you want to clear all nodes?\nUnsaved changes will be lost.",
-            function() log.debug("Clearing all nodes confirmed by user") perform_clear() end,
-            function() log.debug("Clear nodes cancelled by user") end
+            "Are you sure you want to clear all nodes?\nUnsaved changes will be lost.", perform_clear           
         )
     else
         perform_clear()
     end
-end
-
-function handle_context_menu()
-
 end

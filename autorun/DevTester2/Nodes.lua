@@ -78,7 +78,7 @@ end
 -- Node Creation Functions
 -- ========================================
 
-function Nodes.create_starter_node(node_type)
+function Nodes.create_starter_node(node_type, position)
     local node_id = State.next_node_id()
 
     local node = {
@@ -87,7 +87,7 @@ function Nodes.create_starter_node(node_type)
         category = Constants.NODE_CATEGORY_STARTER,
         type = node_type,
         path = "",
-        position = {x = 50, y = 50},
+        position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
         output_attr = nil,
@@ -116,7 +116,7 @@ function Nodes.create_starter_node(node_type)
     return node
 end
 
-function Nodes.create_data_node(node_type)
+function Nodes.create_data_node(node_type, position)
     local node_id = State.next_node_id()
 
     local node = {
@@ -125,7 +125,7 @@ function Nodes.create_data_node(node_type)
         category = Constants.NODE_CATEGORY_DATA,
         type = node_type,
         path = "",
-        position = {x = 50, y = 50},
+        position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
         output_attr = nil,
@@ -197,7 +197,7 @@ function Nodes.create_follower_node(position)
     return node
 end
 
-function Nodes.create_operation_node(node_type)
+function Nodes.create_operation_node(node_type, position)
     local node_id = State.next_node_id()
 
     local node = {
@@ -205,7 +205,7 @@ function Nodes.create_operation_node(node_type)
         node_id = node_id,
         category = Constants.NODE_CATEGORY_OPERATIONS,
         type = node_type,
-        position = {x = 50, y = 50},
+        position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
         output_attr = State.next_pin_id(),
@@ -224,7 +224,7 @@ function Nodes.create_operation_node(node_type)
     return node
 end
 
-function Nodes.create_control_node(node_type)
+function Nodes.create_control_node(node_type, position)
     local node_id = State.next_node_id()
 
     local node = {
@@ -232,7 +232,7 @@ function Nodes.create_control_node(node_type)
         node_id = node_id,
         category = Constants.NODE_CATEGORY_CONTROL,
         type = node_type,
-        position = {x = 50, y = 50},
+        position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
         condition_attr = State.next_pin_id(),
