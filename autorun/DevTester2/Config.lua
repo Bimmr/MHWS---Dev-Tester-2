@@ -483,7 +483,11 @@ function Config.deserialize_node(data)
             input1_attr = data.input1_attr,  -- For math operations
             input2_attr = data.input2_attr,  -- For math operations
             output_attr = data.output_attr,
-            selected_operation = data.selected_operation or Constants.MATH_OPERATION_ADD,  -- For math operations
+            selected_operation = data.selected_operation or 
+                (data.type == Constants.OPERATIONS_TYPE_COMPARE and Constants.COMPARE_OPERATION_EQUALS) or
+                (data.type == Constants.OPERATIONS_TYPE_LOGIC and Constants.LOGIC_OPERATION_AND) or
+                (data.type == Constants.OPERATIONS_TYPE_INVERT and 0) or  -- Invert doesn't use selected_operation
+                Constants.MATH_OPERATION_ADD,  -- Default for math operations
             ending_value = nil,
             status = nil,
             -- Manual values
