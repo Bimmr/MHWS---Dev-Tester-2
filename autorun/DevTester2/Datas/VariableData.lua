@@ -59,7 +59,7 @@ function VariableData.render(node)
         end
     end
     
-   local changed, new_index, new_items = Utils.hybrid_combo_with_add("Name", current_index, items)
+   local changed, new_index, new_items = Utils.hybrid_combo_with_manage("Name", current_index, items)
     if changed then
         items = new_items
 

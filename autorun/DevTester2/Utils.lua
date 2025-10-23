@@ -497,7 +497,7 @@ function Utils.hybrid_combo(label, current_index, items)
     return changed, new_index
 end
 
-function Utils.hybrid_combo_with_add(label, current_index, items)
+function Utils.hybrid_combo_with_manage(label, current_index, items)
     -- Hybrid combo that combines input_text with popup window, with an Add button
     -- Returns: changed (boolean), new_index (number), items (table)
     -- API matches imgui.combo, but allows adding new items
