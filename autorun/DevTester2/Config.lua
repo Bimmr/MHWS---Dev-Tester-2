@@ -132,8 +132,10 @@ function Config.serialize_node(node)
         elseif node.type == Constants.DATA_TYPE_ENUM then
             data.path = node.path
             data.selected_enum_index = node.selected_enum_index
-            data.input_connection = node.input_connection
-            data.input_attr = node.input_attr
+            data.path_input_connection = node.path_input_connection
+            data.path_input_attr = node.path_input_attr
+            data.value_input_connection = node.value_input_connection
+            data.value_input_attr = node.value_input_attr
         elseif node.type == Constants.DATA_TYPE_VARIABLE then
             data.variable_name = node.variable_name
             data.default_value = node.default_value
@@ -463,6 +465,10 @@ function Config.deserialize_node(data)
             status = nil,
             -- Enum-specific
             selected_enum_index = data.selected_enum_index or 1,
+            path_input_connection = data.path_input_connection,
+            path_input_attr = data.path_input_attr,
+            value_input_connection = data.value_input_connection,
+            value_input_attr = data.value_input_attr,
             -- Value-specific
             value = data.value or "",
             -- Variable-specific

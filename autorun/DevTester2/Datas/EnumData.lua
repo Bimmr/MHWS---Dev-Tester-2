@@ -4,10 +4,11 @@
 -- The following properties define the state and configuration of an EnumData node:
 --
 -- Configuration:
--- - path: String - The full type path (e.g., "app.SomeEnum") of the enum type (auto-detected from connected EnumData nodes or HookStarter return types)
+-- - path: String - The full type path (e.g., "app.SomeEnum") of the enum type (auto-detected from connected path input or manual entry)
 --
 -- Input/Output Pins:
--- - input_attr: Number - Pin ID for the input attribute (receives enum type connections or values)
+-- - path_input_attr: Number - Pin ID for the path input attribute (receives enum type connections for auto-detection)
+-- - value_input_attr: Number - Pin ID for the value input attribute (receives enum values to select)
 -- - output_attr: Number - Pin ID for the output attribute (provides selected enum value)
 --
 -- Enum Data:
@@ -18,7 +19,8 @@
 -- - sorted_to_original_index: Array - Mapping from sorted display indices to original enum indices
 --
 -- Connections:
--- - input_connection: NodeID - ID of the connected input node (for auto-detecting enum types from other EnumData nodes or HookStarter return outputs)
+-- - path_input_connection: NodeID - ID of the connected path input node (for auto-detecting enum types)
+-- - value_input_connection: NodeID - ID of the connected value input node (for setting selected enum value)
 --
 -- Runtime Values:
 -- - ending_value: Any - The currently selected enum value (output)
@@ -65,17 +67,18 @@ function EnumData.render(node)
     imnodes.begin_node(node.node_id)
 
     imnodes.begin_node_titlebar()
-    -- Add input attribute for enum connections in the titlebar
-    if not node.input_attr then
-        node.input_attr = State.next_pin_id()
-    end
-    imnodes.begin_input_attribute(node.input_attr)
     imgui.text("Enum Data")
-    imnodes.end_input_attribute()
     imnodes.end_node_titlebar()
 
-    -- Disable path input if there's an input connection
-    if node.input_connection then
+    -- Path input pin
+    if not node.path_input_attr then
+        node.path_input_attr = State.next_pin_id()
+    end
+
+    imnodes.begin_input_attribute(node.path_input_attr)
+    -- Disable path input if there's a path input connection
+    local path_connected = node.path_input_connection ~= nil
+    if path_connected then
         imgui.begin_disabled()
     end
     local path_changed, new_path = imgui.input_text("Path", node.path or "")
@@ -88,12 +91,13 @@ function EnumData.render(node)
         node.sorted_to_original_index = nil
         State.mark_as_modified()
     end
-    if node.input_connection then
+    if path_connected then
         imgui.end_disabled()
         if imgui.is_item_hovered() then
             imgui.set_tooltip("Path is controlled by input connection")
         end
     end
+    imnodes.end_input_attribute()
     if node.path and node.path ~= "" then
         if not node.enum_names or not node.enum_values or not node.enum_display_strings then
             local enum_table = generate_enum(node.path)
@@ -141,8 +145,15 @@ function EnumData.render(node)
         if #node.enum_display_strings > 0 then
             node.selected_enum_index = node.selected_enum_index or 1
             
-            -- Disable value selection if there's an input connection
-            if node.input_connection then
+            -- Value input pin
+            if not node.value_input_attr then
+                node.value_input_attr = State.next_pin_id()
+            end
+            imnodes.begin_input_attribute(node.value_input_attr)
+            
+            -- Disable value selection if there's a value input connection
+            local value_connected = node.value_input_connection ~= nil
+            if value_connected then
                 imgui.begin_disabled()
             end
             local changed, new_index = imgui.combo("Value", node.selected_enum_index, node.enum_display_strings)
@@ -150,12 +161,13 @@ function EnumData.render(node)
                 node.selected_enum_index = new_index
                 State.mark_as_modified()
             end
-            if node.input_connection then
+            if value_connected then
                 imgui.end_disabled()
                 if imgui.is_item_hovered() then
                     imgui.set_tooltip("Value is controlled by input connection")
                 end
             end
+            imnodes.end_input_attribute()
             if not node.output_attr then
                 node.output_attr = State.next_pin_id()
             end
@@ -185,30 +197,30 @@ function EnumData.render(node)
 end
 
 function EnumData.execute(node)
-    -- Check if there's an input connection
-    local input_value = nil
+    -- Check if there's a path input connection for type detection
+    local path_input_value = nil
     local input_type_name = nil
-    if node.input_connection then
-        local connected_node = Nodes.find_node_by_id(node.input_connection)
+    if node.path_input_connection then
+        local connected_node = Nodes.find_node_by_id(node.path_input_connection)
         if connected_node then
             -- Check if connected to a HookStarter with return value
             if connected_node.return_value and connected_node.return_type_full_name then
                 input_type_name = connected_node.return_type_full_name
-                input_value = connected_node.return_value
+                path_input_value = connected_node.return_value
             elseif connected_node.ending_value and connected_node.ending_value_full_name then
                 input_type_name = connected_node.ending_value_full_name
-                input_value = connected_node.ending_value
+                path_input_value = connected_node.ending_value
             else
                 -- Fallback to checking the input value's type
-                input_value = Nodes.get_pin_value(node.input_attr)
-                if input_value ~= nil then
-                    local success, type_def = pcall(function() return input_value:get_type_definition() end)
+                path_input_value = Nodes.get_pin_value(node.path_input_attr)
+                if path_input_value ~= nil then
+                    local success, type_def = pcall(function() return path_input_value:get_type_definition() end)
                     if success and type_def then
                         local parent = type_def:get_parent_type()
                         if parent and parent:get_full_name() == "System.Enum" then
                             input_type_name = type_def:get_full_name()
                         end
-                    elseif type(input_value) == "number" then
+                    elseif type(path_input_value) == "number" then
                         -- For primitive enum values, we can't determine the type, so we'll use the current path
                         input_type_name = node.path
                     end
@@ -228,12 +240,18 @@ function EnumData.execute(node)
         State.mark_as_modified()
     end
     
-    -- If we have an input value and enum data, try to find the matching enum value
-    if input_value ~= nil and node.enum_values and node.sorted_to_original_index then
+    -- Check if there's a value input connection for setting the selected value
+    local value_input_value = nil
+    if node.value_input_connection then
+        value_input_value = Nodes.get_pin_value(node.value_input_attr)
+    end
+    
+    -- If we have a value input and enum data, try to find the matching enum value
+    if value_input_value ~= nil and node.enum_values and node.sorted_to_original_index then
         -- Find the enum value that matches the input
         local found_index = nil
         for sorted_idx, original_idx in ipairs(node.sorted_to_original_index) do
-            if node.enum_values[original_idx] == input_value then
+            if node.enum_values[original_idx] == value_input_value then
                 found_index = sorted_idx
                 break
             end

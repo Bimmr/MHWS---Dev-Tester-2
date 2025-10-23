@@ -704,6 +704,14 @@ function Nodes.handle_link_created(start_pin, end_pin)
         -- Return override connection
         local link = Nodes.create_link("return_override", from_node, start_pin, to_node, end_pin)
         to_node.return_override_connection = from_node.id
+    elseif to_pin_type == "enum_path_input" then
+        -- Enum path input connection
+        local link = Nodes.create_link("enum_path", from_node, start_pin, to_node, end_pin)
+        to_node.path_input_connection = from_node.id
+    elseif to_pin_type == "enum_value_input" then
+        -- Enum value input connection
+        local link = Nodes.create_link("enum_value", from_node, start_pin, to_node, end_pin)
+        to_node.value_input_connection = from_node.id
     elseif to_pin_type == "data_input" then
         -- Data node input connection (for Variable nodes)
         local link = Nodes.create_link("data_input", from_node, start_pin, to_node, end_pin)
@@ -735,45 +743,10 @@ function Nodes.handle_link_destroyed(link_id)
                     to_node.false_connection = nil
                 elseif link.connection_type == "return_override" then
                     to_node.return_override_connection = nil
-                elseif link.connection_type == "data_input" then
-                    to_node.input_connection = nil
-                elseif link.connection_type == "main" then
-                    to_node.parent_node_id = nil
-                end
-            end
-            
-            table.remove(State.all_links, i)
-            State.link_map[link_id] = nil  -- Remove from hash map
-            State.mark_as_modified()
-            break
-        end
-    end
-end
-
-function Nodes.handle_link_destroyed(link_id)
-    for i, link in ipairs(State.all_links) do
-        if link.id == link_id then
-            -- Clean up connection references
-            local to_node = Nodes.find_node_by_id(link.to_node)
-            if to_node then
-                if link.connection_type == "parameter" and link.parameter_index then
-                    to_node.param_connections[link.parameter_index] = nil
-                elseif link.connection_type == "value" then
-                    to_node.value_connection = nil
-                elseif link.connection_type == "array_index" then
-                    to_node.index_connection = nil
-                elseif link.connection_type == "operation_input1" then
-                    to_node.input1_connection = nil
-                elseif link.connection_type == "operation_input2" then
-                    to_node.input2_connection = nil
-                elseif link.connection_type == "control_condition" then
-                    to_node.condition_connection = nil
-                elseif link.connection_type == "control_true" then
-                    to_node.true_connection = nil
-                elseif link.connection_type == "control_false" then
-                    to_node.false_connection = nil
-                elseif link.connection_type == "return_override" then
-                    to_node.return_override_connection = nil
+                elseif link.connection_type == "enum_path" then
+                    to_node.path_input_connection = nil
+                elseif link.connection_type == "enum_value" then
+                    to_node.value_input_connection = nil
                 elseif link.connection_type == "data_input" then
                     to_node.input_connection = nil
                 elseif link.connection_type == "main" then
@@ -807,6 +780,10 @@ function Nodes.find_node_by_pin(pin_id)
             return node, "output"
         elseif node.input_attr == pin_id then
             return node, "data_input"
+        elseif node.path_input_attr == pin_id then
+            return node, "enum_path_input"
+        elseif node.value_input_attr == pin_id then
+            return node, "enum_value_input"
         elseif node.return_override_attr == pin_id then
             return node, "return_override_input"
         end
