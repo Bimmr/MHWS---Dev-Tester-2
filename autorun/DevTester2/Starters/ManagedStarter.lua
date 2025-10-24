@@ -51,7 +51,7 @@ function ManagedStarter.render(node)
             end
         else
             node.ending_value = nil
-            node.status = "Enter a path"
+            node.status = "Path cannot be empty"
         end
     end
     if has_children then

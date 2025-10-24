@@ -68,8 +68,10 @@ function InvertOperation.render(node)
         tooltip_text = string.format("Inverted Value\nInput: %s\nOutput: %s", 
             input_value ~= nil and tostring(input_value) or "none", 
             tostring(output_value))
+            node.status = "Inverted value successfully"
     else
         tooltip_text = "Inverted Value\nConnect input or enter manual value"
+        node.status = "No valid input"
     end
 
     BaseOperation.render_output_attribute(node, output_value ~= nil and tostring(output_value) or "(no input)", tooltip_text)

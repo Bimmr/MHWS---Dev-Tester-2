@@ -119,6 +119,7 @@ function NativeStarter.render(node)
                 end
             else
                 imgui.text("No methods available")
+                node.status = "No methods available"
             end
         end
     end

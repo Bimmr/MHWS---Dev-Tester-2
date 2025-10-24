@@ -188,9 +188,11 @@ function HookStarter.render(node)
                 end
             else
                 imgui.text("No methods available")
+                node.status = "No methods available"
             end
         else
             imgui.text("Type not found")
+            node.status = "Type not found"
         end
     end
     
@@ -240,7 +242,6 @@ function HookStarter.render(node)
         -- Display placeholder attributes if they exist (created during config loading for nodes with children)
         -- This allows follower nodes to reconnect properly when loading from config
         if node.output_attr or node.return_attr or node.return_override_attr then
-            log.debug("Displaying placeholder attributes for uninitialized HookStarter node ID " .. tostring(node.node_id))
             if node.output_attr then
                 imgui.spacing()
                 imnodes.begin_output_attribute(node.output_attr)
@@ -261,6 +262,7 @@ function HookStarter.render(node)
                 imgui.text("Return: Not initialized")
                 imnodes.end_output_attribute()
             end
+            node.status = "Not called yet, placeholder attributes displayed"
         end
     else
         local pos = imgui.get_cursor_pos()

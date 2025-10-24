@@ -107,7 +107,7 @@ function MathOperation.render(node)
     input2_value = Nodes.get_operation_input2_value(node)
 
     -- Always execute to update output (after input pins so manual values are updated)
-    MathOperation.execute(node) -- TODO: This still isn't working unless a dropdown is changed
+    MathOperation.execute(node)
 
     -- Create tooltip for output
     local tooltip_text = nil
@@ -125,8 +125,10 @@ function MathOperation.render(node)
 
         tooltip_text = string.format("Math Operation\n%s %s %s = %s",
             tostring(num1), op_symbol, tostring(num2), tostring(node.ending_value))
+        node.status = "Math operation successful"
     else
         tooltip_text = "Math Operation\nWaiting for both inputs to be connected"
+        node.status = "Waiting for valid inputs"
     end
 
     BaseOperation.render_output_attribute(node, node.ending_value and tostring(node.ending_value) or "(waiting)", tooltip_text)

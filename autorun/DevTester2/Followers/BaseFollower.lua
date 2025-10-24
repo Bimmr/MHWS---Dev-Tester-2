@@ -161,35 +161,54 @@ function BaseFollower.render_action_type_dropdown(node, action_options)
 end
 
 function BaseFollower.render_debug_info(node)
-    -- Collect all input attributes (main + params)
-    local input_attrs = {}
-    if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
-    if node.param_manual_values then
-        for i = 1, #(node.param_manual_values) do
-            local param_pin_id = Nodes.get_param_pin_id(node, i)
-            if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
+
+    local holding_ctrl = imgui.is_key_down(imgui.ImGuiKey.Key_LeftCtrl) or imgui.is_key_down(imgui.ImGuiKey.Key_RightCtrl)
+    local debug_info = string.format("Status: %s", tostring(node.status or "None"))
+    if holding_ctrl then
+        
+        -- Find input and output links, showing pin/attr and link id
+        local input_links, output_links = {}, {}
+        for _, link in ipairs(State.all_links) do
+            if link.to_node == node.id then
+                table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
+            end
+            if link.from_node == node.id then
+                table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
+            end
+        end
+            
+        -- Collect all input attributes (main + params)
+        local input_attrs = {}
+        if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
+        if node.param_manual_values then
+            for i = 1, #(node.param_manual_values) do
+                local param_pin_id = Nodes.get_param_pin_id(node, i)
+                if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
+            end
+        end
+
+        debug_info = debug_info .. string.format(
+            "\n\nNode ID: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            tostring(node.node_id),
+            #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
+            tostring(node.output_attr or "None"),
+            #input_links > 0 and table.concat(input_links, ", ") or "None",
+            #output_links > 0 and table.concat(output_links, ", ") or "None"
+        )
+        
+        debug_info = debug_info .. "\n\n-- All Node Info --"
+        -- Collect all node information for debugging and display
+        for key, value in pairs(node) do
+            if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
+                    value = tostring(value)
+            elseif type(value) == "table" then
+                value = json.dump_string(value)
+            end
+            if tostring(value) ~= "" then
+                debug_info = debug_info .. string.format("\n%s: %s", tostring(key), tostring(value))
+            end
         end
     end
-
-    -- Find input and output links, showing pin/attr and link id
-    local input_links, output_links = {}, {}
-    for _, link in ipairs(State.all_links) do
-        if link.to_node == node.id then
-            table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
-        end
-        if link.from_node == node.id then
-            table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
-        end
-    end
-
-    local debug_info = string.format(
-        "Node ID: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
-        tostring(node.node_id),
-        #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
-        tostring(node.output_attr or "None"),
-        #input_links > 0 and table.concat(input_links, ", ") or "None",
-        #output_links > 0 and table.concat(output_links, ", ") or "None"
-    )
 
     -- Align debug info to the top right of the node
     local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")

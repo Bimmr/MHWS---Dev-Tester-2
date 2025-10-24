@@ -1444,11 +1444,6 @@ function Nodes.validate_and_restore_starter_node(node)
             if not node.input_attr then
                 node.input_attr = State.next_pin_id()
             end
-            if node.path and node.path ~= "" then
-                -- For enums, we need to generate the enum data and set the ending_value
-                -- This is complex, so we'll just set a placeholder and let the render function handle it
-                node.status = "Enum loaded - needs refresh"
-            end
         elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
             -- Restore the value as ending_value
             node.ending_value = node.value

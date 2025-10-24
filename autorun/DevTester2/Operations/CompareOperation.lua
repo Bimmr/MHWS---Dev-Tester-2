@@ -109,8 +109,10 @@ function CompareOperation.render(node)
 
         tooltip_text = string.format("Compare Operation\n%s %s %s = %s",
             tostring(input1_value), op_symbol, tostring(input2_value), tostring(node.ending_value))
+        node.status = "Comparison successful"
     else
         tooltip_text = "Compare Operation\nWaiting for both inputs to be connected"
+        node.status = "Waiting for valid inputs"
     end
 
     BaseOperation.render_output_attribute(node, node.ending_value ~= nil and tostring(node.ending_value) or "(waiting)", tooltip_text)

@@ -183,6 +183,7 @@ function EnumData.render(node)
             -- node.ending_value = node.enum_names[original_index]  -- Moved to execute function
         else
             imgui.text_colored("No enum values found", Constants.COLOR_TEXT_WARNING)
+            node.status = "No enum values found"
         end
     end
 

@@ -107,8 +107,10 @@ function LogicOperation.render(node)
 
         tooltip_text = string.format("Logic Operation\n%s %s %s = %s",
             tostring(bool1), op_name, tostring(bool2), tostring(node.ending_value))
+        node.status = "Logic operation successful"
     else
         tooltip_text = "Logic Operation\nWaiting for both inputs to be connected"
+        node.status = "Waiting for valid inputs"
     end
 
     BaseOperation.render_output_attribute(node, node.ending_value ~= nil and tostring(node.ending_value) or "(waiting)", tooltip_text)

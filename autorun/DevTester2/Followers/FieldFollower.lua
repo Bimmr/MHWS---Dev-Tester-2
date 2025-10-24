@@ -32,7 +32,7 @@ local FieldFollower = {}
 -- ========================================
 -- Field Follower Node
 -- ========================================
-
+-- TODO: Putting an array in a set field will crash the game - need to handle that case
 function FieldFollower.render(node)
     local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then return end

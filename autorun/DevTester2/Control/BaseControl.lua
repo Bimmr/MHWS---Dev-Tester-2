@@ -62,28 +62,47 @@ function BaseControl.render_action_buttons(node)
 end
 
 function BaseControl.render_debug_info(node)
-    -- Collect link information
-    local input_links, output_links = {}, {}
-    for _, link in ipairs(State.all_links) do
-        if link.to_node == node.id then
-            table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
-        end
-        if link.from_node == node.id then
-            table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
-        end
-    end
 
-    local debug_info = string.format(
-        "Node ID: %s\nStatus: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
-        tostring(node.node_id),
-        tostring(node.status or "None"),
-        tostring(node.output_attr or "None"),
-        #input_links > 0 and table.concat(input_links, ", ") or "None",
-        #output_links > 0 and table.concat(output_links, ", ") or "None"
-    )
+    local holding_ctrl = imgui.is_key_down(imgui.ImGuiKey.Key_LeftCtrl) or imgui.is_key_down(imgui.ImGuiKey.Key_RightCtrl)
+    local debug_info = string.format("Status: %s", tostring(node.status or "None"))
+    if holding_ctrl then
+        
+        
+        -- Collect link information
+        local input_links, output_links = {}, {}
+        for _, link in ipairs(State.all_links) do
+            if link.to_node == node.id then
+                table.insert(input_links, string.format("(Pin %s, Link %s)", tostring(link.to_pin), tostring(link.id)))
+            end
+            if link.from_node == node.id then
+                table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
+            end
+        end
+
+        debug_info = debug_info .. string.format(
+            "\n\nNode ID: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            tostring(node.node_id),
+            tostring(node.output_attr or "None"),
+            #input_links > 0 and table.concat(input_links, ", ") or "None",
+            #output_links > 0 and table.concat(output_links, ", ") or "None"
+        )
+            
+            debug_info = debug_info .. "\n\n-- All Node Info --"
+            -- Collect all node information for debugging and display
+            for key, value in pairs(node) do
+                if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
+                        value = tostring(value)
+                elseif type(value) == "table" then
+                    value = json.dump_string(value)
+                end
+                if tostring(value) ~= "" then
+                    debug_info = debug_info .. string.format("\n%s: %s", tostring(key), tostring(value))
+                end
+            end
+        end
 
     -- Position debug info in top right
-   local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     if imgui.is_item_hovered() then
