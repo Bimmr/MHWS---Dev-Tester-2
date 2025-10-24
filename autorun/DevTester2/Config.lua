@@ -177,18 +177,20 @@ function Config.serialize_node(node)
             data.selected_method_combo = node.selected_method_combo
             data.method_group_index = node.method_group_index
             data.method_index = node.method_index
-            if node.action_type == 1 and node.param_manual_values then -- Call
-                data.param_manual_values = node.param_manual_values
-            end
+            data.param_input_attrs = node.param_input_attrs
+            data.param_manual_values = node.param_manual_values
         elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
             data.selected_field_combo = node.selected_field_combo
             data.field_group_index = node.field_group_index
             data.field_index = node.field_index
-            if node.action_type == 1 and node.value_manual_input then -- Set
+            data.value_input_attr = node.value_input_attr
+            if node.action_type == 1 then -- Set
                 data.value_manual_input = node.value_manual_input
+                data.set_active = node.set_active
             end
         elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
             data.selected_element_index = node.selected_element_index
+            data.index_input_attr = node.index_input_attr
         end
     end
     
@@ -317,6 +319,16 @@ function Config.load_configuration(config_path)
         -- Check other pin types that might exist
         if node_data.value_input_attr and node_data.value_input_attr > max_pin_id then
             max_pin_id = node_data.value_input_attr
+        end
+        if node_data.index_input_attr and node_data.index_input_attr > max_pin_id then
+            max_pin_id = node_data.index_input_attr
+        end
+        if node_data.param_input_attrs then
+            for _, pin_id in pairs(node_data.param_input_attrs) do
+                if pin_id > max_pin_id then
+                    max_pin_id = pin_id
+                end
+            end
         end
         if node_data.return_attr and node_data.return_attr > max_pin_id then
             max_pin_id = node_data.return_attr
@@ -537,16 +549,20 @@ function Config.deserialize_node(data)
             method_index = data.method_index,
             param_manual_values = data.param_manual_values or {},
             param_connections = {},
-            param_input_attrs = {},
+            param_input_attrs = data.param_input_attrs or {},
             -- Field-specific
             selected_field_combo = data.selected_field_combo or 1,
             field_group_index = data.field_group_index,
             field_index = data.field_index,
             value_manual_input = data.value_manual_input or "",
             value_connection = nil,
-            value_input_attr = nil,
+            value_input_attr = data.value_input_attr,
+            set_active = data.set_active or false,
             -- Array-specific
             selected_element_index = data.selected_element_index or 0,
+            index_connection = nil,
+            index_manual_value = "",
+            index_input_attr = data.index_input_attr,
             -- Common
             starting_value = nil,
             ending_value = nil,
