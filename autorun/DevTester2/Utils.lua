@@ -371,18 +371,22 @@ function Utils.hybrid_combo(label, current_index, items)
 
     -- Set popup size constraints
     local visible_items = 0
+    local visible_categorys = 0
     for i, item in ipairs(items) do
         local show_item = true
         if State.hybrid_combo_text[label] and State.hybrid_combo_text[label] ~= "" then
             local item_lower = item:lower()
             local text_lower = State.hybrid_combo_text[label]:lower()
-            show_item = item_lower:find(text_lower, 1, true) ~= nil
+            show_item = item_lower:find(text_lower, 1, true) ~= nil and not item:find("\n")
+        elseif item:find("\n") then
+            visible_categorys = visible_categorys + 1
         end
         if show_item then
             visible_items = visible_items + 1
+            log.debug(imgui.calc_text_size(item).y)
         end
     end
-    local popup_height = math.min(200, visible_items * 20 + 40) -- Item height + padding for filter
+    local popup_height = math.min(200, (visible_items * 20) + (visible_categorys * 40) + 110) -- Item height + padding for filter
     imgui.set_next_window_size(Vector2f.new(popup_width, popup_height), nil)
 
     -- Popup window with styled buttons
@@ -583,18 +587,21 @@ function Utils.hybrid_combo_with_manage(label, current_index, items)
 
     -- Set popup size constraints
     local visible_items = 0
+    local visible_categorys = 0
     for i, item in ipairs(items) do
         local show_item = true
         if State.hybrid_combo_text[label] and State.hybrid_combo_text[label] ~= "" then
             local item_lower = item:lower()
             local text_lower = State.hybrid_combo_text[label]:lower()
-            show_item = item_lower:find(text_lower, 1, true) ~= nil
+            show_item = item_lower:find(text_lower, 1, true) ~= nil and not item:find("\n")
+        elseif item:find("\n") then
+            visible_categorys = visible_categorys + 1
         end
         if show_item then
             visible_items = visible_items + 1
         end
     end
-    local popup_height = math.min(200, visible_items * 20 + 40) -- Item height + padding for filter
+    local popup_height = math.min(200, (visible_items * 20) + (visible_categorys * 40) + 110) -- Item height + padding for filter
     imgui.set_next_window_size(Vector2f.new(popup_width, popup_height), nil)
 
     -- Popup window with styled buttons
