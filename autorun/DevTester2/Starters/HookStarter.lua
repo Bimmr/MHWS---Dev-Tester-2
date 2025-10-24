@@ -531,9 +531,10 @@ function HookStarter.initialize_hook(node)
             local managed = sdk.to_managed_object(args[2])
             if managed then
                 node.ending_value = managed
-                node.status = "Hook: Pre-hook called"
+                -- Store pre-hook info for combined status
+                node.pre_hook_info = node.pre_hook_result == "SKIP_ORIGINAL" and "skipping original" or "calling original"
             else
-                node.status = "Hook: Managed object not found"
+                node.pre_hook_info = "managed object not found"
             end
             -- Return the selected pre-hook result
             return sdk.PreHookResult[node.pre_hook_result]
@@ -542,7 +543,11 @@ function HookStarter.initialize_hook(node)
             local ret_type = method:get_return_type()
             node.retval_vtypename = node.return_type_name  -- Pass the full type name for proper conversion
             node.actual_return_value = convert_ptr(retval, node.retval_vtypename)
-            node.status = "Hook: Post-hook called"
+            
+            -- Build comprehensive status string with both pre and post hook info
+            local status_parts = {}
+            table.insert(status_parts, "Pre: " .. (node.pre_hook_info or "unknown"))
+            table.insert(status_parts, "Post: called")
             
             -- Check for return override
             local override_value = nil
@@ -553,13 +558,20 @@ function HookStarter.initialize_hook(node)
             end
             
             if override_value ~= nil then
-                node.status = "Hook: Post-hook called (return overridden)"
+                table.insert(status_parts, "return overridden")
                 node.return_value = override_value  -- Use the parsed override value directly
                 node.is_return_overridden = true
-                return sdk.to_ptr(override_value)
             else
+                table.insert(status_parts, "return unchanged")
                 node.return_value = node.actual_return_value
                 node.is_return_overridden = false
+            end
+            
+            node.status = "Hook: " .. table.concat(status_parts, ", ")
+            
+            if override_value ~= nil then
+                return sdk.to_ptr(override_value)
+            else
                 return retval
             end
         end)
