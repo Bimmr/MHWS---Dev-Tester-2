@@ -383,7 +383,6 @@ function Utils.hybrid_combo(label, current_index, items)
         end
         if show_item then
             visible_items = visible_items + 1
-            log.debug(imgui.calc_text_size(item).y)
         end
     end
     local popup_height = math.min(200, (visible_items * 20) + (visible_categorys * 40) + 110) -- Item height + padding for filter
