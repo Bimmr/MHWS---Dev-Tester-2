@@ -574,9 +574,8 @@ function HookStarter.render(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
         if node.is_initialized and node.hook_id then
-            -- Note: REFramework doesn't support removing hooks, so we just remove the node
-            -- The hook will remain active until the game restarts
-            -- sdk.hook_remove(node.hook_id) -- Not supported
+            -- Hook will be automatically disabled since node no longer exists in State.node_map
+            -- The hook functions check State.node_map[node.id] and return default behavior if node is removed
         end
         Nodes.remove_starter_node(node)
     end
@@ -639,6 +638,11 @@ function HookStarter.initialize_hook(node)
     -- Set up both pre and post hooks
     success, result = pcall(function()
         return sdk.hook(method, function(args)
+            -- Check if node still exists - if removed, call original method
+            if not State.node_map[node.id] then
+                return sdk.PreHookResult.CALL_ORIGINAL
+            end
+            
             node.last_hook_time = os.clock()
             local managed = sdk.to_managed_object(args[2])
             if managed then
@@ -662,6 +666,11 @@ function HookStarter.initialize_hook(node)
             -- Return the selected pre-hook result
             return sdk.PreHookResult[node.pre_hook_result]
         end, function(retval)
+            -- Check if node still exists - if removed, don't override return value
+            if not State.node_map[node.id] then
+                return retval  -- Return original value unchanged
+            end
+            
             -- Convert return value to proper type if possible
             local ret_type = method:get_return_type()
             node.retval_vtypename = node.return_type_name  -- Pass the full type name for proper conversion
