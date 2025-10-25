@@ -97,11 +97,13 @@ function BaseFollower.render_title_bar(node, parent_type, custom_title)
     if custom_title then
         imgui.text(custom_title)
     else
-        local type_name = parent_type:get_full_name()
-        if #type_name > 35 then
-            type_name = "..." .. string.sub(type_name, -32)
+        local full_name = parent_type:get_full_name()
+        local is_long = #full_name > 50
+        local display_name = is_long and ("..." .. string.sub(full_name, -50)) or full_name
+        imgui.text(display_name)
+        if is_long and imgui.is_item_hovered() then
+            imgui.set_tooltip(full_name)
         end
-        imgui.text(type_name)
     end
 
     imnodes.end_input_attribute()
