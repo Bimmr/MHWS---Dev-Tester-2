@@ -17,6 +17,7 @@
 -- Output Pins:
 -- - output_attr: Number - Pin ID for the "Managed (this)" output (the object instance)
 -- - return_attr: Number - Pin ID for the method return value output
+-- - hook_arg_attrs: Array - Pin IDs for method parameter outputs (args[3], args[4], etc.)
 --
 -- Return Override:
 -- - return_override_attr: Number - Pin ID for the return override input pin
@@ -27,6 +28,7 @@
 -- - ending_value: Object - The managed object instance from the pre-hook (args[2])
 -- - return_value: Any - The final return value (may be overridden)
 -- - actual_return_value: Any - The original return value from the method before override
+-- - hook_arg_values: Array - Converted values of method parameters (args[3], args[4], etc.)
 -- - last_hook_time: Number - Timestamp (os.clock()) of the last hook execution
 --
 -- Type Information:
@@ -57,18 +59,21 @@ local function convert_ptr(arg, td_name)
 	if success and mobj then
 		output = mobj:add_ref()
 	else
-		-- Fallback to basic conversions
-		if td_name == "System.Single" then
+		-- Fallback to basic conversions as per RE Engine documentation
+		if td_name == "System.Single" or td_name == "Single" then
 			output = sdk.to_float(arg)
+		elseif td_name == "System.Double" or td_name == "Double" then
+			output = sdk.to_double(arg)
 		else
 			output = sdk.to_int64(arg) or tostring(arg)
 		end
 	end
 
-	-- If we have a type name and output is numeric, try to create valuetype
-	if td_name and tonumber(output) then
-		local success, vt = pcall(function() return sdk.to_valuetype(output, td_name) end)
-		if success and vt then
+	-- For ValueTypes, try to create proper valuetype objects
+	-- This provides better usability than raw field access
+	if td_name and not success and tonumber(output) then
+		local success_vt, vt = pcall(function() return sdk.to_valuetype(output, td_name) end)
+		if success_vt and vt then
 			local type_def = sdk.find_type_definition(td_name)
 			if type_def and type_def:is_a("System.Enum") then
 				-- For enums, return the valuetype directly
@@ -165,13 +170,31 @@ function HookStarter.render(node)
                             end)
                             if success_get and selected_method then
                                 node.method_name = selected_method:get_name()
+                                -- Get param types and create arg placeholders
+                                local success_params, method_param_types = pcall(function() return selected_method:get_param_types() end)
+                                if success_params and method_param_types then
+                                    node.param_types = method_param_types
+                                    -- Create placeholder arg attributes
+                                    if not node.hook_arg_attrs then
+                                        node.hook_arg_attrs = {}
+                                    end
+                                    -- Clear existing and recreate for the new method
+                                    node.hook_arg_attrs = {}
+                                    for i = 1, #method_param_types do
+                                        table.insert(node.hook_arg_attrs, State.next_pin_id())
+                                    end
+                                end
                             else
                                 node.method_name = ""
+                                node.param_types = nil
+                                node.hook_arg_attrs = {}
                             end
                         else
                             node.method_group_index = nil
                             node.method_index = nil
                             node.method_name = ""
+                            node.param_types = nil
+                            node.hook_arg_attrs = {}
                         end
                     else
                         node.method_group_index = nil
@@ -207,6 +230,13 @@ function HookStarter.render(node)
         end
         if not node.return_override_attr then
             node.return_override_attr = State.next_pin_id()
+        end
+        -- Create arg placeholders if param_types exist but hook_arg_attrs don't
+        if node.param_types and (not node.hook_arg_attrs or #node.hook_arg_attrs ~= #node.param_types) then
+            node.hook_arg_attrs = {}
+            for i = 1, #node.param_types do
+                table.insert(node.hook_arg_attrs, State.next_pin_id())
+            end
         end
     end
     
@@ -338,12 +368,86 @@ function HookStarter.render(node)
                 imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
             end
             imnodes.end_output_attribute()
-            imgui.spacing()
-            imgui.spacing()
+        end
+        
+        -- Display argument outputs if they exist (either with values or as placeholders)
+        if node.hook_arg_attrs and #node.hook_arg_attrs > 0 then
+            for i, arg_attr in ipairs(node.hook_arg_attrs) do
+                imgui.spacing()
+                local param_type = node.param_types and node.param_types[i]
+                local param_type_name = param_type and param_type:get_name() or "Unknown"
+                local arg_pos = imgui.get_cursor_pos()
+                imnodes.begin_output_attribute(arg_attr)
+                imgui.text("Arg " .. i .. " (" .. param_type_name .. "):")
+                imgui.same_line()
+                
+                if node.is_initialized then
+                    -- Display arg value if available
+                    if node.hook_arg_values and node.hook_arg_values[i] ~= nil and node.last_hook_time then
+                        -- Display simplified value without address
+                        local display_value = "Object"
+                        local arg_type = type(node.hook_arg_values[i])
+                        if arg_type == "userdata" then
+                            local success, type_info = pcall(function() return node.hook_arg_values[i]:get_type_definition() end)
+                            if success and type_info then
+                                display_value = type_info:get_name()
+                            end
+                        else
+                            display_value = tostring(node.hook_arg_values[i])
+                        end
+                        local arg_display = display_value .. " (?)"
+                        local arg_pos = Utils.get_right_cursor_pos(node.node_id, arg_display)
+                        imgui.set_cursor_pos(arg_pos)
+                        imgui.text(display_value)
+                        imgui.same_line()
+                        imgui.text("(?)")
+                        if imgui.is_item_hovered() then
+                            -- Build tooltip
+                            local tooltip_text = string.format("Type: %s", param_type and param_type:get_full_name() or "Unknown")
+                            if arg_type == "userdata" then
+                                local success, type_info = pcall(function() return node.hook_arg_values[i]:get_type_definition() end)
+                                if success and type_info then
+                                    local address = string.format("0x%X", node.hook_arg_values[i]:get_address())
+                                    tooltip_text = tooltip_text .. string.format("\nValue: %s @ %s", type_info:get_name(), address)
+                                else
+                                    tooltip_text = tooltip_text .. "\nValue: (ValueType or native pointer)"
+                                end
+                            else
+                                tooltip_text = tooltip_text .. string.format("\nValue: %s", tostring(node.hook_arg_values[i]))
+                            end
+                            imgui.set_tooltip(tooltip_text)
+                        end
+                        
+                        if node.hook_arg_values[i] ~= nil and type(node.hook_arg_values[i]) == "userdata" then
+                            imgui.spacing()
+                            local arg_button_text = "+ Add Child to Arg " .. i
+                            local arg_button_pos = Utils.get_right_cursor_pos(node.node_id, arg_button_text)
+                            imgui.set_cursor_pos(arg_button_pos)
+                            if imgui.button(arg_button_text) then
+                                Nodes.add_child_node_to_arg(node, i)
+                            end
+                        end
+                    else
+                        -- No arg value yet
+                        local status_text = "Not called yet"
+                        local pos = Utils.get_right_cursor_pos(node.node_id, status_text)
+                        imgui.set_cursor_pos(pos)
+                        imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
+                    end
+                else
+                    -- Not initialized - show placeholder
+                    local status_text = "Not initialized"
+                    local pos = Utils.get_right_cursor_pos(node.node_id, status_text)
+                    imgui.set_cursor_pos(pos)
+                    imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
+                end
+                imnodes.end_output_attribute()
+            end
         end
         
         -- Display return attributes if they exist and hook is initialized
         if node.return_override_attr then
+            imgui.spacing()
             imgui.spacing()
             imnodes.begin_input_attribute(node.return_override_attr)
             local has_return_override_connection = Nodes.is_param_connected_for_return_override(node)
@@ -516,6 +620,14 @@ function HookStarter.initialize_hook(node)
         node.param_types = param_types  -- Store for display
     end
     
+    -- Create arg output attributes if not already created
+    if not node.hook_arg_attrs or #node.hook_arg_attrs ~= #param_types then
+        node.hook_arg_attrs = {}
+        for i = 1, #param_types do
+            table.insert(node.hook_arg_attrs, State.next_pin_id())
+        end
+    end
+    
     -- Get return type for display
     local success_return, return_type = pcall(function() return method:get_return_type() end)
     if success_return and return_type then
@@ -536,6 +648,17 @@ function HookStarter.initialize_hook(node)
             else
                 node.pre_hook_info = "managed object not found"
             end
+            
+            -- Convert and store method arguments
+            node.hook_arg_values = {}
+            for i = 1, #param_types do
+                local arg = args[i + 2]  -- args[3] is param 1, args[4] is param 2, etc.
+                local param_type = param_types[i]
+                local type_name = param_type:get_name()
+                log.debug("Converting arg " .. i .. " of type " .. type_name)
+                node.hook_arg_values[i] = convert_ptr(arg, type_name)
+            end
+            
             -- Return the selected pre-hook result
             return sdk.PreHookResult[node.pre_hook_result]
         end, function(retval)

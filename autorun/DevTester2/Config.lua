@@ -116,6 +116,7 @@ function Config.serialize_node(node)
             data.return_override_attr = node.return_override_attr
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
+            data.hook_arg_attrs = node.hook_arg_attrs
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
             data.selected_method_combo = node.selected_method_combo
@@ -460,6 +461,7 @@ function Config.deserialize_node(data)
             return_override_attr = data.return_override_attr,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
+            hook_arg_attrs = data.hook_arg_attrs or {},
             -- Native-specific
             native_method_result = data.native_method_result
         }

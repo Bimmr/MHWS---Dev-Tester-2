@@ -771,6 +771,12 @@ function Nodes.find_node_by_pin(pin_id)
             return node, "output"
         elseif node.return_override_attr == pin_id then
             return node, "return_override_input"
+        elseif node.hook_arg_attrs then
+            for i, pin in ipairs(node.hook_arg_attrs) do
+                if pin == pin_id then
+                    return node, "output"
+                end
+            end
         end
     end
     
@@ -876,6 +882,12 @@ function Nodes.get_parent_value(node)
     elseif connection_pin == parent.return_attr then
         -- Connected to return value output
         return parent.return_value
+    elseif parent.hook_arg_attrs then
+        for i, pin in ipairs(parent.hook_arg_attrs) do
+            if pin == connection_pin then
+                return parent.hook_arg_values and parent.hook_arg_values[i]
+            end
+        end
     end
     
     -- Fallback
@@ -898,6 +910,12 @@ function Nodes.get_pin_value(pin_id)
                 if pin_type == "output" and source_node.return_attr == link.from_pin then
                     -- This is a return_attr pin, return return_value
                     return source_node.return_value
+                elseif pin_type == "output" and source_node.hook_arg_attrs then
+                    for i, pin in ipairs(source_node.hook_arg_attrs) do
+                        if pin == link.from_pin then
+                            return source_node.hook_arg_values and source_node.hook_arg_values[i]
+                        end
+                    end
                 else
                     -- Regular output pin, return ending_value
                     return source_node.ending_value
