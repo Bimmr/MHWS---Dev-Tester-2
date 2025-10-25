@@ -13,6 +13,7 @@ local Dialogs = require("DevTester2.Dialogs")
 local ManagedStarter = require("DevTester2.Starters.ManagedStarter")
 local HookStarter = require("DevTester2.Starters.HookStarter")
 local NativeStarter = require("DevTester2.Starters.NativeStarter")
+local TypeStarter = require("DevTester2.Starters.TypeStarter")
 local EnumData = require("DevTester2.Datas.EnumData")
 local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
 local VariableData = require("DevTester2.Datas.VariableData")
@@ -139,6 +140,12 @@ function render_starter_menu_items(position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Hook node to hook native functions")
+    end
+    if imgui.menu_item("Type") then
+        Nodes.create_starter_node(Constants.STARTER_TYPE_TYPE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Type node to get type definitions")
     end
 end
 
@@ -348,6 +355,8 @@ function render_node_editor()
                 HookStarter.render(node)
             elseif node.type == Constants.STARTER_TYPE_NATIVE then
                 NativeStarter.render(node)
+            elseif node.type == Constants.STARTER_TYPE_TYPE then
+                TypeStarter.render(node)
             end
 
             imgui.pop_item_width()

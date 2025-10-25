@@ -54,6 +54,16 @@ function BaseFollower.check_parent_connection(node)
 end
 
 function BaseFollower.get_parent_type(parent_value)
+    -- Check if parent_value is already a type definition
+    if type(parent_value) == "userdata" and parent_value.get_full_name then
+        -- This is likely a type definition object
+        local success, test_name = pcall(function() return parent_value:get_full_name() end)
+        if success and test_name then
+            return parent_value
+        end
+    end
+
+    -- Otherwise, try to get type definition from managed object
     local success, parent_type = pcall(function()
         return parent_value:get_type_definition()
     end)
@@ -63,6 +73,15 @@ function BaseFollower.get_parent_type(parent_value)
     end
 
     return parent_type
+end
+
+function BaseFollower.is_parent_type_definition(parent_value)
+    -- Check if parent_value is already a type definition
+    if type(parent_value) == "userdata" and parent_value.get_full_name then
+        local success, test_name = pcall(function() return parent_value:get_full_name() end)
+        return success and test_name ~= nil
+    end
+    return false
 end
 
 function BaseFollower.render_title_bar(node, parent_type, custom_title)

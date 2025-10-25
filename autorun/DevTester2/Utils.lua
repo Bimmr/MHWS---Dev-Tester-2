@@ -116,6 +116,8 @@ function Utils.parse_category_and_type(category, type)
             return "STARTER", "MANAGED"
         elseif type == Constants.STARTER_TYPE_HOOK then
             return "STARTER", "HOOK"
+        elseif type == Constants.STARTER_TYPE_TYPE then
+            return "STARTER", "TYPE"
         end
     elseif category == Constants.NODE_CATEGORY_DATA then
         if type == Constants.DATA_TYPE_PRIMITIVE then

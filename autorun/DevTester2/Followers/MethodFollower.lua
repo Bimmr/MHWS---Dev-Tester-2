@@ -27,7 +27,6 @@ local sdk = sdk
 
 local HybridCombo = require("DevTester2.HybridCombo")
 local MethodFollower = {}
-
 -- ========================================
 -- Method Follower Node
 -- ========================================
@@ -42,6 +41,9 @@ function MethodFollower.render(node)
         return
     end
 
+    -- Determine if we're working with static methods (type definition) or instance methods (managed object)
+    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+
     imnodes.begin_node(node.node_id)
 
     BaseFollower.render_title_bar(node, parent_type)
@@ -52,7 +54,7 @@ function MethodFollower.render(node)
     BaseFollower.render_action_type_dropdown(node, {"Run", "Call"})
 
     -- Method selection
-    local methods = Nodes.get_methods_for_combo(parent_type)
+    local methods = Nodes.get_methods_for_combo(parent_type, is_static_context)
     local returns_void = false  -- Declare at higher scope
     if #methods > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
@@ -87,11 +89,12 @@ function MethodFollower.render(node)
             end
 
             node.param_manual_values = {} -- Reset params
+            node.last_call_time = nil -- Reset Last Call timer when method changes
 
             -- Check if selected method returns void, if so switch to Call mode
             if node.method_group_index and node.method_index then
                 local current_method = Nodes.get_method_by_group_and_index(parent_type,
-                    node.method_group_index, node.method_index)
+                    node.method_group_index, node.method_index, is_static_context)
                 if current_method then
                     local success_return, return_type = pcall(function()
                         return current_method:get_return_type()
@@ -145,7 +148,7 @@ function MethodFollower.render(node)
         local selected_method = nil
         if node.method_group_index and node.method_index then
             selected_method = Nodes.get_method_by_group_and_index(parent_type, 
-                node.method_group_index, node.method_index)
+                node.method_group_index, node.method_index, is_static_context)
         end
 
         -- Handle parameters (show for both Run and Call)
@@ -379,13 +382,22 @@ function MethodFollower.execute(node, parent_value, selected_method)
         -- Output all the params for debugging
         log.debug(node.node_id.." MethodFollower: Executing method with params:".. json.dump_string(params))
     end
-    -- Execute method based on type
+    
+    -- Determine if we're calling a static method
+    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+    
+    -- Execute method based on type and context
     local success, result
-    if node.action_type == 0 then -- Run
+    if is_static_context then
+        -- Static method call - call on the type definition
+        success, result = pcall(function()
+            return selected_method:call(nil, table.unpack(params))
+        end)
+    elseif node.action_type == 0 then -- Run (instance method)
         success, result = pcall(function()
             return selected_method:call(parent_value, table.unpack(params))
         end)
-    else -- Call
+    else -- Call (instance method)
         success, result = pcall(function()
             return parent_value:call(selected_method:get_name(), table.unpack(params))
         end)

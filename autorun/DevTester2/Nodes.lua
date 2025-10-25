@@ -33,7 +33,7 @@ function Nodes.get_node_titlebar_color(category, type)
     elseif Constants["NODE_COLOR_" .. category] then
         return Constants["NODE_COLOR_" .. category]
     end
-    return Constants.COLOR_NODE_DEFAULT
+    return Constants.NODE_COLOR_DEFAULT
 end
 
 function Nodes.get_node_width(category, type)
@@ -1071,13 +1071,13 @@ function Nodes.cleanup_cache(cache, max_size)
     end
 end
 
-function Nodes.get_cached_type_info(type_def)
-    local type_name = type_def:get_full_name()
+function Nodes.get_cached_type_info(type_def, is_static_context)
+    local type_name = type_def:get_full_name() .. (is_static_context and "_static" or "_instance")
     
     if not State.type_cache[type_name] then
         State.type_cache[type_name] = {
-            methods = Nodes.build_method_list(type_def),
-            fields = Nodes.build_field_list(type_def),
+            methods = Nodes.build_method_list(type_def, is_static_context),
+            fields = Nodes.build_field_list(type_def, is_static_context),
             last_accessed = os.time()
         }
         
@@ -1089,7 +1089,7 @@ function Nodes.get_cached_type_info(type_def)
     return State.type_cache[type_name]
 end
 
-function Nodes.build_method_list(type_def)
+function Nodes.build_method_list(type_def, is_static_context)
     local methods = {}
     
     -- Walk inheritance chain and get methods from each type
@@ -1097,7 +1097,13 @@ function Nodes.build_method_list(type_def)
     local level = 1
     
     while current_type do
-        local success, type_methods = pcall(function() return current_type:get_methods() end)
+        local success, type_methods = pcall(function() 
+            if is_static_context then
+                return current_type:get_methods(true)  -- true = include static methods
+            else
+                return current_type:get_methods() 
+            end
+        end)
         if not success or not type_methods then
             break
         end
@@ -1158,7 +1164,7 @@ function Nodes.build_method_list(type_def)
     return methods
 end
 
-function Nodes.build_field_list(type_def)
+function Nodes.build_field_list(type_def, is_static_context)
     local fields = {}
     
     -- Walk inheritance chain and get fields from each type
@@ -1166,7 +1172,13 @@ function Nodes.build_field_list(type_def)
     local level = 1
     
     while current_type do
-        local success, type_fields = pcall(function() return current_type:get_fields() end)
+        local success, type_fields = pcall(function() 
+            if is_static_context then
+                return current_type:get_fields(true)  -- true = include static fields
+            else
+                return current_type:get_fields() 
+            end
+        end)
         if not success or not type_fields then
             break
         end
@@ -1213,11 +1225,11 @@ function Nodes.build_field_list(type_def)
     return fields
 end
 
-function Nodes.get_methods_for_combo(type_def)
-    local cache_key = type_def:get_full_name()
+function Nodes.get_methods_for_combo(type_def, is_static_context)
+    local cache_key = type_def:get_full_name() .. (is_static_context and "_static" or "_instance")
     
     if not State.combo_cache[cache_key] then
-        local type_info = Nodes.get_cached_type_info(type_def)
+        local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
         local combo_items = {""}  -- Start with empty item
         
         for _, item in ipairs(type_info.methods) do
@@ -1231,8 +1243,8 @@ function Nodes.get_methods_for_combo(type_def)
     return State.combo_cache[cache_key]
 end
 
-function Nodes.get_method_by_group_and_index(type_def, group_index, method_index)
-    local type_info = Nodes.get_cached_type_info(type_def)
+function Nodes.get_method_by_group_and_index(type_def, group_index, method_index, is_static_context)
+    local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
     
     for _, item in ipairs(type_info.methods) do
         if item.type == "method" and item.level == group_index and item.index == method_index then
@@ -1265,26 +1277,26 @@ function Nodes.get_method_from_combo_index(type_def, combo_index)
     return nil
 end
 
-function Nodes.get_fields_for_combo(type_def)
-    local cache_key = type_def:get_full_name()
+function Nodes.get_fields_for_combo(type_def, is_static_context)
+    local cache_key = type_def:get_full_name() .. (is_static_context and "_static" or "_instance") .. "_fields"
     
-    if not State.combo_cache[cache_key .. "_fields"] then
-        local type_info = Nodes.get_cached_type_info(type_def)
+    if not State.combo_cache[cache_key] then
+        local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
         local combo_items = {""}  -- Start with empty item
         
         for _, item in ipairs(type_info.fields) do
             table.insert(combo_items, item.display)
         end
         
-        State.combo_cache[cache_key .. "_fields"] = combo_items
+        State.combo_cache[cache_key] = combo_items
         Nodes.cleanup_cache(State.combo_cache, Constants.COMBO_CACHE_SIZE_LIMIT)
     end
     
-    return State.combo_cache[cache_key .. "_fields"]
+    return State.combo_cache[cache_key]
 end
 
-function Nodes.get_field_by_group_and_index(type_def, group_index, field_index)
-    local type_info = Nodes.get_cached_type_info(type_def)
+function Nodes.get_field_by_group_and_index(type_def, group_index, field_index, is_static_context)
+    local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
     
     for _, item in ipairs(type_info.fields) do
         if item.type == "field" and item.level == group_index and item.index == field_index then
@@ -1453,6 +1465,16 @@ function Nodes.validate_and_restore_starter_node(node)
             if node.method_name and node.method_name ~= "" then
                 if not node.output_attr then
                     node.output_attr = State.next_pin_id()
+                end
+            end
+        elseif node.type == Constants.STARTER_TYPE_TYPE then
+            if node.path and node.path ~= "" then
+                local success, type_def = pcall(function() return sdk.find_type_definition(node.path) end)
+                if success and type_def then
+                    node.ending_value = type_def
+                    node.status = "Success"
+                else
+                    node.status = "Type not found"
                 end
             end
         end

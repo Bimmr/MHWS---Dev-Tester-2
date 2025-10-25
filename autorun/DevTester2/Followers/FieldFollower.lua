@@ -43,6 +43,9 @@ function FieldFollower.render(node)
         return
     end
 
+    -- Determine if we're working with static fields (type definition) or instance fields (managed object)
+    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+
     imnodes.begin_node(node.node_id)
 
     BaseFollower.render_title_bar(node, parent_type)
@@ -61,7 +64,7 @@ function FieldFollower.render(node)
     end
 
     -- Build field list
-    local fields = Nodes.get_fields_for_combo(parent_type)
+    local fields = Nodes.get_fields_for_combo(parent_type, is_static_context)
     if #fields > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
         if not node.selected_field_combo then
@@ -103,11 +106,18 @@ function FieldFollower.render(node)
             -- If we have a valid field selection, initialize manual input with current value
             if node.field_group_index and node.field_index then
                 local current_field = Nodes.get_field_by_group_and_index(parent_type, 
-                    node.field_group_index, node.field_index)
+                    node.field_group_index, node.field_index, is_static_context)
                 if current_field then
-                    local success, current_value = pcall(function()
-                        return current_field:get_data(parent_value)
-                    end)
+                    local success, current_value
+                    if is_static_context then
+                        success, current_value = pcall(function()
+                            return current_field:get_data(nil)
+                        end)
+                    else
+                        success, current_value = pcall(function()
+                            return current_field:get_data(parent_value)
+                        end)
+                    end
                     if success and current_value ~= nil then
                         node.value_manual_input = tostring(current_value)
                     end
@@ -126,7 +136,7 @@ function FieldFollower.render(node)
         local selected_field = nil
         if node.field_group_index and node.field_index then
             selected_field = Nodes.get_field_by_group_and_index(parent_type, 
-                node.field_group_index, node.field_index)
+                node.field_group_index, node.field_index, is_static_context)
         end
         
         -- Handle value input for Set
@@ -221,19 +231,36 @@ function FieldFollower.execute(node, parent_value, selected_field)
         return nil
     end
 
+    -- Determine if we're working with static fields
+    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+
     local success, result
 
     if node.action_type == 0 then -- Get
-        success, result = pcall(function()
-            return selected_field:get_data(parent_value)
-        end)
+        if is_static_context then
+            -- Static field get - call on nil (type definition context)
+            success, result = pcall(function()
+                return selected_field:get_data(nil)
+            end)
+        else
+            -- Instance field get
+            success, result = pcall(function()
+                return selected_field:get_data(parent_value)
+            end)
+        end
     else -- Set
         -- Check if setting is active
         if not node.set_active then
             -- Return current field value without setting
-            success, result = pcall(function()
-                return selected_field:get_data(parent_value)
-            end)
+            if is_static_context then
+                success, result = pcall(function()
+                    return selected_field:get_data(nil)
+                end)
+            else
+                success, result = pcall(function()
+                    return selected_field:get_data(parent_value)
+                end)
+            end
         else
             -- Try to get value from connected input first
             local set_value = nil
@@ -258,16 +285,28 @@ function FieldFollower.execute(node, parent_value, selected_field)
                     set_value = Utils.parse_primitive_value(manual_input)
                 else
                     -- Use current field value
-                    set_value = selected_field:get_data(parent_value)
+                    if is_static_context then
+                        set_value = selected_field:get_data(nil)
+                    else
+                        set_value = selected_field:get_data(parent_value)
+                    end
                 end
             end
 
             -- Execute set operation
-            
-            success, result = pcall(function()
-                parent_value:set_field(selected_field:get_name(), set_value)
-                return selected_field:get_data(parent_value) -- Return the new value
-            end)
+            if is_static_context then
+                -- Static field set - call on nil (type definition context)
+                success, result = pcall(function()
+                    parent_value:set_field(selected_field:get_name(), set_value)
+                    return selected_field:get_data(nil) -- Return the new value
+                end)
+            else
+                -- Instance field set
+                success, result = pcall(function()
+                    parent_value:set_field(selected_field:get_name(), set_value)
+                    return selected_field:get_data(parent_value) -- Return the new value
+                end)
+            end
         end
     end
 
