@@ -29,10 +29,14 @@ local ArrayFollower = {}
 
 function ArrayFollower.render(node)
     local parent_value = BaseFollower.check_parent_connection(node)
-    if not parent_value then return end
+    if not parent_value then 
+        node.status = "Waiting for parent connection"
+        return 
+    end
 
     -- Verify it's an array by trying to get size
     if not Utils.is_array(parent_value) then
+        node.status = "Parent is not an array"
         Nodes.render_disconnected_operation_node(node, "type_error")
         return
     end
@@ -295,7 +299,7 @@ function ArrayFollower.execute(node, parent_value)
         node.status = "Error: " .. tostring(result)
         return nil
     else
-        node.status = nil
+        node.status = "Array access: index " .. selected_index
         return result
     end
 end

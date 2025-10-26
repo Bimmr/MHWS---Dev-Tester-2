@@ -35,7 +35,10 @@ local FieldFollower = {}
 -- TODO: Putting an array in a set field will crash the game - need to handle that case
 function FieldFollower.render(node)
     local parent_value = BaseFollower.check_parent_connection(node)
-    if not parent_value then return end
+    if not parent_value then 
+        node.status = "Waiting for parent connection"
+        return 
+    end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
     if not parent_type then
@@ -314,7 +317,17 @@ function FieldFollower.execute(node, parent_value, selected_field)
         node.status = "Error: " .. tostring(result)
         return nil
     else
-        node.status = nil
+        -- Set success status based on operation type and context
+        local operation = is_static_context and "Static " or "Instance "
+        if node.action_type == 0 then
+            operation = operation .. "Get"
+        else
+            operation = operation .. "Set"
+        end
+        
+        local field_name = selected_field:get_name()
+        node.status = operation .. ": " .. field_name
+        
         return result
     end
 end

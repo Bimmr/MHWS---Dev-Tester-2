@@ -33,7 +33,10 @@ local MethodFollower = {}
 
 function MethodFollower.render(node)
     local parent_value = BaseFollower.check_parent_connection(node)
-    if not parent_value then return end
+    if not parent_value then 
+        node.status = "Waiting for parent connection"
+        return 
+    end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
     if not parent_type then
@@ -407,7 +410,24 @@ function MethodFollower.execute(node, parent_value, selected_method)
         node.status = "Error: " .. tostring(result)
         return nil
     else
-        node.status = nil
+        -- Set success status based on operation type and context
+        local operation = is_static_context and "Static " or "Instance "
+        if node.action_type == 0 then
+            operation = operation .. "Run"
+        else
+            operation = operation .. "Call"
+        end
+        
+        local method_name = selected_method:get_name()
+        local return_type = selected_method:get_return_type()
+        local is_void = return_type and return_type:get_name() == "System.Void"
+        
+        if is_void then
+            node.status = operation .. ": " .. method_name .. " (void)"
+        else
+            node.status = operation .. ": " .. method_name
+        end
+        
         return result
     end
 end
