@@ -843,6 +843,21 @@ function Nodes.get_link_by_id(link_id)
 end
 
 -- ========================================
+-- Connection Utilities
+-- ========================================
+
+-- Get the source output pin that a given input pin is connected to
+-- Returns the from_pin (output pin ID) that the specified input pin is connected to, or nil if not connected
+function Nodes.get_connected_output_pin(to_node_id, to_pin_attr)
+    for _, link in ipairs(State.all_links) do
+        if link.to_node == to_node_id and link.to_pin == to_pin_attr then
+            return link.from_pin
+        end
+    end
+    return nil
+end
+
+-- ========================================
 -- Value Resolution
 -- ========================================
 
@@ -863,34 +878,42 @@ function Nodes.get_parent_value(node)
     
     -- For Hook starters, determine which output we're connected to
     -- Find the link connecting this node to its parent
-    local connection_pin = nil
-    for _, link in ipairs(State.all_links) do
-        if link.to_node == node.id and link.to_pin == node.input_attr then
-            connection_pin = link.from_pin
-            break
-        end
-    end
+    local connection_pin = Nodes.get_connected_output_pin(node.id, node.input_attr)
     
     if not connection_pin then
+        log.debug("get_parent_value: No connection_pin found, returning ending_value")
         return parent.ending_value -- Fallback
+    end
+    
+    log.debug("get_parent_value: connection_pin = " .. tostring(connection_pin))
+    log.debug("get_parent_value: parent.output_attr = " .. tostring(parent.output_attr))
+    log.debug("get_parent_value: parent.return_attr = " .. tostring(parent.return_attr))
+    if parent.hook_arg_attrs then
+        for i, pin in ipairs(parent.hook_arg_attrs) do
+            log.debug("get_parent_value: parent.hook_arg_attrs[" .. i .. "] = " .. tostring(pin))
+        end
     end
     
     -- Determine which output pin we're connected to
     if connection_pin == parent.output_attr then
         -- Connected to managed object output
+        log.debug("get_parent_value: Connected to output_attr, returning ending_value")
         return parent.ending_value
     elseif connection_pin == parent.return_attr then
         -- Connected to return value output
+        log.debug("get_parent_value: Connected to return_attr, returning return_value")
         return parent.return_value
     elseif parent.hook_arg_attrs then
         for i, pin in ipairs(parent.hook_arg_attrs) do
             if pin == connection_pin then
+                log.debug("get_parent_value: Connected to hook_arg_attrs[" .. i .. "], returning hook_arg_values[" .. i .. "] = " .. tostring(parent.hook_arg_values and parent.hook_arg_values[i]))
                 return parent.hook_arg_values and parent.hook_arg_values[i]
             end
         end
     end
     
     -- Fallback
+    log.debug("get_parent_value: No pin match found, returning ending_value as fallback")
     return parent.ending_value
 end
 

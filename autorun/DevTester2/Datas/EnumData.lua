@@ -203,9 +203,34 @@ function EnumData.execute(node)
     local input_type_name = nil
     if node.path_input_connection then
         local connected_node = Nodes.find_node_by_id(node.path_input_connection)
+        
         if connected_node then
-            -- Check if connected to a HookStarter with return value
-            if connected_node.return_value and connected_node.return_type_full_name then
+            -- Special handling for HookStarter connections
+            if connected_node.category == Constants.NODE_CATEGORY_STARTER and connected_node.type == Constants.STARTER_TYPE_HOOK then
+                -- Find which HookStarter output pin we're connected to
+                local connection_pin = Nodes.get_connected_output_pin(node.id, node.path_input_attr)
+                
+                if connection_pin then
+                    if connection_pin == connected_node.return_attr then
+                        -- Connected to return value output
+                        input_type_name = connected_node.return_type_full_name
+                        path_input_value = connected_node.return_value
+                    elseif connected_node.hook_arg_attrs then
+                        -- Check if connected to an argument output
+                        for i, arg_attr in ipairs(connected_node.hook_arg_attrs) do
+                            if arg_attr == connection_pin then
+                                -- Connected to argument i
+                                if connected_node.param_types and connected_node.param_types[i] then
+                                    local param_type = connected_node.param_types[i]
+                                    input_type_name = param_type:get_full_name()
+                                end
+                                path_input_value = connected_node.hook_arg_values and connected_node.hook_arg_values[i]
+                                break
+                            end
+                        end
+                    end
+                end
+            elseif connected_node.return_value and connected_node.return_type_full_name then
                 input_type_name = connected_node.return_type_full_name
                 path_input_value = connected_node.return_value
             elseif connected_node.ending_value and connected_node.ending_value_full_name then
