@@ -615,10 +615,30 @@ function Config.deserialize_link(data, node_map)
         to_node.param_connections[data.parameter_index] = from_node.id
     elseif data.connection_type == "value" then
         to_node.value_connection = from_node.id
+    elseif data.connection_type == "array_index" then
+        to_node.index_connection = from_node.id
+    elseif data.connection_type == "operation_input1" then
+        to_node.input1_connection = from_node.id
+    elseif data.connection_type == "operation_input2" then
+        to_node.input2_connection = from_node.id
     elseif data.connection_type == "data_input" then
         to_node.input_connection = from_node.id
     elseif data.connection_type == "main" then
         to_node.parent_node_id = from_node.id
+    elseif data.connection_type == "control_condition" then
+        to_node.condition_connection = from_node.id
+    elseif data.connection_type == "control_true" then
+        to_node.true_connection = from_node.id
+    elseif data.connection_type == "control_false" then
+        to_node.false_connection = from_node.id
+    elseif data.connection_type == "control_input" then
+        to_node.input_connection = from_node.id
+    elseif data.connection_type == "return_override" then
+        to_node.return_override_connection = from_node.id
+    elseif data.connection_type == "enum_path" then
+        to_node.path_input_connection = from_node.id
+    elseif data.connection_type == "enum_value" then
+        to_node.value_input_connection = from_node.id
     end
     
     return link
