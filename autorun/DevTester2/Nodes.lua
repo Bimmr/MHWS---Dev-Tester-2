@@ -275,7 +275,7 @@ function Nodes.create_utility_node(node_type, position)
         ending_value = nil,
         status = nil,
         -- Label-specific
-        text = "Enter label text..."
+        text = ""
     }
 
     table.insert(State.all_nodes, node)

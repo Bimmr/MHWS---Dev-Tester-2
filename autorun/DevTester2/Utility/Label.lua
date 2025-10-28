@@ -9,6 +9,7 @@
 
 local State = require("DevTester2.State")
 local Constants = require("DevTester2.Constants")
+local Nodes = require("DevTester2.Nodes")
 local imgui = imgui
 local imnodes = imnodes
 
@@ -24,9 +25,11 @@ function Label.render(node)
 
     -- Text input for the label content
     if not node.text then
-        node.text = "Enter label text..."
+        node.text = ""
     end
-    local changed, new_text = imgui.input_text_multiline("##label_text", node.text, Vector2f.new(Constants.NODE_WIDTH_DEFAULT, 60))
+    local width = math.max(imgui.calc_text_size(node.text).x + 20, Nodes.get_node_width(Constants.NODE_WIDTH_UTILITY, Constants.UTILITY_TYPE_LABEL)-10)
+    imgui.set_next_item_width(width)
+    local changed, new_text = imgui.input_text("##label_text", node.text)
     if changed then
         node.text = new_text
         State.mark_as_modified()
