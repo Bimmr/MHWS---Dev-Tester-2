@@ -12,6 +12,7 @@ Constants.NODE_CATEGORY_DATA = 2
 Constants.NODE_CATEGORY_FOLLOWER = 3
 Constants.NODE_CATEGORY_OPERATIONS = 4
 Constants.NODE_CATEGORY_CONTROL = 5
+Constants.NODE_CATEGORY_UTILITY = 6
 
 -- ========================================
 -- Node Types (within categories)
@@ -41,6 +42,10 @@ Constants.OPERATIONS_TYPE_COMPARE = 4
 
 -- Control Node Types
 Constants.CONTROL_TYPE_SELECT = 1
+Constants.CONTROL_TYPE_TOGGLE = 2
+
+-- Utility Node Types
+Constants.UTILITY_TYPE_LABEL = 1
 
 -- Math Operation Types
 Constants.MATH_OPERATION_ADD = 1
@@ -90,6 +95,8 @@ Constants.NODE_COLOR_OPERATIONS = 0xFF9C27B0            -- Purple
 
 Constants.NODE_COLOR_CONTROL = 0xFF9C27B0               -- Purple
 
+Constants.NODE_COLOR_UTILITY = 0xFF607D8B               -- Blue Gray
+
 Constants.NODE_COLOR_DEFAULT = 0xFF222222              -- Black
 Constants.NODE_COLOR_DEFAULT_HOVER = 0xFF3C3C3C         -- Dark Gray
 Constants.NODE_COLOR_DEFAULT_SELECTED = 0xFF3C3C3C      -- Dark Gray
@@ -105,6 +112,8 @@ Constants.NODE_WIDTH_OPERATIONS_INVERT = 150
 Constants.NODE_WIDTH_DATA = 200
 Constants.NODE_WIDTH_DATA_ENUM = 300
 Constants.NODE_WIDTH_DATA_PRIMITIVE = 150
+
+Constants.NODE_WIDTH_UTILITY = 250
 
 -- ========================================
 -- UI Dimensions

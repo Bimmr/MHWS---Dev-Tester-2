@@ -234,17 +234,48 @@ function Nodes.create_control_node(node_type, position)
         type = node_type,
         position = position or {x = 50, y = 50},
         ending_value = nil,
+        status = nil
+    }
+
+    -- Set type-specific properties
+    if node_type == Constants.CONTROL_TYPE_SELECT then
+        node.condition_attr = State.next_pin_id()
+        node.true_attr = State.next_pin_id()
+        node.false_attr = State.next_pin_id()
+        node.output_attr = State.next_pin_id()
+        node.condition_connection = nil
+        node.true_connection = nil
+        node.false_connection = nil
+        node.condition_manual_value = ""
+        node.true_manual_value = ""
+        node.false_manual_value = ""
+    elseif node_type == Constants.CONTROL_TYPE_TOGGLE then
+        node.input_attr = State.next_pin_id()
+        node.output_attr = State.next_pin_id()
+        node.input_connection = nil
+        node.input_manual_value = ""
+        node.toggle_enabled = false
+    end
+
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
+    State.mark_as_modified()
+    return node
+end
+
+function Nodes.create_utility_node(node_type, position)
+    local node_id = State.next_node_id()
+
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_UTILITY,
+        type = node_type,
+        position = position or {x = 50, y = 50},
+        ending_value = nil,
         status = nil,
-        condition_attr = State.next_pin_id(),
-        true_attr = State.next_pin_id(),
-        false_attr = State.next_pin_id(),
-        output_attr = State.next_pin_id(),
-        condition_connection = nil,
-        true_connection = nil,
-        false_connection = nil,
-        condition_manual_value = "",
-        true_manual_value = "",
-        false_manual_value = ""
+        -- Label-specific
+        text = "Enter label text..."
     }
 
     table.insert(State.all_nodes, node)
@@ -490,7 +521,7 @@ function Nodes.remove_starter_node(node)
                 break
             end
         end
-    elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
+    elseif node.category == Constants.NODE_CATEGORY_OPERATIONS or node.category == Constants.NODE_CATEGORY_UTILITY then
         for i, n in ipairs(State.all_nodes) do
             if n.id == node.id then
                 table.remove(State.all_nodes, i)
@@ -700,6 +731,10 @@ function Nodes.handle_link_created(start_pin, end_pin)
         -- Control false value input connection
         local link = Nodes.create_link("control_false", from_node, start_pin, to_node, end_pin)
         to_node.false_connection = from_node.id
+    elseif to_pin_type == "control_input" then
+        -- Control input connection (for Toggle node)
+        local link = Nodes.create_link("control_input", from_node, start_pin, to_node, end_pin)
+        to_node.input_connection = from_node.id
     elseif to_pin_type == "return_override_input" then
         -- Return override connection
         local link = Nodes.create_link("return_override", from_node, start_pin, to_node, end_pin)
@@ -741,6 +776,8 @@ function Nodes.handle_link_destroyed(link_id)
                     to_node.true_connection = nil
                 elseif link.connection_type == "control_false" then
                     to_node.false_connection = nil
+                elseif link.connection_type == "control_input" then
+                    to_node.input_connection = nil
                 elseif link.connection_type == "return_override" then
                     to_node.return_override_connection = nil
                 elseif link.connection_type == "enum_path" then
@@ -797,7 +834,16 @@ function Nodes.find_node_by_pin(pin_id)
     
     -- Search operation nodes
     for _, node in ipairs(State.all_nodes) do
-        if node.input_attr == pin_id then
+        -- Check control-specific inputs first
+        if node.condition_attr == pin_id then
+            return node, "control_condition_input"
+        elseif node.true_attr == pin_id then
+            return node, "control_true_input"
+        elseif node.false_attr == pin_id then
+            return node, "control_false_input"
+        elseif node.input_attr == pin_id and node.category == Constants.NODE_CATEGORY_CONTROL then
+            return node, "control_input"
+        elseif node.input_attr == pin_id then
             return node, "main_input"
         elseif node.output_attr == pin_id then
             return node, "output"
@@ -805,12 +851,6 @@ function Nodes.find_node_by_pin(pin_id)
             return node, "operation_input1"
         elseif node.input2_attr == pin_id then
             return node, "operation_input2"
-        elseif node.condition_attr == pin_id then
-            return node, "control_condition_input"
-        elseif node.true_attr == pin_id then
-            return node, "control_true_input"
-        elseif node.false_attr == pin_id then
-            return node, "control_false_input"
         else
             -- Check parameter pins
             if node.param_input_attrs then
@@ -1514,6 +1554,11 @@ function Nodes.validate_and_restore_starter_node(node)
         elseif node.type == Constants.DATA_TYPE_VARIABLE then
             -- For variables, ending_value will be determined by the VariableData.get_variable_value function
             node.ending_value = nil  -- Will be set during execution
+            node.status = "Ready"
+        end
+    elseif node.category == Constants.NODE_CATEGORY_UTILITY then
+        if node.type == Constants.UTILITY_TYPE_LABEL then
+            -- Label nodes are ready to use immediately
             node.status = "Ready"
         end
     end

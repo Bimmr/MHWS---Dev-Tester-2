@@ -25,6 +25,8 @@ local MathOperation = require("DevTester2.Operations.MathOperation")
 local LogicOperation = require("DevTester2.Operations.LogicOperation")
 local CompareOperation = require("DevTester2.Operations.CompareOperation")
 local SelectControl = require("DevTester2.Control.SelectControl")
+local ToggleControl = require("DevTester2.Control.ToggleControl")
+local Label = require("DevTester2.Utility.Label")
 
 -- Local references
 local re = re
@@ -209,6 +211,22 @@ function render_control_menu_items(position)
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
     end
+    
+    if imgui.menu_item("Toggle") then
+        Nodes.create_control_node(Constants.CONTROL_TYPE_TOGGLE, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Toggle node that controls data flow with an on/off switch")
+    end
+end
+
+function render_utility_menu_items(position)
+    if imgui.menu_item("Label") then
+        Nodes.create_utility_node(Constants.UTILITY_TYPE_LABEL, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Label node for adding text comments and documentation to your node graph")
+    end
 end
 
 function render_follower_menu_item(position)
@@ -239,6 +257,11 @@ function render_node_creation_menu(position)
     
     if imgui.begin_menu("Add Control") then
         render_control_menu_items(position)
+        imgui.end_menu()
+    end
+    
+    if imgui.begin_menu("Add Utility") then
+        render_utility_menu_items(position)
         imgui.end_menu()
     end
     
@@ -293,6 +316,12 @@ function render_menu_bar()
         -- Create Control dropdown menu
         if imgui.begin_menu("+ Create Control  ▼") then
             render_control_menu_items(nil, true)
+            imgui.end_menu()
+        end
+        
+        -- Create Utility dropdown menu
+        if imgui.begin_menu("+ Create Utility  ▼") then
+            render_utility_menu_items(nil, true)
             imgui.end_menu()
         end
         
@@ -419,6 +448,19 @@ function render_node_editor()
 
             if node.type == Constants.CONTROL_TYPE_SELECT then
                 SelectControl.render(node)
+            elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
+                ToggleControl.render(node)
+            end
+
+            imgui.pop_item_width()
+            Nodes.reset_node_titlebar_color()
+        elseif node.category == Constants.NODE_CATEGORY_UTILITY then
+            local category, type = Utils.parse_category_and_type(node.category, node.type)
+            imgui.push_item_width(Nodes.get_node_width(category, type))
+            Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
+
+            if node.type == Constants.UTILITY_TYPE_LABEL then
+                Label.render(node)
             end
 
             imgui.pop_item_width()
