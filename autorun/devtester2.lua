@@ -26,6 +26,7 @@ local LogicOperation = require("DevTester2.Operations.LogicOperation")
 local CompareOperation = require("DevTester2.Operations.CompareOperation")
 local SelectControl = require("DevTester2.Control.SelectControl")
 local ToggleControl = require("DevTester2.Control.ToggleControl")
+local CounterControl = require("DevTester2.Control.CounterControl")
 local Label = require("DevTester2.Utility.Label")
 
 -- Local references
@@ -217,6 +218,13 @@ function render_control_menu_items(position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Toggle node that controls data flow with an on/off switch")
+    end
+    
+    if imgui.menu_item("Counter") then
+        Nodes.create_control_node(Constants.CONTROL_TYPE_COUNTER, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Counter node that counts up to a maximum value and can be restarted")
     end
 end
 
@@ -450,6 +458,8 @@ function render_node_editor()
                 SelectControl.render(node)
             elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
                 ToggleControl.render(node)
+            elseif node.type == Constants.CONTROL_TYPE_COUNTER then
+                CounterControl.render(node)
             end
 
             imgui.pop_item_width()

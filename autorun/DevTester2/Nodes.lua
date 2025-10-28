@@ -251,10 +251,23 @@ function Nodes.create_control_node(node_type, position)
         node.false_manual_value = ""
     elseif node_type == Constants.CONTROL_TYPE_TOGGLE then
         node.input_attr = State.next_pin_id()
+        node.enabled_attr = State.next_pin_id()
         node.output_attr = State.next_pin_id()
         node.input_connection = nil
+        node.enabled_connection = nil
         node.input_manual_value = ""
-        node.toggle_enabled = false
+        node.enabled_manual_value = false
+    elseif node_type == Constants.CONTROL_TYPE_COUNTER then
+        node.max_attr = State.next_pin_id()
+        node.active_attr = State.next_pin_id()
+        node.restart_attr = State.next_pin_id()
+        node.output_attr = State.next_pin_id()
+        node.max_connection = nil
+        node.active_connection = nil
+        node.restart_connection = nil
+        node.max_manual_value = "10"
+        node.active_manual_value = false
+        node.restart_manual_value = false
     end
 
     table.insert(State.all_nodes, node)
@@ -735,6 +748,22 @@ function Nodes.handle_link_created(start_pin, end_pin)
         -- Control input connection (for Toggle node)
         local link = Nodes.create_link("control_input", from_node, start_pin, to_node, end_pin)
         to_node.input_connection = from_node.id
+    elseif to_pin_type == "control_enabled_input" then
+        -- Control enabled input connection (for Toggle node)
+        local link = Nodes.create_link("control_enabled", from_node, start_pin, to_node, end_pin)
+        to_node.enabled_connection = from_node.id
+    elseif to_pin_type == "control_active_input" then
+        -- Control active input connection (for Counter node)
+        local link = Nodes.create_link("control_active", from_node, start_pin, to_node, end_pin)
+        to_node.active_connection = from_node.id
+    elseif to_pin_type == "control_restart_input" then
+        -- Control restart input connection (for Counter node)
+        local link = Nodes.create_link("control_restart", from_node, start_pin, to_node, end_pin)
+        to_node.restart_connection = from_node.id
+    elseif to_pin_type == "control_max_input" then
+        -- Control max input connection (for Counter node)
+        local link = Nodes.create_link("control_max", from_node, start_pin, to_node, end_pin)
+        to_node.max_connection = from_node.id
     elseif to_pin_type == "return_override_input" then
         -- Return override connection
         local link = Nodes.create_link("return_override", from_node, start_pin, to_node, end_pin)
@@ -778,6 +807,14 @@ function Nodes.handle_link_destroyed(link_id)
                     to_node.false_connection = nil
                 elseif link.connection_type == "control_input" then
                     to_node.input_connection = nil
+                elseif link.connection_type == "control_enabled" then
+                    to_node.enabled_connection = nil
+                elseif link.connection_type == "control_active" then
+                    to_node.active_connection = nil
+                elseif link.connection_type == "control_restart" then
+                    to_node.restart_connection = nil
+                elseif link.connection_type == "control_max" then
+                    to_node.max_connection = nil
                 elseif link.connection_type == "return_override" then
                     to_node.return_override_connection = nil
                 elseif link.connection_type == "enum_path" then
@@ -841,6 +878,14 @@ function Nodes.find_node_by_pin(pin_id)
             return node, "control_true_input"
         elseif node.false_attr == pin_id then
             return node, "control_false_input"
+        elseif node.enabled_attr == pin_id then
+            return node, "control_enabled_input"
+        elseif node.active_attr == pin_id then
+            return node, "control_active_input"
+        elseif node.restart_attr == pin_id then
+            return node, "control_restart_input"
+        elseif node.max_attr == pin_id then
+            return node, "control_max_input"
         elseif node.input_attr == pin_id and node.category == Constants.NODE_CATEGORY_CONTROL then
             return node, "control_input"
         elseif node.input_attr == pin_id then
@@ -1549,7 +1594,7 @@ function Nodes.validate_and_restore_starter_node(node)
             end
         elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
             -- Restore the value as ending_value
-            node.ending_value = node.value
+            node.ending_value = Utils.parse_primitive_value(node.value)
             node.status = "Ready"
         elseif node.type == Constants.DATA_TYPE_VARIABLE then
             -- For variables, ending_value will be determined by the VariableData.get_variable_value function
@@ -1563,6 +1608,5 @@ function Nodes.validate_and_restore_starter_node(node)
         end
     end
 end
-
 
 return Nodes

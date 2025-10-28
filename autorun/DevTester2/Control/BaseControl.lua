@@ -110,36 +110,56 @@ function BaseControl.render_debug_info(node)
     end
 end
 
-function BaseControl.render_input_pin(node, label, attr_name, converted_value, original_value)
+function BaseControl.render_input_pin(node, label, attr_name, converted_value, original_value, input_type)
     -- Create input attribute if needed
     if not node[attr_name] then
         node[attr_name] = State.next_pin_id()
     end
 
-    imnodes.begin_input_attribute(node[attr_name])
-    imgui.text(label)
-    imnodes.end_input_attribute()
-
-    imgui.same_line()
-    
     -- Check if this input is connected
     local connection_name = attr_name:gsub("_attr", "_connection")
     local manual_name = attr_name:gsub("_attr", "_manual_value")
     local has_connection = node[connection_name] ~= nil
+
+    imnodes.begin_input_attribute(node[attr_name])
+    imgui.text(label)
+    imnodes.end_input_attribute()
     
-    if has_connection then
-        -- Show connected value in disabled input
-        local display_value = original_value ~= nil and tostring(converted_value) or "(no input)"
-        imgui.begin_disabled()
-        imgui.input_text("##" .. attr_name, display_value)
-        imgui.end_disabled()
-    else
-        -- Show manual input field
-        node[manual_name] = node[manual_name] or ""
-        local input_changed, new_value = imgui.input_text("##" .. attr_name, node[manual_name])
-        if input_changed then
-            node[manual_name] = new_value
-            State.mark_as_modified()
+    imgui.same_line()
+    
+    if input_type == "checkbox" then
+        -- Handle checkbox input
+        if has_connection then
+            -- Show connected value in disabled checkbox
+            local bool_value = original_value ~= nil and not not converted_value
+            imgui.begin_disabled()
+            imgui.checkbox("##" .. attr_name, bool_value)
+            imgui.end_disabled()
+        else
+            -- Show manual checkbox
+            node[manual_name] = node[manual_name] or false
+            local checkbox_changed, new_value = imgui.checkbox("##" .. attr_name, node[manual_name])
+            if checkbox_changed then
+                node[manual_name] = new_value
+                State.mark_as_modified()
+            end
+        end
+    elseif input_type == "text" then
+        -- Handle text input (default behavior)
+        if has_connection then
+            -- Show connected value in disabled input
+            local display_value = original_value ~= nil and tostring(converted_value) or "(no input)"
+            imgui.begin_disabled()
+            imgui.input_text("##" .. attr_name, display_value)
+            imgui.end_disabled()
+        else
+            -- Show manual input field
+            node[manual_name] = node[manual_name] or ""
+            local input_changed, new_value = imgui.input_text("##" .. attr_name, node[manual_name])
+            if input_changed then
+                node[manual_name] = new_value
+                State.mark_as_modified()
+            end
         end
     end
 end

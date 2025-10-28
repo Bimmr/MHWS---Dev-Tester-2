@@ -87,9 +87,9 @@ function SelectControl.render(node)
     local condition_bool = not not condition_value  -- Convert to boolean (nil becomes false)
 
     -- Input pins
-    BaseControl.render_input_pin(node, "Condition", "condition_attr", condition_bool, condition_value)
-    BaseControl.render_input_pin(node, "True", "true_attr", true_value, true_value)
-    BaseControl.render_input_pin(node, "False", "false_attr", false_value, false_value)
+    BaseControl.render_input_pin(node, "Condition", "condition_attr", condition_bool, condition_value, "checkbox")
+    BaseControl.render_input_pin(node, "True", "true_attr", true_value, true_value, "text")
+    BaseControl.render_input_pin(node, "False", "false_attr", false_value, false_value, "text")
 
     -- Create tooltip for output
     local tooltip_text = nil

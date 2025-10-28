@@ -43,6 +43,7 @@ Constants.OPERATIONS_TYPE_COMPARE = 4
 -- Control Node Types
 Constants.CONTROL_TYPE_SELECT = 1
 Constants.CONTROL_TYPE_TOGGLE = 2
+Constants.CONTROL_TYPE_COUNTER = 3
 
 -- Utility Node Types
 Constants.UTILITY_TYPE_LABEL = 1

@@ -159,15 +159,38 @@ function Config.serialize_node(node)
     elseif node.category == Constants.NODE_CATEGORY_CONTROL then
         data.category = node.category
         data.type = node.type
-        -- Control nodes have multiple input/output attributes
-        data.condition_attr = node.condition_attr
-        data.true_attr = node.true_attr
-        data.false_attr = node.false_attr
-        data.output_attr = node.output_attr
-        -- Manual values
-        data.condition_manual_value = node.condition_manual_value
-        data.true_manual_value = node.true_manual_value
-        data.false_manual_value = node.false_manual_value
+        
+        -- Type-specific attributes
+        if node.type == Constants.CONTROL_TYPE_SELECT then
+            data.condition_attr = node.condition_attr
+            data.true_attr = node.true_attr
+            data.false_attr = node.false_attr
+            data.output_attr = node.output_attr
+            -- Manual values
+            data.condition_manual_value = node.condition_manual_value
+            data.true_manual_value = node.true_manual_value
+            data.false_manual_value = node.false_manual_value
+        elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
+            data.input_attr = node.input_attr
+            data.enabled_attr = node.enabled_attr
+            data.output_attr = node.output_attr
+            -- Manual values
+            data.input_manual_value = node.input_manual_value
+            data.enabled_manual_value = node.enabled_manual_value
+        elseif node.type == Constants.CONTROL_TYPE_COUNTER then
+            data.max_attr = node.max_attr
+            data.active_attr = node.active_attr
+            data.restart_attr = node.restart_attr
+            data.output_attr = node.output_attr
+            -- Manual values
+            data.max_manual_value = node.max_manual_value
+            data.active_manual_value = node.active_manual_value
+            data.restart_manual_value = node.restart_manual_value
+            -- Runtime values
+            data.current_count = node.current_count
+            data.delay_ms = node.delay_ms
+            data.last_increment_time = node.last_increment_time
+        end
     elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
         data.category = node.category
         data.type = node.type
@@ -522,17 +545,41 @@ function Config.deserialize_node(data)
             category = data.category,
             type = data.type,
             position = data.position or {x = 0, y = 0},
-            condition_attr = data.condition_attr,
-            true_attr = data.true_attr,
-            false_attr = data.false_attr,
-            output_attr = data.output_attr,
             ending_value = nil,
-            status = nil,
-            -- Manual values
-            condition_manual_value = data.condition_manual_value or "",
-            true_manual_value = data.true_manual_value or "",
-            false_manual_value = data.false_manual_value or ""
+            status = nil
         }
+        
+        -- Type-specific attributes
+        if data.type == Constants.CONTROL_TYPE_SELECT then
+            node.condition_attr = data.condition_attr
+            node.true_attr = data.true_attr
+            node.false_attr = data.false_attr
+            node.output_attr = data.output_attr
+            -- Manual values
+            node.condition_manual_value = data.condition_manual_value or ""
+            node.true_manual_value = data.true_manual_value or ""
+            node.false_manual_value = data.false_manual_value or ""
+        elseif data.type == Constants.CONTROL_TYPE_TOGGLE then
+            node.input_attr = data.input_attr
+            node.enabled_attr = data.enabled_attr
+            node.output_attr = data.output_attr
+            -- Manual values
+            node.input_manual_value = data.input_manual_value or ""
+            node.enabled_manual_value = data.enabled_manual_value or false
+        elseif data.type == Constants.CONTROL_TYPE_COUNTER then
+            node.max_attr = data.max_attr
+            node.active_attr = data.active_attr
+            node.restart_attr = data.restart_attr
+            node.output_attr = data.output_attr
+            -- Manual values
+            node.max_manual_value = data.max_manual_value or "10"
+            node.active_manual_value = data.active_manual_value or false
+            node.restart_manual_value = data.restart_manual_value or false
+            -- Runtime values
+            node.current_count = data.current_count or 0
+            node.delay_ms = data.delay_ms or 1000
+            node.last_increment_time = data.last_increment_time
+        end
         
     elseif data.category == Constants.NODE_CATEGORY_FOLLOWER then
         node = {
@@ -633,6 +680,14 @@ function Config.deserialize_link(data, node_map)
         to_node.false_connection = from_node.id
     elseif data.connection_type == "control_input" then
         to_node.input_connection = from_node.id
+    elseif data.connection_type == "control_enabled" then
+        to_node.enabled_connection = from_node.id
+    elseif data.connection_type == "control_active" then
+        to_node.active_connection = from_node.id
+    elseif data.connection_type == "control_restart" then
+        to_node.restart_connection = from_node.id
+    elseif data.connection_type == "control_max" then
+        to_node.max_connection = from_node.id
     elseif data.connection_type == "return_override" then
         to_node.return_override_connection = from_node.id
     elseif data.connection_type == "enum_path" then
