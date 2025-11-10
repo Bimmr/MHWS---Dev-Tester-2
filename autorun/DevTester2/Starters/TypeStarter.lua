@@ -36,7 +36,7 @@ function TypeStarter.render(node)
     -- Always sync output pin value with ending_value on every render
     output_pin.value = node.ending_value
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     imnodes.begin_node_titlebar()
     imgui.text("Type Starter")
@@ -90,7 +90,7 @@ function TypeStarter.render(node)
         imgui.spacing()
         imnodes.begin_output_attribute(output_pin.id)
         local display = display_value .. " (?)"
-        local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
+        local debug_pos = Utils.get_right_cursor_pos(node.id, display)
         imgui.set_cursor_pos(debug_pos)
         imgui.text(display_value)
         imgui.same_line()

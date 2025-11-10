@@ -40,7 +40,7 @@ function BaseControl.render_output_attribute(node, display_value, tooltip_text)
 
     -- Display value with tooltip
     local display = display_value .. " (?)"
-    local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
+    local debug_pos = Utils.get_right_cursor_pos(node.id, display)
     imgui.set_cursor_pos(debug_pos)
     imgui.text(display_value)
     imgui.same_line()
@@ -90,7 +90,7 @@ function BaseControl.render_debug_info(node)
 
         debug_info = debug_info .. string.format(
             "\n\nNode ID: %s\nOutput Pins: %s\nInput Links: %s\nOutput Links: %s",
-            tostring(node.node_id),
+            tostring(node.id),
             #output_pins > 0 and table.concat(output_pins, ", ") or "None",
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
@@ -111,7 +111,7 @@ function BaseControl.render_debug_info(node)
         end
 
     -- Position debug info in top right
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     if imgui.is_item_hovered() then
@@ -183,7 +183,6 @@ function BaseControl.create(node_type, position)
 
     local node = {
         id = node_id,
-        node_id = node_id,
         category = Constants.NODE_CATEGORY_CONTROL,
         type = node_type,
         position = position or {x = 50, y = 50},

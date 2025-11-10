@@ -210,7 +210,7 @@ function BaseFollower.render_debug_info(node)
 
         debug_info = debug_info .. string.format(
             "\n\nNode ID: %s\nInput Links: %s\nOutput Links: %s",
-            tostring(node.node_id),
+            tostring(node.id),
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
         )
@@ -230,7 +230,7 @@ function BaseFollower.render_debug_info(node)
     end
 
     -- Align debug info to the top right of the node
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
 
@@ -257,7 +257,7 @@ function BaseFollower.render_action_buttons(node, can_add_child)
     if should_show_add then
         imgui.same_line()
         local display_width = imgui.calc_text_size("+ Add Child Node").x
-        local node_width = imnodes.get_node_dimensions(node.node_id).x
+        local node_width = imnodes.get_node_dimensions(node.id).x
         pos.x = pos.x + node_width - display_width - 20
         imgui.set_cursor_pos(pos)
         if imgui.button("+ Add Child Node") then
@@ -275,7 +275,7 @@ function BaseFollower.create(position)
     local node_id = State.next_node_id()
     local node = {
         id = node_id,
-        node_id = node_id,
+        id = node_id,
         category = Constants.NODE_CATEGORY_FOLLOWER,
         type = Constants.FOLLOWER_TYPE_METHOD, -- Default to Method
         position = position or {x = 0, y = 0},
@@ -306,3 +306,5 @@ function BaseFollower.create(position)
 end
 
 return BaseFollower
+
+

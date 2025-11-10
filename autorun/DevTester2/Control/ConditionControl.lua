@@ -238,7 +238,6 @@ function ConditionControl.create(position)
     local node_id = State.next_node_id()
     local node = {
         id = node_id,
-        node_id = node_id,
         category = Constants.NODE_CATEGORY_CONTROL,
         type = Constants.CONTROL_TYPE_CONDITION,
         position = position or {x = 0, y = 0},

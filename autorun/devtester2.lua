@@ -476,18 +476,18 @@ function render_node_editor()
         end
         
         -- Unified positioning logic for all nodes
-        if not State.nodes_positioned[node.node_id] then
+        if not State.nodes_positioned[node.id] then
             if node.position then
-                imnodes.set_node_editor_space_pos(node.node_id, node.position.x, node.position.y)
+                imnodes.set_node_editor_space_pos(node.id, node.position.x, node.position.y)
             end
-            State.nodes_positioned[node.node_id] = true
+            State.nodes_positioned[node.id] = true
         end
         
         -- Update stored position for all nodes
         if not node.position then
             node.position = {}
         end
-        local current_pos = imnodes.get_node_editor_space_pos(node.node_id)
+        local current_pos = imnodes.get_node_editor_space_pos(node.id)
         node.position.x = current_pos.x
         node.position.y = current_pos.y
     end

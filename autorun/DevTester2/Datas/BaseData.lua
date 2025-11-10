@@ -58,7 +58,7 @@ function BaseData.render_debug_info(node)
 
         debug_info = debug_info .. string.format(
             "\n\nNode ID: %s\nOutput Pins: %s\nInput Links: %s\nOutput Links: %s",
-            tostring(node.node_id),
+            tostring(node.id),
             #output_pins > 0 and table.concat(output_pins, ", ") or "None",
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
@@ -79,7 +79,7 @@ function BaseData.render_debug_info(node)
     end
 
     -- Position debug info in top right
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     if imgui.is_item_hovered() then
@@ -88,7 +88,7 @@ function BaseData.render_debug_info(node)
 end
 
 function BaseData.render_node_hover_tooltip(node, tooltip_text)
-    if imnodes.is_node_hovered(node.node_id) then
+    if imnodes.is_node_hovered(node.id) then
         imgui.set_tooltip(tooltip_text)
     end
 end
@@ -103,7 +103,7 @@ function BaseData.create(node_type, position)
 
     local node = {
         id = node_id,
-        node_id = node_id,
+        id = node_id,
         category = Constants.NODE_CATEGORY_DATA,
         type = node_type,
         path = "",
@@ -131,3 +131,5 @@ function BaseData.create(node_type, position)
 end
 
 return BaseData
+
+

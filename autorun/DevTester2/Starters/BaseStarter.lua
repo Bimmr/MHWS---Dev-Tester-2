@@ -19,7 +19,7 @@ function BaseStarter.render_action_buttons(node)
     -- Only show Add Child Node if result is valid
     if node.ending_value then
         imgui.same_line()
-        local pos = Utils.get_right_cursor_pos(node.node_id, "+ Add Child Node")
+        local pos = Utils.get_right_cursor_pos(node.id, "+ Add Child Node")
         imgui.set_cursor_pos(pos)
         if imgui.button("+ Add Child Node") then
             Nodes.add_child_node(node)
@@ -64,7 +64,7 @@ function BaseStarter.render_debug_info(node)
     end
 
     -- Position debug info in top right
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", 0xFFDADADA)
     if imgui.is_item_hovered() then
@@ -73,7 +73,7 @@ function BaseStarter.render_debug_info(node)
 end
 
 function BaseStarter.render_node_hover_tooltip(node, tooltip_text)
-    if imnodes.is_node_hovered(node.node_id) then
+    if imnodes.is_node_hovered(node.id) then
         imgui.set_tooltip(tooltip_text)
     end
 end
@@ -88,7 +88,7 @@ function BaseStarter.create(node_type, position)
 
     local node = {
         id = node_id,
-        node_id = node_id,
+        id = node_id,
         category = Constants.NODE_CATEGORY_STARTER,
         type = node_type,
         path = "",
@@ -117,3 +117,5 @@ function BaseStarter.create(node_type, position)
 end
 
 return BaseStarter
+
+

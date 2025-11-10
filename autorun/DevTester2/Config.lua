@@ -16,7 +16,7 @@ local Config = {}
 -- ========================================
 
 function Config.get_config_directory()
-    return "DevTester2/Configs"
+    return "DevTester2/Configs/"
 end
 
 -- ========================================

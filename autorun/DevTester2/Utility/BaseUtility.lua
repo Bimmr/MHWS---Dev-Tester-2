@@ -41,7 +41,7 @@ function BaseUtility.render_debug_info(node)
     if holding_ctrl then
         debug_info = debug_info .. string.format(
             "\n\nNode ID: %s\nText: %s",
-            tostring(node.node_id),
+            tostring(node.id),
             tostring(node.text or "")
         )
 
@@ -60,7 +60,7 @@ function BaseUtility.render_debug_info(node)
     end
 
     -- Position debug info in top right
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     if imgui.is_item_hovered() then
@@ -78,7 +78,6 @@ function BaseUtility.create(node_type, position)
 
     local node = {
         id = node_id,
-        node_id = node_id,
         category = Constants.NODE_CATEGORY_UTILITY,
         type = node_type,
         position = position or {x = 50, y = 50},

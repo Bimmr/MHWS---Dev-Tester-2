@@ -17,7 +17,7 @@ local Label = {}
 
 function Label.render(node)
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     imnodes.begin_node_titlebar()
     imgui.text("Label")
@@ -40,9 +40,9 @@ function Label.render(node)
     if imgui.button("- Remove Node") then
         -- Find and remove this node from State
         for i, state_node in pairs(State.all_nodes) do
-            if state_node.node_id == node.node_id then
+            if state_node.id == node.id then
                 table.remove(State.all_nodes, i)
-                State.node_map[node.node_id] = nil
+                State.node_map[node.id] = nil
                 State.mark_as_modified()
                 break
             end

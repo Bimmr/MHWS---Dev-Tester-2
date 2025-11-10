@@ -269,7 +269,7 @@ function FieldFollower.render(node)
                 display_value = tostring(result)
             end
             local output_display = display_value .. " (?)"
-            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+            local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             if can_continue then
@@ -293,7 +293,7 @@ function FieldFollower.render(node)
             -- Display "nil" when result is nil
             local display_value = "nil"
             local output_display = display_value .. " (?)"
-            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+            local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             imgui.same_line()

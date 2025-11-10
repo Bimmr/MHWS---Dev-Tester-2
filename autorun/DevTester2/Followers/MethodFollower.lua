@@ -285,7 +285,7 @@ function MethodFollower.render(node)
                 display_value = tostring(result)
             end
             local output_display = display_value .. " (?)"
-            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+            local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             imgui.same_line()
@@ -308,7 +308,7 @@ function MethodFollower.render(node)
             -- For void methods, show execution status
             if node.action_type == 0 then -- Run mode - always executing
                 local executing_text = "Executing"
-                local pos = Utils.get_right_cursor_pos(node.node_id, executing_text)
+                local pos = Utils.get_right_cursor_pos(node.id, executing_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(executing_text)
                 if imgui.is_item_hovered() then
@@ -330,7 +330,7 @@ function MethodFollower.render(node)
                     time_since_call = string.format("%.1fs ago", elapsed)
                 end
                 local executed_text = "Executed | Last call: " .. time_since_call
-                local pos = Utils.get_right_cursor_pos(node.node_id, executed_text)
+                local pos = Utils.get_right_cursor_pos(node.id, executed_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(executed_text)
                 if imgui.is_item_hovered() then
@@ -346,14 +346,14 @@ function MethodFollower.render(node)
             else
                 -- Show ready status for void methods that haven't been called
                 local ready_text = "Ready"
-                local pos = Utils.get_right_cursor_pos(node.node_id, ready_text)
+                local pos = Utils.get_right_cursor_pos(node.id, ready_text)
                 imgui.set_cursor_pos(pos)
                 imgui.text(ready_text)
             end
         else
             -- Show nil state
             local output_text = "nil"
-            local pos = Utils.get_right_cursor_pos(node.node_id, output_text)
+            local pos = Utils.get_right_cursor_pos(node.id, output_text)
             imgui.set_cursor_pos(pos)
             imgui.text(output_text)
         end
@@ -383,7 +383,7 @@ function MethodFollower.execute(node, parent_value, selected_method)
     local params = MethodFollower.resolve_method_parameters(node, selected_method)
     if params and #params > 0 then
         -- Output all the params for debugging
-        log.debug(node.node_id.." MethodFollower: Executing method with params:".. json.dump_string(params))
+        log.debug(node.id.." MethodFollower: Executing method with params:".. json.dump_string(params))
     end
     
     -- Determine if we're calling a static method
@@ -469,3 +469,4 @@ function MethodFollower.resolve_method_parameters(node, selected_method)
 end
 
 return MethodFollower
+
