@@ -15,28 +15,41 @@ DevTester v2.0 is a powerful visual scripting tool for Monster Hunter Wilds modd
 ### 🔧 **Node Types**
 
 #### **Starter Nodes**
-- **Managed Starter**: Initialize managed objects
-- **Hook Starter**: Intercept and modify method calls
-- **Native Starter**: Access native game functions
+Entry points for your node graphs - start execution and provide initial data.
+- **Managed Starter**: Initialize managed objects from type definitions
+- **Type Starter**: Access static types and their members without instances
+- **Hook Starter**: Intercept and modify method calls in real-time
+- **Native Starter**: Call native game functions directly
 
 #### **Data Nodes**
-- **Primitive Data**: Numbers, strings, booleans
-- **Enum Data**: Game enumeration values
-- **Variable Data**: Shared variables with persistence
+Source nodes that provide values to your graph.
+- **Primitive Data**: Numbers, strings, booleans with manual input
+- **Enum Data**: Game enumeration values with dropdown selection
+- **Variable Data**: Shared variables with get/set modes and persistence
 
 #### **Follower Nodes**
-- **Method Follower**: Call object methods
-- **Field Follower**: Access object properties
-- **Array Follower**: Manipulate collections
+Process and manipulate data from parent nodes.
+- **Method Follower**: Call methods on objects with parameter support
+- **Field Follower**: Get or set object field values
+- **Array Follower**: Access array elements by index
 
 #### **Operation Nodes**
-- **Math Operations**: Add, subtract, multiply, divide, modulo, power
-- **Logic Operations**: AND, OR, NOT, XOR
-- **Compare Operations**: Equal, not equal, greater, less, etc.
-- **Invert Operation**: Boolean negation
+Mathematical and logical operations for data processing.
+- **Math Operation**: Add, subtract, multiply, divide, modulo, power, min, max
+- **Logic Operation**: AND, OR, NAND, NOR
+- **Compare Operation**: Equals, not equals, greater than, less than
+- **Invert Operation**: Boolean negation (NOT)
 
 #### **Control Nodes**
-- **Select Control**: Conditional branching
+Control flow and conditional logic.
+- **Switch Control**: Multi-way branching based on input values
+- **Toggle Control**: Enable/disable pass-through with manual or connected toggle
+- **Counter Control**: Count events with configurable start, max, and step values
+- **Condition Control**: If/else branching based on boolean conditions
+
+#### **Utility Nodes**
+Helper nodes for organization and documentation.
+- **Label**: Add text labels and comments to your node graph
 
 ### 🎣 **Advanced Hooking**
 - Method hooking with pre/post callbacks
