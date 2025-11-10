@@ -275,7 +275,6 @@ function BaseFollower.create(position)
     local node_id = State.next_node_id()
     local node = {
         id = node_id,
-        id = node_id,
         category = Constants.NODE_CATEGORY_FOLLOWER,
         type = Constants.FOLLOWER_TYPE_METHOD, -- Default to Method
         position = position or {x = 0, y = 0},

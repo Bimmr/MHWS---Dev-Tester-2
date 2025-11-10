@@ -103,7 +103,6 @@ function BaseData.create(node_type, position)
 
     local node = {
         id = node_id,
-        id = node_id,
         category = Constants.NODE_CATEGORY_DATA,
         type = node_type,
         path = "",

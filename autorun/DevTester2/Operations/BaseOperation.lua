@@ -121,7 +121,6 @@ function BaseOperation.create(node_type, position)
 
     local node = {
         id = node_id,
-        id = node_id,
         category = Constants.NODE_CATEGORY_OPERATIONS,
         type = node_type,
         position = position or {x = 50, y = 50},
