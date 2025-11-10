@@ -347,10 +347,7 @@ end
 -- ========================================
 
 function Nodes.remove_node(node)
-    -- Remove child operation nodes first
-    Nodes.remove_child_nodes(node)
-    
-    -- Remove connected links
+    -- Remove connected links (this will disconnect children without deleting them)
     Nodes.remove_links_for_node(node)
     
     -- Remove from all_nodes list

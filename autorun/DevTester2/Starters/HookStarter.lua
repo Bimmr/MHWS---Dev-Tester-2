@@ -215,7 +215,7 @@ local function render_return_info(node, is_placeholder)
         local has_return_override_connection = return_override_pin.connection ~= nil
         local return_override_label = "Return Override"
         if has_return_override_connection then
-            local connected_value = return_override_pin.connection.pin.value
+            local connected_value = Nodes.get_input_pin_value(node, 1)
             -- Display simplified value without address
             local display_value = "Object"
             if type(connected_value) == "userdata" then
@@ -762,7 +762,7 @@ function HookStarter.initialize_hook(node)
             if #node.pins.inputs > 0 then
                 local return_override_pin = node.pins.inputs[1]
                 if return_override_pin.connection then
-                    override_value = return_override_pin.connection.pin.value
+                    override_value = Nodes.get_input_pin_value(node, 1)
                 elseif node.return_override_manual and node.return_override_manual ~= "" then
                     override_value = Utils.parse_primitive_value(node.return_override_manual)
                 end

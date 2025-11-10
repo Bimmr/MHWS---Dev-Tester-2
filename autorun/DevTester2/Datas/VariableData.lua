@@ -172,9 +172,10 @@ function VariableData.render(node)
         imnodes.begin_input_attribute(input_pin.id)
         
         -- Display connected value (disabled)
+        local connected_value = Nodes.get_input_pin_value(node, 1)
         local display_value = "Connected"
-        if input_pin.value ~= nil then
-            display_value = tostring(input_pin.value)
+        if connected_value ~= nil then
+            display_value = tostring(connected_value)
         end
         imgui.begin_disabled()
         imgui.input_text("Value", display_value) 

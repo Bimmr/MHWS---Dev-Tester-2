@@ -198,7 +198,7 @@ function NativeStarter.render(node)
                     
                     if param_pin.connection and param_pin.connection.pin then
                         -- Display connected value
-                        local connected_value = param_pin.connection.pin.value
+                        local connected_value = Nodes.get_input_pin_value(node, i)
                         local display_value = "Object"
                         if type(connected_value) == "userdata" then
                             local success, type_info = pcall(function() return connected_value:get_type_definition() end)
