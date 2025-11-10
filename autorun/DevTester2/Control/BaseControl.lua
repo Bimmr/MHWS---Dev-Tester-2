@@ -29,13 +29,14 @@ local BaseControl = {}
 -- ========================================
 
 function BaseControl.render_output_attribute(node, display_value, tooltip_text)
-    -- Create output attribute if needed
-    if not node.output_attr then
-        node.output_attr = State.next_pin_id()
+    -- Get or create output pin
+    if not node.pins or not node.pins.outputs or #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "Output", nil)
     end
+    local output_pin = node.pins.outputs[1]
 
     imgui.spacing()
-    imnodes.begin_output_attribute(node.output_attr)
+    imnodes.begin_output_attribute(output_pin.id)
 
     -- Display value with tooltip
     local display = display_value .. " (?)"
@@ -54,7 +55,7 @@ end
 function BaseControl.render_action_buttons(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_operation_node(node)  -- Control nodes are stored in all_nodes like operations
+        Nodes.remove_node(node)
     end
 
     -- Control nodes typically don't add child nodes since they're control flow providers
@@ -79,10 +80,18 @@ function BaseControl.render_debug_info(node)
             end
         end
 
+        -- Collect pin info
+        local output_pins = {}
+        if node.pins and node.pins.outputs then
+            for _, pin in ipairs(node.pins.outputs) do
+                table.insert(output_pins, tostring(pin.id))
+            end
+        end
+
         debug_info = debug_info .. string.format(
-            "\n\nNode ID: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            "\n\nNode ID: %s\nOutput Pins: %s\nInput Links: %s\nOutput Links: %s",
             tostring(node.node_id),
-            tostring(node.output_attr or "None"),
+            #output_pins > 0 and table.concat(output_pins, ", ") or "None",
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
         )
@@ -162,6 +171,51 @@ function BaseControl.render_input_pin(node, label, attr_name, converted_value, o
             end
         end
     end
+end
+
+-- ========================================
+-- Control Node Creation
+-- ========================================
+
+function BaseControl.create(node_type, position)
+    local Constants = require("DevTester2.Constants")
+    local node_id = State.next_node_id()
+
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_CONTROL,
+        type = node_type,
+        position = position or {x = 50, y = 50},
+        ending_value = nil,
+        status = nil,
+        pins = { inputs = {}, outputs = {} }
+    }
+
+    -- Set type-specific properties
+    if node_type == Constants.CONTROL_TYPE_SWITCH then
+        node.condition_manual_value = ""
+        node.true_value_manual_value = ""
+        node.false_value_manual_value = ""
+    elseif node_type == Constants.CONTROL_TYPE_TOGGLE then
+        node.input_manual_value = ""
+        node.enabled_manual_value = false
+        node.toggle_state = false
+    elseif node_type == Constants.CONTROL_TYPE_COUNTER then
+        node.max_manual_value = "10"
+        node.active_manual_value = false
+        node.restart_manual_value = false
+        node.counter_value = 0
+    elseif node_type == Constants.CONTROL_TYPE_CONDITION then
+        node.condition_manual_value = ""
+        node.true_manual_value = ""
+        node.false_manual_value = ""
+    end
+
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node
+    State.mark_as_modified()
+    return node
 end
 
 return BaseControl

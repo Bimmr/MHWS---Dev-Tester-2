@@ -5,6 +5,9 @@
 -- Configuration:
 -- - path: String - The full type path (e.g., "app.SomeClass") of the type to retrieve
 --
+-- Pins:
+-- - pins.outputs[1]: "output" - The type definition output
+--
 -- Runtime Values:
 -- - ending_value: TypeDefinition - The type definition object retrieved from the specified path
 --
@@ -23,6 +26,15 @@ local sdk = sdk
 local TypeStarter = {}
 
 function TypeStarter.render(node)
+    -- Ensure output pin exists
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
+    local output_pin = node.pins.outputs[1]
+    
+    -- Always sync output pin value with ending_value on every render
+    output_pin.value = node.ending_value
 
     imnodes.begin_node(node.node_id)
 
@@ -44,13 +56,16 @@ function TypeStarter.render(node)
             local success, type_def = pcall(function() return sdk.find_type_definition(node.path) end)
             if success and type_def then
                 node.ending_value = type_def
+                output_pin.value = type_def
                 node.status = "Success"
             else
                 node.ending_value = nil
+                output_pin.value = nil
                 node.status = "Type not found"
             end
         else
             node.ending_value = nil
+            output_pin.value = nil
             node.status = "Path cannot be empty"
         end
     end
@@ -71,7 +86,19 @@ function TypeStarter.render(node)
             node.ending_value:get_namespace() or "global"
         )
 
-        BaseStarter.render_output_attribute(node, display_value, tooltip_text)
+        -- Render output pin
+        imgui.spacing()
+        imnodes.begin_output_attribute(output_pin.id)
+        local display = display_value .. " (?)"
+        local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
+        imgui.set_cursor_pos(debug_pos)
+        imgui.text(display_value)
+        imgui.same_line()
+        imgui.text("(?)")
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip(tooltip_text)
+        end
+        imnodes.end_output_attribute()
     elseif node.status == "Type not found" then
         imgui.text_colored("Type not found", Constants.COLOR_TEXT_WARNING)
     end

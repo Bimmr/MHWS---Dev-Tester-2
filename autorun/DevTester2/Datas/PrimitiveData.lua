@@ -6,7 +6,7 @@
 -- - value: String - The text input value that gets parsed into a primitive
 --
 -- Output Pins:
--- - output_attr: Number - Pin ID for the output attribute (provides parsed primitive value)
+-- - pins.outputs[1]: The output pin (provides parsed primitive value)
 --
 -- Runtime Values:
 -- - ending_value: Any - The parsed primitive value (number, boolean, or string)
@@ -26,7 +26,12 @@ function PrimitiveData.render(node)
     -- Execute the node to update ending_value
     PrimitiveData.execute(node)
     
-    imnodes.begin_node(node.node_id)
+    -- Ensure output pin exists
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
+    imnodes.begin_node(node.id)
     
     imnodes.begin_node_titlebar()
     imgui.text("Primitive Data")
@@ -44,9 +49,21 @@ function PrimitiveData.render(node)
         node.ending_value = Utils.parse_primitive_value(node.value)
     end
 
-    -- Create tooltip for output
-    local tooltip_text = nil
-    if node.ending_value then
+    -- Render output pin with value and type info
+    local output_pin = node.pins.outputs[1]
+    output_pin.value = node.ending_value
+    
+    imgui.spacing()
+    imnodes.begin_output_attribute(output_pin.id)
+    
+    local display_value = tostring(node.value)
+    local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
+    imgui.set_cursor_pos(debug_pos)
+    imgui.text(display_value)
+    imgui.same_line()
+    imgui.text("(?)")
+    
+    if imgui.is_item_hovered() and node.ending_value then
         local value_type = type(node.ending_value)
         local type_description = "Unknown"
         if value_type == "number" then
@@ -56,10 +73,11 @@ function PrimitiveData.render(node)
         elseif value_type == "string" then
             type_description = "String"
         end
-        tooltip_text = string.format("Primitive Value\nType: %s\nValue: %s", type_description, tostring(node.ending_value))
+        local tooltip_text = string.format("Primitive Value\nType: %s\nValue: %s", type_description, tostring(node.ending_value))
+        imgui.set_tooltip(tooltip_text)
     end
-
-    BaseData.render_output_attribute(node, tostring(node.value), tooltip_text)
+    
+    imnodes.end_output_attribute()
 
     BaseData.render_action_buttons(node)
     BaseData.render_debug_info(node)

@@ -1,6 +1,10 @@
 -- FieldFollower Node Properties:
 -- This node accesses or modifies fields/properties of parent objects.
--- The following properties define the state and configuration of a FieldFollower node:
+--
+-- Pins:
+-- - pins.inputs[1]: "parent" - Connection to parent node
+-- - pins.inputs[2]: "value" - Value to set (only in Set mode)
+-- - pins.outputs[1]: "output" - The field value result
 --
 -- Field Selection:
 -- - selected_field_combo: Number - Index in the field selection dropdown (1-based)
@@ -10,13 +14,12 @@
 -- Field Setting (for Set mode):
 -- - value_manual_input: String - Manual text input for the value to set
 -- - set_active: Boolean - Whether the set operation is currently active/enabled
--- - value_input_attr: Number - Pin ID for the value input attribute (for connected set values)
 --
 -- Runtime Values:
 -- - ending_value: Any - The current field value (or the value that was just set)
 -- - ending_value_full_name: String - Full type name of the ending value
 --
--- Inherits all BaseFollower properties (input_attr, output_attr, type, action_type, status, etc.)
+-- Inherits all BaseFollower properties (type, action_type, status, etc.)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -34,6 +37,14 @@ local FieldFollower = {}
 -- ========================================
 -- TODO: Putting an array in a set field will crash the game - need to handle that case
 function FieldFollower.render(node)
+    -- Ensure pins exist
+    if #node.pins.inputs == 0 then
+        Nodes.add_input_pin(node, "parent", nil)
+    end
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
     local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then 
         node.status = "Waiting for parent connection"
@@ -49,7 +60,7 @@ function FieldFollower.render(node)
     -- Determine if we're working with static fields (type definition) or instance fields (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     BaseFollower.render_title_bar(node, parent_type)
     local has_children = Nodes.has_children(node)
@@ -59,10 +70,12 @@ function FieldFollower.render(node)
     -- Type dropdown (Get/Set)
     local type_changed = BaseFollower.render_action_type_dropdown(node, {"Get", "Set"})
     if type_changed then
-        -- If switching to Get, disconnect value input links
-        if node.action_type == 0 then
-            local value_pin = Nodes.get_field_value_pin_id(node)
-            Nodes.remove_links_for_pin(value_pin)
+        -- If switching to Get, remove value input pin
+        if node.action_type == 0 and #node.pins.inputs > 1 then
+            table.remove(node.pins.inputs, 2)
+        elseif node.action_type == 1 and #node.pins.inputs == 1 then
+            -- Switching to Set, add value input pin
+            Nodes.add_input_pin(node, "value", nil)
         end
     end
 
@@ -102,9 +115,17 @@ function FieldFollower.render(node)
             
             node.value_manual_input = "" -- Reset value
             
-            -- Disconnect value input links since field type may have changed
-            local value_pin = Nodes.get_field_value_pin_id(node)
-            Nodes.remove_links_for_pin(value_pin)
+            -- Remove value input pin if it exists
+            if #node.pins.inputs > 1 then
+                table.remove(node.pins.inputs, 2)
+            end
+            
+            -- Re-add value input pin if in Set mode
+            if node.action_type == 1 then
+                if #node.pins.inputs == 1 then
+                    Nodes.add_input_pin(node, "value", nil)
+                end
+            end
             
             -- If we have a valid field selection, initialize manual input with current value
             if node.field_group_index and node.field_index then
@@ -144,14 +165,22 @@ function FieldFollower.render(node)
         
         -- Handle value input for Set
         if node.action_type == 1 and selected_field then -- Set
+            -- Ensure value input pin exists
+            if #node.pins.inputs == 1 then
+                Nodes.add_input_pin(node, "value", nil)
+            end
+            
             imgui.spacing()
             local field_type = selected_field:get_type()
+            local value_pin = node.pins.inputs[2]
+            
             -- Value input pin
-            local value_pin_id = Nodes.get_field_value_pin_id(node)
-            imnodes.begin_input_attribute(value_pin_id)
-            local has_connection = Nodes.is_field_value_connected(node)
+            imnodes.begin_input_attribute(value_pin.id)
+            local has_connection = value_pin.connection ~= nil
             if has_connection then
-                local connected_value = Nodes.get_connected_field_value(node)
+                -- Look up connected pin via State.pin_map
+                local source_pin_info = State.pin_map[value_pin.connection.pin]
+                local connected_value = source_pin_info and source_pin_info.pin.value
                 -- Display simplified value without address
                 local display_value = "Object"
                 if type(connected_value) == "userdata" then
@@ -187,6 +216,11 @@ function FieldFollower.render(node)
                 node.set_active = new_active
                 State.mark_as_modified()
             end
+        else
+            -- Get mode - ensure only parent input pin exists
+            if #node.pins.inputs > 1 then
+                table.remove(node.pins.inputs, 2)
+            end
         end
         
         imgui.spacing()
@@ -199,6 +233,9 @@ function FieldFollower.render(node)
         if result then
             node.ending_value_full_name = selected_field:get_type():get_full_name()
         end
+        
+        -- Update output pin value
+        node.pins.outputs[1].value = result
 
         -- Check if result is userdata (can continue to child nodes)
         local can_continue = type(result) == "userdata"
@@ -215,7 +252,58 @@ function FieldFollower.render(node)
             end
         end
         
-        BaseFollower.render_output_attribute(node, result, can_continue)
+        -- Render output pin
+        local output_pin = node.pins.outputs[1]
+        imgui.spacing()
+        imnodes.begin_output_attribute(output_pin.id)
+        
+        if result ~= nil then
+            -- Display the actual result
+            local display_value = "Object"
+            if type(result) == "userdata" then
+                local success, type_info = pcall(function() return result:get_type_definition() end)
+                if success and type_info then
+                    display_value = type_info:get_name()
+                end
+            else
+                display_value = tostring(result)
+            end
+            local output_display = display_value .. " (?)"
+            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+            imgui.set_cursor_pos(pos)
+            imgui.text(display_value)
+            if can_continue then
+                imgui.same_line()
+                imgui.text("(?)")
+                if imgui.is_item_hovered() then
+                    if type(result) == "userdata" and result.get_type_definition then
+                        local type_info = result:get_type_definition()
+                        local address = result.get_address and string.format("0x%X", result:get_address()) or "N/A"
+                        local tooltip_text = string.format(
+                            "Type: %s\nAddress: %s\nFull Name: %s",
+                            type_info:get_name(), address, type_info:get_full_name()
+                        )
+                        imgui.set_tooltip(tooltip_text)
+                    else
+                        imgui.set_tooltip(tostring(result))
+                    end
+                end
+            end
+        else
+            -- Display "nil" when result is nil
+            local display_value = "nil"
+            local output_display = display_value .. " (?)"
+            local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+            imgui.set_cursor_pos(pos)
+            imgui.text(display_value)
+            imgui.same_line()
+            imgui.text("(?)")
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("nil")
+            end
+        end
+        
+        imnodes.end_output_attribute()
     else
         imgui.text("No fields available")
     end
@@ -265,18 +353,17 @@ function FieldFollower.execute(node, parent_value, selected_field)
                 end)
             end
         else
-            -- Try to get value from connected input first
+            -- Try to get value from connected input first using pin system
             local set_value = nil
 
-            if node.value_input_attr then
-                for _, link in ipairs(State.all_links) do
-                    if link.to_pin == node.value_input_attr then
-                        -- Find the source node
-                        local source_node = Nodes.find_node_by_id(link.from_node)
-                        if source_node and source_node.ending_value ~= nil then
-                            set_value = source_node.ending_value
-                            break
-                        end
+            -- Check if value input pin exists and is connected (pin 2)
+            if #node.pins.inputs >= 2 then
+                local value_pin = node.pins.inputs[2]
+                if value_pin.connection then
+                    -- Look up connected pin via State.pin_map
+                    local source_pin_info = State.pin_map[value_pin.connection.pin]
+                    if source_pin_info then
+                        set_value = source_pin_info.pin.value
                     end
                 end
             end
@@ -327,6 +414,11 @@ function FieldFollower.execute(node, parent_value, selected_field)
         
         local field_name = selected_field:get_name()
         node.status = operation .. ": " .. field_name
+        
+        -- Update output pin value
+        if #node.pins.outputs > 0 then
+            node.pins.outputs[1].value = result
+        end
         
         return result
     end

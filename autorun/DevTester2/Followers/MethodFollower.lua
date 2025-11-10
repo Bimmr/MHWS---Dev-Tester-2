@@ -1,6 +1,10 @@
 -- MethodFollower Node Properties:
 -- This node calls methods on parent objects with optional parameters.
--- The following properties define the state and configuration of a MethodFollower node:
+--
+-- Pins:
+-- - pins.inputs[1]: "parent" - Connection to parent object
+-- - pins.inputs[2+]: "param_N" - Dynamic parameter inputs based on method signature
+-- - pins.outputs[1]: "output" - The method return value
 --
 -- Method Selection:
 -- - selected_method_combo: Number - Index in the method selection dropdown (1-based)
@@ -9,12 +13,11 @@
 --
 -- Parameters:
 -- - param_manual_values: Array - Manual text input values for method parameters (indexed by parameter position)
--- - param_input_attrs: Array - Pin IDs for parameter input attributes
 --
 -- Runtime Values:
 -- - ending_value: Any - The return value from the method call (nil for void methods)
 --
--- Inherits all BaseFollower properties (input_attr, output_attr, type, action_type, status, last_call_time, etc.)
+-- Inherits all BaseFollower properties (type, action_type, status, last_call_time, etc.)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -32,6 +35,14 @@ local MethodFollower = {}
 -- ========================================
 
 function MethodFollower.render(node)
+    -- Ensure parent input and output pins exist
+    if #node.pins.inputs == 0 then
+        Nodes.add_input_pin(node, "parent", nil)
+    end
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
     local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then 
         node.status = "Waiting for parent connection"
@@ -47,7 +58,7 @@ function MethodFollower.render(node)
     -- Determine if we're working with static methods (type definition) or instance methods (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     BaseFollower.render_title_bar(node, parent_type)
 
@@ -94,6 +105,11 @@ function MethodFollower.render(node)
             node.param_manual_values = {} -- Reset params
             node.last_call_time = nil -- Reset Last Call timer when method changes
 
+            -- Remove all parameter input pins (start from index 2, after parent)
+            while #node.pins.inputs > 1 do
+                table.remove(node.pins.inputs, 2)
+            end
+
             -- Check if selected method returns void, if so switch to Call mode
             if node.method_group_index and node.method_index then
                 local current_method = Nodes.get_method_by_group_and_index(parent_type,
@@ -109,32 +125,14 @@ function MethodFollower.render(node)
                         end
                     end
 
-                    -- Disconnect links for parameters that no longer exist
+                    -- Add parameter input pins based on method signature
                     local success_param, param_types = pcall(function()
                         return current_method:get_param_types()
                     end)
                     if success_param and param_types then
-                        local new_param_count = #param_types
-                        -- Remove links for parameter pins beyond the new count
-                        for i = new_param_count + 1, 100 do -- Arbitrary high number to cover old params
-                            if node.param_input_attrs and node.param_input_attrs[i] then
-                                Nodes.remove_links_for_pin(node.param_input_attrs[i])
-                            end
+                        for i = 1, #param_types do
+                            Nodes.add_input_pin(node, "param_" .. (i-1), nil)
                         end
-                    else
-                        -- No parameters, remove all param links
-                        if node.param_input_attrs then
-                            for i, pin_id in pairs(node.param_input_attrs) do
-                                Nodes.remove_links_for_pin(pin_id)
-                            end
-                        end
-                    end
-                end
-            else
-                -- No method selected, remove all param links
-                if node.param_input_attrs then
-                    for i, pin_id in pairs(node.param_input_attrs) do
-                        Nodes.remove_links_for_pin(pin_id)
                     end
                 end
             end
@@ -161,6 +159,13 @@ function MethodFollower.render(node)
             end)
             
             if success_param and param_types and #param_types > 0 then
+                -- Ensure correct number of parameter input pins exist
+                local needed_pins = 1 + #param_types  -- parent + parameters
+                while #node.pins.inputs < needed_pins do
+                    local param_idx = #node.pins.inputs - 1 + 1  -- -1 for parent, +1 for 1-based
+                    Nodes.add_input_pin(node, "param_" .. (param_idx - 1), nil)
+                end
+                
                 imgui.spacing()
                 
                 if not node.param_manual_values then
@@ -168,16 +173,17 @@ function MethodFollower.render(node)
                 end
                 
                 for i, param_type in ipairs(param_types) do
-                    -- Get parameter type name
-                    local param_type_name = param_type:get_name()
+                    -- Get parameter input pin (starts at index 2, after parent)
+                    local param_pin = node.pins.inputs[i + 1]
                     
                     -- Parameter input pin
-                    local param_pin_id = Nodes.get_param_pin_id(node, i)
-                    imnodes.begin_input_attribute(param_pin_id)
-                    local has_connection = Nodes.is_param_connected(node, i)
+                    imnodes.begin_input_attribute(param_pin.id)
+                    local has_connection = param_pin.connection ~= nil
                     local label = string.format("Arg %d(%s)", i, param_type:get_name())
                     if has_connection then
-                        local connected_value = Nodes.get_connected_param_value(node, i)
+                        -- Look up connected pin via State.pin_map
+                        local source_pin_info = State.pin_map[param_pin.connection.pin]
+                        local connected_value = source_pin_info and source_pin_info.pin.value
                         -- Display simplified value without address
                         local display_value = "Object"
                         if type(connected_value) == "userdata" then
@@ -245,6 +251,9 @@ function MethodFollower.render(node)
             node.ending_value_full_name = selected_method:get_return_type():get_full_name()
         end
         
+        -- Update output pin value
+        node.pins.outputs[1].value = result
+        
         -- Check if result is userdata (can continue to child nodes)
         local can_continue = type(result) == "userdata"
         -- If result is valid, check if we should unpause child nodes
@@ -258,18 +267,11 @@ function MethodFollower.render(node)
                 -- Nodes.unpause_child_nodes(node, result_type_name)
             end
         end
-        -- Create output attribute only if we should show the pin
-        local should_show_output_pin = (result ~= nil and not returns_void) or (node.output_attr and not returns_void)
         
-        if should_show_output_pin then
-            if not node.output_attr then
-                node.output_attr = State.next_pin_id()
-            end
-            imgui.spacing()
-            imnodes.begin_output_attribute(node.output_attr)
-        else
-            imgui.spacing()
-        end
+        -- Render output pin
+        local output_pin = node.pins.outputs[1]
+        imgui.spacing()
+        imnodes.begin_output_attribute(output_pin.id)
         
         if result ~= nil and not returns_void then
             -- Display the actual result
@@ -356,9 +358,7 @@ function MethodFollower.render(node)
             imgui.text(output_text)
         end
         
-        if should_show_output_pin then
-            imnodes.end_output_attribute()
-        end
+        imnodes.end_output_attribute()
     else
         imgui.text("No methods available")
     end
@@ -442,11 +442,15 @@ function MethodFollower.resolve_method_parameters(node, selected_method)
     end
 
     for i, param_type in ipairs(param_types) do
-        -- Check if parameter is connected
-        if Nodes.is_param_connected(node, i) then
-            -- Use connected value
-            local connected_value = Nodes.get_connected_param_value(node, i)
-            table.insert(params, connected_value)
+        -- Parameter pins start at index 2 (after parent pin at index 1)
+        local param_pin = node.pins.inputs[i + 1]
+        
+        if param_pin and param_pin.connection then
+            -- Use connected value from pin system - look up via State.pin_map
+            local source_pin_info = State.pin_map[param_pin.connection.pin]
+            if source_pin_info then
+                table.insert(params, source_pin_info.pin.value)
+            end
         else
             -- Use manual input
             local manual_value = node.param_manual_values[i] or ""

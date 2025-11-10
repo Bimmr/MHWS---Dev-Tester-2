@@ -21,6 +21,8 @@ end
 
 function Dialogs.render()
     
+    
+    imgui.push_style_var(imgui.ImGuiStyleVar.Alpha, 0.95) -- Window transparency
     imgui.push_style_var(imgui.ImGuiStyleVar.WindowPadding, Constants.POP_PADDING)
     imgui.push_style_var(imgui.ImGuiStyleVar.PopupRounding, Constants.FRAME_ROUNDING)
     
@@ -55,7 +57,7 @@ function Dialogs.render()
         end
         imgui.end_popup()
     end
-    imgui.pop_style_var(2)
+    imgui.pop_style_var(3)
     
     if imgui.is_key_pressed(imgui.ImGuiKey.Key_Escape) then
        Dialogs.close_all_popups()

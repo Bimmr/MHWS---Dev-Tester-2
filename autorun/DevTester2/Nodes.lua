@@ -51,250 +51,22 @@ function Nodes.reset_operation_data(node)
     node.method_group_index = nil
     node.method_index = nil
     node.param_manual_values = {}
-    node.param_connections = {}
-    node.param_input_attrs = {}
     
     -- Clear field-specific data
     node.selected_field_combo = 1
     node.field_group_index = nil
     node.field_index = nil
     node.value_manual_input = ""
-    node.value_connection = nil
-    node.value_input_attr = nil
     node.action_type = Constants.ACTION_GET -- Reset to default action
     
     -- Clear array-specific data
     node.selected_element_index = 0
-    node.index_connection = nil
     node.index_manual_value = ""
     
     -- Clear common data that might be operation-specific
     node.starting_value = nil
     node.ending_value = nil
     node.status = nil
-end
-
--- ========================================
--- Node Creation Functions
--- ========================================
-
-function Nodes.create_starter_node(node_type, position)
-    local node_id = State.next_node_id()
-
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_STARTER,
-        type = node_type,
-        path = "",
-        position = position or {x = 50, y = 50},
-        ending_value = nil,
-        status = nil,
-        output_attr = nil,
-        return_attr = nil,
-        -- Parameter support for starters that need it (like Native)
-        param_connections = {},
-        param_input_attrs = {},
-        param_manual_values = {},
-        -- Enum-specific
-        selected_enum_index = 1,
-        enum_names = nil,
-        enum_values = nil,
-        -- Hook-specific
-        method_name = "",
-        hook_id = nil,
-        is_initialized = false,
-        return_override_manual = "",
-        return_override_connection = nil,
-        return_override_attr = nil,
-        is_return_overridden = false
-    }
-    
-    table.insert(State.starter_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
-end
-
-function Nodes.create_data_node(node_type, position)
-    local node_id = State.next_node_id()
-
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_DATA,
-        type = node_type,
-        path = "",
-        position = position or {x = 50, y = 50},
-        ending_value = nil,
-        status = nil,
-        output_attr = nil,
-        -- Enum-specific
-        selected_enum_index = 1,
-        enum_names = nil,
-        enum_values = nil,
-        -- Value-specific
-        value = "",
-        -- Variable-specific
-        variable_name = "",
-        default_value = "",
-        input_connection = nil,
-        input_manual_value = "",
-        pending_reset = false
-    }
-    
-    -- Data nodes that need inputs (like Variable and Enum) get input attributes
-    if node_type == Constants.DATA_TYPE_VARIABLE or node_type == Constants.DATA_TYPE_ENUM then
-        node.input_attr = State.next_pin_id()
-        node.input_connection = nil
-    end
-    
-    table.insert(State.data_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
-end
-
-function Nodes.create_follower_node(position)
-    local node_id = State.next_node_id()
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_FOLLOWER,
-        type = Constants.FOLLOWER_TYPE_METHOD, -- Default to Method
-        position = position or {x = 0, y = 0},
-        parent_node_id = nil,
-        -- Method-specific
-        selected_method_combo = 1, -- 1-based indexing for combo
-        method_group_index = nil, -- Parsed from selection
-        method_index = nil, -- Parsed from selection
-        param_manual_values = {},
-        param_connections = {},
-        param_input_attrs = {},
-        -- Field-specific
-        selected_field_combo = 1, -- 1-based indexing for combo
-        field_group_index = nil, -- Parsed from selection
-        field_index = nil, -- Parsed from selection
-        value_manual_input = "",
-        value_connection = nil,
-        value_input_attr = nil,
-        -- Array-specific
-        selected_element_index = 0,
-        index_connection = nil,
-        index_manual_value = "",
-        index_input_attr = nil,
-        -- Common
-        starting_value = nil,
-        ending_value = nil,
-        status = nil,
-        input_attr = nil,
-        output_attr = nil
-    }
-    
-    table.insert(State.all_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
-end
-
-function Nodes.create_operation_node(node_type, position)
-    local node_id = State.next_node_id()
-
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_OPERATIONS,
-        type = node_type,
-        position = position or {x = 50, y = 50},
-        ending_value = nil,
-        status = nil,
-        output_attr = State.next_pin_id(),
-        input1_attr = State.next_pin_id(),
-        input2_attr = State.next_pin_id(),
-        selected_operation = 0,
-        input1_connection = nil,
-        input2_connection = nil,
-        input1_manual_value = "",
-        input2_manual_value = ""
-    }
-
-    table.insert(State.all_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
-end
-
-function Nodes.create_control_node(node_type, position)
-    local node_id = State.next_node_id()
-
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_CONTROL,
-        type = node_type,
-        position = position or {x = 50, y = 50},
-        ending_value = nil,
-        status = nil
-    }
-
-    -- Set type-specific properties
-    if node_type == Constants.CONTROL_TYPE_SELECT then
-        node.condition_attr = State.next_pin_id()
-        node.true_attr = State.next_pin_id()
-        node.false_attr = State.next_pin_id()
-        node.output_attr = State.next_pin_id()
-        node.condition_connection = nil
-        node.true_connection = nil
-        node.false_connection = nil
-        node.condition_manual_value = ""
-        node.true_manual_value = ""
-        node.false_manual_value = ""
-    elseif node_type == Constants.CONTROL_TYPE_TOGGLE then
-        node.input_attr = State.next_pin_id()
-        node.enabled_attr = State.next_pin_id()
-        node.output_attr = State.next_pin_id()
-        node.input_connection = nil
-        node.enabled_connection = nil
-        node.input_manual_value = ""
-        node.enabled_manual_value = false
-    elseif node_type == Constants.CONTROL_TYPE_COUNTER then
-        node.max_attr = State.next_pin_id()
-        node.active_attr = State.next_pin_id()
-        node.restart_attr = State.next_pin_id()
-        node.output_attr = State.next_pin_id()
-        node.max_connection = nil
-        node.active_connection = nil
-        node.restart_connection = nil
-        node.max_manual_value = "10"
-        node.active_manual_value = false
-        node.restart_manual_value = false
-    end
-
-    table.insert(State.all_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
-end
-
-function Nodes.create_utility_node(node_type, position)
-    local node_id = State.next_node_id()
-
-    local node = {
-        id = node_id,
-        node_id = node_id,
-        category = Constants.NODE_CATEGORY_UTILITY,
-        type = node_type,
-        position = position or {x = 50, y = 50},
-        ending_value = nil,
-        status = nil,
-        -- Label-specific
-        text = ""
-    }
-
-    table.insert(State.all_nodes, node)
-    State.node_map[node_id] = node  -- Add to hash map
-    State.mark_as_modified()
-    return node
 end
 
 -- ========================================
@@ -315,12 +87,19 @@ end
 
 function Nodes.render_disconnected_titlebar(node, reason)
     imnodes.begin_node_titlebar()
-    imnodes.begin_input_attribute(node.input_attr)
+    
+    -- Get the first input pin (parent connection)
+    local input_pin = node.pins and node.pins.inputs and node.pins.inputs[1]
+    if input_pin then
+        imnodes.begin_input_attribute(input_pin.id)
+    end
     
     local operation_name = Utils.parse_category_and_type(node.category, node.type)
     imgui.text(operation_name .. " (Disconnected)")
     
-    imnodes.end_input_attribute()
+    if input_pin then
+        imnodes.end_input_attribute()
+    end
     imnodes.end_node_titlebar()
 end
 
@@ -331,28 +110,24 @@ function Nodes.render_disconnected_message(reason)
 end
 
 function Nodes.render_disconnected_attributes(node)
-    -- Output attribute - always render if it exists (from config or created)
-    if node.output_attr then
-        imnodes.begin_output_attribute(node.output_attr)
-        imgui.text("Output (Disconnected)")
-        imnodes.end_output_attribute()
-    end
-
-    -- Parameter input attributes (placeholders)
-    if node.param_manual_values then
-        for i = 1, #node.param_manual_values do
-            local param_pin_id = Nodes.get_param_pin_id(node, i)
-            imnodes.begin_input_attribute(param_pin_id)
-            imgui.text(string.format("Param %d (Disconnected)", i))
-            imnodes.end_input_attribute()
+    -- Render all output pins if they exist
+    if node.pins and node.pins.outputs then
+        for _, output_pin in ipairs(node.pins.outputs) do
+            imnodes.begin_output_attribute(output_pin.id)
+            imgui.text(output_pin.name or "Output (Disconnected)")
+            imnodes.end_output_attribute()
         end
     end
 
-    -- Field value input attribute for Set operations
-    if node.type == Constants.FOLLOWER_TYPE_FIELD and node.action_type == Constants.ACTION_SET then
-        imnodes.begin_input_attribute(node.value_input_attr)
-        imgui.text("Value (Disconnected)")
-        imnodes.end_input_attribute()
+    -- Render parameter input pins (if any beyond the parent connection)
+    if node.pins and node.pins.inputs then
+        -- Skip first pin (parent connection), render the rest as params
+        for i = 2, #node.pins.inputs do
+            local input_pin = node.pins.inputs[i]
+            imnodes.begin_input_attribute(input_pin.id)
+            imgui.text(input_pin.name or string.format("Param %d (Disconnected)", i - 1))
+            imnodes.end_input_attribute()
+        end
     end
 end
 
@@ -360,31 +135,37 @@ function Nodes.render_disconnected_operation_node(node, reason)
     -- Ensure all pin IDs exist before rendering
     Nodes.ensure_node_pin_ids(node)
     
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
     
     Nodes.render_disconnected_titlebar(node, reason)
     Nodes.render_disconnected_message(reason)
     Nodes.render_disconnected_attributes(node)
     
     if imgui.button("- Remove Node") then
-        Nodes.remove_operation_node(node)
+        Nodes.remove_node(node)
     end
     
     imnodes.end_node()
 end
 
 function Nodes.render_disconnected_debug_info(node)
-    -- Collect all input attributes (main + params)
-    local input_attrs = {}
-    if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
-    if node.param_manual_values then
-        for i = 1, #(node.param_manual_values) do
-            local param_pin_id = Nodes.get_param_pin_id(node, i)
-            if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
+    -- Collect all input pin IDs
+    local input_pins = {}
+    if node.pins and node.pins.inputs then
+        for _, pin in ipairs(node.pins.inputs) do
+            table.insert(input_pins, tostring(pin.id))
         end
     end
     
-    -- Find input and output links, showing pin/attr and link id
+    -- Collect all output pin IDs
+    local output_pins = {}
+    if node.pins and node.pins.outputs then
+        for _, pin in ipairs(node.pins.outputs) do
+            table.insert(output_pins, tostring(pin.id))
+        end
+    end
+    
+    -- Find input and output links, showing pin and link id
     local input_links, output_links = {}, {}
     for _, link in ipairs(State.all_links) do
         if link.to_node == node.id then
@@ -396,16 +177,16 @@ function Nodes.render_disconnected_debug_info(node)
     end
     
     local debug_info = string.format(
-        "Node ID: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
-        tostring(node.node_id),
-        #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
-        tostring(node.output_attr or "None"),
+        "Node ID: %s\nInput Pins: %s\nOutput Pins: %s\nInput Links: %s\nOutput Links: %s",
+        tostring(node.id),
+        #input_pins > 0 and table.concat(input_pins, ", ") or "None",
+        #output_pins > 0 and table.concat(output_pins, ", ") or "None",
         #input_links > 0 and table.concat(input_links, ", ") or "None",
         #output_links > 0 and table.concat(output_links, ", ") or "None"
     )
     
     -- Align debug info to the top right of the node
-    local pos_for_debug = Utils.get_top_right_cursor_pos(node.node_id, "[?]")
+    local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
     imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     
@@ -431,11 +212,11 @@ function Nodes.add_child_node(parent_node)
     -- Random Y offset between -150 and +150
     local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
-    local child = Nodes.create_follower_node({
-        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
+    local BaseFollower = require("DevTester2.Followers.BaseFollower")
+    local child = BaseFollower.create({
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
-    child.parent_node_id = parent_node.id
     
     -- Auto-detect if parent value is an array and set type to Array
     if parent_node.ending_value then
@@ -444,72 +225,118 @@ function Nodes.add_child_node(parent_node)
         end
     end
     
-    -- Ensure parent has output attribute
-    if not parent_node.output_attr then
-        parent_node.output_attr = State.next_pin_id()
+    -- Ensure parent has output pin
+    if not parent_node.pins or not parent_node.pins.outputs or #parent_node.pins.outputs == 0 then
+        -- Create output pin with parent's current ending_value
+        Nodes.add_output_pin(parent_node, "Output", parent_node.ending_value)
     end
+    local parent_output_pin = parent_node.pins.outputs[1]
     
-    -- Ensure child has input attribute
-    if not child.input_attr then
-        child.input_attr = State.next_pin_id()
+    -- Sync output pin value with parent's ending_value
+    parent_output_pin.value = parent_node.ending_value
+    
+    -- Ensure child has input pin
+    if not child.pins or not child.pins.inputs or #child.pins.inputs == 0 then
+        Nodes.add_input_pin(child, "Parent", nil)
     end
+    local child_input_pin = child.pins.inputs[1]
     
     -- Auto-create link from parent to child
-    Nodes.create_link("main", parent_node, parent_node.output_attr, 
-                child, child.input_attr)
+    local link = Nodes.create_link("main", parent_node, parent_output_pin.id, 
+                child, child_input_pin.id)
+    
+    -- Update pin connection fields (same as handle_link_created does)
+    child_input_pin.connection = { node = parent_node.id, pin = parent_output_pin.id, link = link.id }
+    if not parent_output_pin.connections then
+        parent_output_pin.connections = {}
+    end
+    table.insert(parent_output_pin.connections, { node = child.id, pin = child_input_pin.id, link = link.id })
 end
 
 function Nodes.add_child_node_to_arg(parent_node, arg_index)
     -- Random Y offset between -150 and +150
     local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
-    local child = Nodes.create_follower_node({
-        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
+    local BaseFollower = require("DevTester2.Followers.BaseFollower")
+    local child = BaseFollower.create({
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
-    child.parent_node_id = parent_node.id
     
-    -- Ensure parent has the specific arg output attribute
-    if not parent_node.hook_arg_attrs or not parent_node.hook_arg_attrs[arg_index] then
-        if not parent_node.hook_arg_attrs then
-            parent_node.hook_arg_attrs = {}
-        end
-        parent_node.hook_arg_attrs[arg_index] = State.next_pin_id()
+    -- Find the arg output pin (args start at index 2+ in outputs, after main return)
+    local arg_pin_index = arg_index + 1  -- +1 because output[1] is usually the return value
+    
+    if not parent_node.pins or not parent_node.pins.outputs or not parent_node.pins.outputs[arg_pin_index] then
+        -- Ensure the arg output pin exists - get value from hook_arg_values if available
+        local arg_value = parent_node.hook_arg_values and parent_node.hook_arg_values[arg_index] or nil
+        Nodes.add_output_pin(parent_node, "Arg " .. arg_index, arg_value)
+    end
+    local parent_arg_pin = parent_node.pins.outputs[arg_pin_index]
+    
+    -- Sync arg pin value with hook_arg_values if available
+    if parent_node.hook_arg_values and parent_node.hook_arg_values[arg_index] then
+        parent_arg_pin.value = parent_node.hook_arg_values[arg_index]
     end
     
-    -- Ensure child has input attribute
-    if not child.input_attr then
-        child.input_attr = State.next_pin_id()
+    -- Ensure child has input pin
+    if not child.pins or not child.pins.inputs or #child.pins.inputs == 0 then
+        Nodes.add_input_pin(child, "Parent", nil)
     end
+    local child_input_pin = child.pins.inputs[1]
     
     -- Auto-create link from parent arg to child
-    Nodes.create_link("main", parent_node, parent_node.hook_arg_attrs[arg_index], 
-                child, child.input_attr)
+    local link = Nodes.create_link("main", parent_node, parent_arg_pin.id, 
+                child, child_input_pin.id)
+    
+    -- Update pin connection fields
+    child_input_pin.connection = { node = parent_node.id, pin = parent_arg_pin.id, link = link.id }
+    if not parent_arg_pin.connections then
+        parent_arg_pin.connections = {}
+    end
+    table.insert(parent_arg_pin.connections, { node = child.id, pin = child_input_pin.id, link = link.id })
 end
 
 function Nodes.add_child_node_to_return(parent_node)
     -- Random Y offset between -150 and +150
     local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
-    local child = Nodes.create_follower_node({
-        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.node_id).x + Constants.CHILD_NODE_OFFSET_X,
+    local BaseFollower = require("DevTester2.Followers.BaseFollower")
+    local child = BaseFollower.create({
+        x = parent_node.position.x + imnodes.get_node_dimensions(parent_node.id).x + Constants.CHILD_NODE_OFFSET_X,
         y = parent_node.position.y + random_y_offset
     })
-    child.parent_node_id = parent_node.id
     
-    -- Ensure parent has return output attribute
-    if not parent_node.return_attr then
-        parent_node.return_attr = State.next_pin_id()
+    -- Find the return output pin (usually first output pin)
+    if not parent_node.pins or not parent_node.pins.outputs or #parent_node.pins.outputs == 0 then
+        -- Create return pin with return_value or actual_return_value if available
+        local return_val = parent_node.return_value or parent_node.actual_return_value or nil
+        Nodes.add_output_pin(parent_node, "Return", return_val)
+    end
+    local parent_return_pin = parent_node.pins.outputs[1]
+    
+    -- Sync return pin value
+    if parent_node.return_value then
+        parent_return_pin.value = parent_node.return_value
+    elseif parent_node.actual_return_value then
+        parent_return_pin.value = parent_node.actual_return_value
     end
     
-    -- Ensure child has input attribute
-    if not child.input_attr then
-        child.input_attr = State.next_pin_id()
+    -- Ensure child has input pin
+    if not child.pins or not child.pins.inputs or #child.pins.inputs == 0 then
+        Nodes.add_input_pin(child, "Parent", nil)
     end
+    local child_input_pin = child.pins.inputs[1]
     
     -- Auto-create link from parent return to child
-    Nodes.create_link("main", parent_node, parent_node.return_attr, 
-                child, child.input_attr)
+    local link = Nodes.create_link("main", parent_node, parent_return_pin.id, 
+                child, child_input_pin.id)
+    
+    -- Update pin connection fields
+    child_input_pin.connection = { node = parent_node.id, pin = parent_return_pin.id, link = link.id }
+    if not parent_return_pin.connections then
+        parent_return_pin.connections = {}
+    end
+    table.insert(parent_return_pin.connections, { node = child.id, pin = child_input_pin.id, link = link.id })
 end
 
 
@@ -519,57 +346,14 @@ end
 -- Node Management
 -- ========================================
 
-function Nodes.remove_starter_node(node)
+function Nodes.remove_node(node)
     -- Remove child operation nodes first
     Nodes.remove_child_nodes(node)
     
     -- Remove connected links
     Nodes.remove_links_for_node(node)
     
-    -- Remove from the appropriate list
-    if node.category == Constants.NODE_CATEGORY_DATA then
-        for i, n in ipairs(State.data_nodes) do
-            if n.id == node.id then
-                table.remove(State.data_nodes, i)
-                break
-            end
-        end
-    elseif node.category == Constants.NODE_CATEGORY_OPERATIONS or node.category == Constants.NODE_CATEGORY_UTILITY then
-        for i, n in ipairs(State.all_nodes) do
-            if n.id == node.id then
-                table.remove(State.all_nodes, i)
-                break
-            end
-        end
-    else
-        for i, n in ipairs(State.starter_nodes) do
-            if n.id == node.id then
-                table.remove(State.starter_nodes, i)
-                break
-            end
-        end
-    end
-    
-    -- Remove from hash map
-    State.node_map[node.id] = nil
-    
-    State.mark_as_modified()
-    -- Reset node positioning state so nodes are repositioned after node removal
-    if State.nodes_positioned then
-        for k in pairs(State.nodes_positioned) do
-            State.nodes_positioned[k] = nil
-        end
-    end
-end
-
-function Nodes.remove_operation_node(node)
-    -- Remove child operation nodes first
-    Nodes.remove_child_nodes(node)
-    
-    -- Remove connected links
-    Nodes.remove_links_for_node(node)
-    
-    -- Remove from the list
+    -- Remove from all_nodes list
     for i, n in ipairs(State.all_nodes) do
         if n.id == node.id then
             table.remove(State.all_nodes, i)
@@ -588,6 +372,10 @@ function Nodes.remove_operation_node(node)
         end
     end
 end
+
+-- Backwards compatibility aliases
+Nodes.remove_starter_node = Nodes.remove_node
+Nodes.remove_operation_node = Nodes.remove_node
 
 function Nodes.remove_links_for_node(node)
     -- Remove all links where the node being deleted is directly involved
@@ -622,28 +410,36 @@ end
 function Nodes.remove_child_nodes(parent_node)
     local children_to_remove = {}
     
+    -- Find all nodes with input pins connected to this parent's output pins
     for i, node in ipairs(State.all_nodes) do
-        if node.parent_node_id == parent_node.id then
-            table.insert(children_to_remove, node)
+        if node.pins and node.pins.inputs and #node.pins.inputs > 0 then
+            local main_input = node.pins.inputs[1]
+            if main_input.connection and main_input.connection.node == parent_node.id then
+                table.insert(children_to_remove, node)
+            end
         end
     end
     
     for _, child in ipairs(children_to_remove) do
-        Nodes.remove_operation_node(child)
+        Nodes.remove_node(child)
     end
 end
 
 function Nodes.has_children(node)
+    -- Check if any node has its first input pin connected to this node's output
     for _, child in ipairs(State.all_nodes) do
-        if child.parent_node_id == node.id then
-            return true
+        if child.pins and child.pins.inputs and #child.pins.inputs > 0 then
+            local main_input = child.pins.inputs[1]
+            if main_input.connection and main_input.connection.node == node.id then
+                return true
+            end
         end
     end
     return false
 end
 
 function Nodes.get_node_count()
-    return #State.starter_nodes + #State.data_nodes + #State.all_nodes
+    return #State.all_nodes
 end
 
 function Nodes.clear_all_nodes()
@@ -684,7 +480,7 @@ function Nodes.create_link(connection_type, from_node, from_pin, to_node, to_pin
 end
 
 function Nodes.handle_link_created(start_pin, end_pin)
-    -- Find nodes and pins
+    -- Find nodes containing these pins
     local from_node, from_pin_type = Nodes.find_node_by_pin(start_pin)
     local to_node, to_pin_type = Nodes.find_node_by_pin(end_pin)
     if not from_node or not to_node then
@@ -701,135 +497,41 @@ function Nodes.handle_link_created(start_pin, end_pin)
         end
     end
 
-    -- Prevent multiple connections to main input
-    if to_pin_type == "main_input" then
-        if to_node.parent_node_id ~= nil then
-            -- Already connected, do not allow another link
-            return
+    -- Create link and update pin connections
+    local connection_type = to_pin_type or "generic"
+    local link = Nodes.create_link(connection_type, from_node, start_pin, to_node, end_pin)
+    
+    -- Update pin connection fields
+    local from_pin_info = State.pin_map[start_pin]
+    local to_pin_info = State.pin_map[end_pin]
+    
+    if to_pin_info and to_pin_info.pin then
+        to_pin_info.pin.connection = { node = from_node.id, pin = start_pin, link = link.id }
+    end
+    
+    if from_pin_info and from_pin_info.pin then
+        if not from_pin_info.pin.connections then
+            from_pin_info.pin.connections = {}
         end
-        -- Main connection
-        Nodes.create_link("main", from_node, start_pin, to_node, end_pin)
-        to_node.parent_node_id = from_node.id
-    elseif to_pin_type == "param_input" then
-        -- Parameter connection
+        table.insert(from_pin_info.pin.connections, { node = to_node.id, pin = end_pin, link = link.id })
+    end
+    
+    -- Handle special cases that need extra tracking
+    if to_pin_type == "param_input" then
         local param_index = Nodes.get_param_index_from_pin(to_node, end_pin)
-        local link = Nodes.create_link("parameter", from_node, start_pin, to_node, end_pin)
         link.parameter_index = param_index
-        to_node.param_connections[param_index] = from_node.id
-    elseif to_pin_type == "value_input" then
-        -- Field value connection
-        local link = Nodes.create_link("value", from_node, start_pin, to_node, end_pin)
-        to_node.value_connection = from_node.id
-    elseif to_pin_type == "array_index_input" then
-        -- Array index connection
-        local link = Nodes.create_link("array_index", from_node, start_pin, to_node, end_pin)
-        to_node.index_connection = from_node.id
-    elseif to_pin_type == "operation_input1" then
-        -- Operation input 1 connection
-        local link = Nodes.create_link("operation_input1", from_node, start_pin, to_node, end_pin)
-        to_node.input1_connection = from_node.id
-    elseif to_pin_type == "operation_input2" then
-        -- Operation input 2 connection
-        local link = Nodes.create_link("operation_input2", from_node, start_pin, to_node, end_pin)
-        to_node.input2_connection = from_node.id
-    elseif to_pin_type == "control_condition_input" then
-        -- Control condition input connection
-        local link = Nodes.create_link("control_condition", from_node, start_pin, to_node, end_pin)
-        to_node.condition_connection = from_node.id
-    elseif to_pin_type == "control_true_input" then
-        -- Control true value input connection
-        local link = Nodes.create_link("control_true", from_node, start_pin, to_node, end_pin)
-        to_node.true_connection = from_node.id
-    elseif to_pin_type == "control_false_input" then
-        -- Control false value input connection
-        local link = Nodes.create_link("control_false", from_node, start_pin, to_node, end_pin)
-        to_node.false_connection = from_node.id
-    elseif to_pin_type == "control_input" then
-        -- Control input connection (for Toggle node)
-        local link = Nodes.create_link("control_input", from_node, start_pin, to_node, end_pin)
-        to_node.input_connection = from_node.id
-    elseif to_pin_type == "control_enabled_input" then
-        -- Control enabled input connection (for Toggle node)
-        local link = Nodes.create_link("control_enabled", from_node, start_pin, to_node, end_pin)
-        to_node.enabled_connection = from_node.id
-    elseif to_pin_type == "control_active_input" then
-        -- Control active input connection (for Counter node)
-        local link = Nodes.create_link("control_active", from_node, start_pin, to_node, end_pin)
-        to_node.active_connection = from_node.id
-    elseif to_pin_type == "control_restart_input" then
-        -- Control restart input connection (for Counter node)
-        local link = Nodes.create_link("control_restart", from_node, start_pin, to_node, end_pin)
-        to_node.restart_connection = from_node.id
-    elseif to_pin_type == "control_max_input" then
-        -- Control max input connection (for Counter node)
-        local link = Nodes.create_link("control_max", from_node, start_pin, to_node, end_pin)
-        to_node.max_connection = from_node.id
-    elseif to_pin_type == "return_override_input" then
-        -- Return override connection
-        local link = Nodes.create_link("return_override", from_node, start_pin, to_node, end_pin)
-        to_node.return_override_connection = from_node.id
-    elseif to_pin_type == "enum_path_input" then
-        -- Enum path input connection
-        local link = Nodes.create_link("enum_path", from_node, start_pin, to_node, end_pin)
-        to_node.path_input_connection = from_node.id
-    elseif to_pin_type == "enum_value_input" then
-        -- Enum value input connection
-        local link = Nodes.create_link("enum_value", from_node, start_pin, to_node, end_pin)
-        to_node.value_input_connection = from_node.id
-    elseif to_pin_type == "data_input" then
-        -- Data node input connection (for Variable nodes)
-        local link = Nodes.create_link("data_input", from_node, start_pin, to_node, end_pin)
-        to_node.input_connection = from_node.id
     end
 end
 
 function Nodes.handle_link_destroyed(link_id)
+    -- Use the disconnect helper which handles pin.connection cleanup
+    Nodes.disconnect_link(link_id)
+    
+    -- No additional cleanup needed - pins handle all connection tracking
     for i, link in ipairs(State.all_links) do
         if link.id == link_id then
-            -- Clean up connection references
-            local to_node = Nodes.find_node_by_id(link.to_node)
-            if to_node then
-                if link.connection_type == "parameter" and link.parameter_index then
-                    to_node.param_connections[link.parameter_index] = nil
-                elseif link.connection_type == "value" then
-                    to_node.value_connection = nil
-                elseif link.connection_type == "array_index" then
-                    to_node.index_connection = nil
-                elseif link.connection_type == "operation_input1" then
-                    to_node.input1_connection = nil
-                elseif link.connection_type == "operation_input2" then
-                    to_node.input2_connection = nil
-                elseif link.connection_type == "control_condition" then
-                    to_node.condition_connection = nil
-                elseif link.connection_type == "control_true" then
-                    to_node.true_connection = nil
-                elseif link.connection_type == "control_false" then
-                    to_node.false_connection = nil
-                elseif link.connection_type == "control_input" then
-                    to_node.input_connection = nil
-                elseif link.connection_type == "control_enabled" then
-                    to_node.enabled_connection = nil
-                elseif link.connection_type == "control_active" then
-                    to_node.active_connection = nil
-                elseif link.connection_type == "control_restart" then
-                    to_node.restart_connection = nil
-                elseif link.connection_type == "control_max" then
-                    to_node.max_connection = nil
-                elseif link.connection_type == "return_override" then
-                    to_node.return_override_connection = nil
-                elseif link.connection_type == "enum_path" then
-                    to_node.path_input_connection = nil
-                elseif link.connection_type == "enum_value" then
-                    to_node.value_input_connection = nil
-                elseif link.connection_type == "data_input" then
-                    to_node.input_connection = nil
-                elseif link.connection_type == "main" then
-                    to_node.parent_node_id = nil
-                end
-            end
-            
             table.remove(State.all_links, i)
-            State.link_map[link_id] = nil  -- Remove from hash map
+            State.link_map[link_id] = nil
             State.mark_as_modified()
             break
         end
@@ -837,81 +539,24 @@ function Nodes.handle_link_destroyed(link_id)
 end
 
 function Nodes.find_node_by_pin(pin_id)
-    -- Search starter nodes
-    for _, node in ipairs(State.starter_nodes) do
-        if node.output_attr == pin_id then
-            return node, "output"
-        elseif node.return_attr == pin_id then
-            return node, "output"
-        elseif node.return_override_attr == pin_id then
-            return node, "return_override_input"
-        elseif node.hook_arg_attrs then
-            for i, pin in ipairs(node.hook_arg_attrs) do
-                if pin == pin_id then
-                    return node, "output"
-                end
-            end
-        end
-    end
-    
-    -- Search data nodes
-    for _, node in ipairs(State.data_nodes) do
-        if node.output_attr == pin_id then
-            return node, "output"
-        elseif node.input_attr == pin_id then
-            return node, "data_input"
-        elseif node.path_input_attr == pin_id then
-            return node, "enum_path_input"
-        elseif node.value_input_attr == pin_id then
-            return node, "enum_value_input"
-        elseif node.return_override_attr == pin_id then
-            return node, "return_override_input"
-        end
-    end
-    
-    -- Search operation nodes
+    -- Search all nodes for matching pin
     for _, node in ipairs(State.all_nodes) do
-        -- Check control-specific inputs first
-        if node.condition_attr == pin_id then
-            return node, "control_condition_input"
-        elseif node.true_attr == pin_id then
-            return node, "control_true_input"
-        elseif node.false_attr == pin_id then
-            return node, "control_false_input"
-        elseif node.enabled_attr == pin_id then
-            return node, "control_enabled_input"
-        elseif node.active_attr == pin_id then
-            return node, "control_active_input"
-        elseif node.restart_attr == pin_id then
-            return node, "control_restart_input"
-        elseif node.max_attr == pin_id then
-            return node, "control_max_input"
-        elseif node.input_attr == pin_id and node.category == Constants.NODE_CATEGORY_CONTROL then
-            return node, "control_input"
-        elseif node.input_attr == pin_id then
-            return node, "main_input"
-        elseif node.output_attr == pin_id then
-            return node, "output"
-        elseif node.input1_attr == pin_id then
-            return node, "operation_input1"
-        elseif node.input2_attr == pin_id then
-            return node, "operation_input2"
-        else
-            -- Check parameter pins
-            if node.param_input_attrs then
-                for i, pin in pairs(node.param_input_attrs) do
-                    if pin == pin_id then
-                        return node, "param_input"
+        if node.pins then
+            -- Check input pins
+            if node.pins.inputs then
+                for _, pin in ipairs(node.pins.inputs) do
+                    if pin.id == pin_id then
+                        return node, "input"
                     end
                 end
             end
-            -- Check value pin
-            if node.value_input_attr == pin_id then
-                return node, "value_input"
-            end
-            -- Check array index pin
-            if node.index_input_attr == pin_id then
-                return node, "array_index_input"
+            -- Check output pins
+            if node.pins.outputs then
+                for _, pin in ipairs(node.pins.outputs) do
+                    if pin.id == pin_id then
+                        return node, "output"
+                    end
+                end
             end
         end
     end
@@ -947,59 +592,32 @@ end
 -- ========================================
 
 function Nodes.get_parent_value(node)
-    if not node.parent_node_id then
+    -- Get the first input pin (main parent connection)
+    if not node.pins or not node.pins.inputs or #node.pins.inputs == 0 then
         return nil
     end
     
-    local parent = Nodes.find_node_by_id(node.parent_node_id)
-    if not parent then
+    local input_pin = node.pins.inputs[1]
+    
+    -- Check if this pin has a connection
+    if not input_pin.connection then
         return nil
     end
     
-    -- For most nodes, just return ending_value
-    if parent.category ~= Constants.NODE_CATEGORY_STARTER or parent.type ~= Constants.STARTER_TYPE_HOOK then -- Not a Hook starter
-        return parent.ending_value
+    -- Look up the connected node and pin
+    local parent_node = Nodes.find_node_by_id(input_pin.connection.node)
+    if not parent_node then
+        return nil
     end
     
-    -- For Hook starters, determine which output we're connected to
-    -- Find the link connecting this node to its parent
-    local connection_pin = Nodes.get_connected_output_pin(node.id, node.input_attr)
-    
-    if not connection_pin then
-        log.debug("get_parent_value: No connection_pin found, returning ending_value")
-        return parent.ending_value -- Fallback
+    -- Find the output pin that's connected
+    local output_pin_info = State.pin_map[input_pin.connection.pin]
+    if output_pin_info and output_pin_info.pin then
+        return output_pin_info.pin.value
     end
     
-    log.debug("get_parent_value: connection_pin = " .. tostring(connection_pin))
-    log.debug("get_parent_value: parent.output_attr = " .. tostring(parent.output_attr))
-    log.debug("get_parent_value: parent.return_attr = " .. tostring(parent.return_attr))
-    if parent.hook_arg_attrs then
-        for i, pin in ipairs(parent.hook_arg_attrs) do
-            log.debug("get_parent_value: parent.hook_arg_attrs[" .. i .. "] = " .. tostring(pin))
-        end
-    end
-    
-    -- Determine which output pin we're connected to
-    if connection_pin == parent.output_attr then
-        -- Connected to managed object output
-        log.debug("get_parent_value: Connected to output_attr, returning ending_value")
-        return parent.ending_value
-    elseif connection_pin == parent.return_attr then
-        -- Connected to return value output
-        log.debug("get_parent_value: Connected to return_attr, returning return_value")
-        return parent.return_value
-    elseif parent.hook_arg_attrs then
-        for i, pin in ipairs(parent.hook_arg_attrs) do
-            if pin == connection_pin then
-                log.debug("get_parent_value: Connected to hook_arg_attrs[" .. i .. "], returning hook_arg_values[" .. i .. "] = " .. tostring(parent.hook_arg_values and parent.hook_arg_values[i]))
-                return parent.hook_arg_values and parent.hook_arg_values[i]
-            end
-        end
-    end
-    
-    -- Fallback
-    log.debug("get_parent_value: No pin match found, returning ending_value as fallback")
-    return parent.ending_value
+    -- No valid pin found
+    return nil
 end
 
 function Nodes.get_pin_value(pin_id)
@@ -1010,126 +628,67 @@ function Nodes.get_pin_value(pin_id)
     -- Find the link that connects to this pin
     for _, link in ipairs(State.all_links) do
         if link.to_pin == pin_id then
-            -- Found a link to this pin, get the value from the source
+            -- Found a link to this pin, get the value from the source node
             local source_node = Nodes.find_node_by_id(link.from_node)
             if source_node then
-                -- Check what type of pin we're connected from
-                local _, pin_type = Nodes.find_node_by_pin(link.from_pin)
-                if pin_type == "output" and source_node.return_attr == link.from_pin then
-                    -- This is a return_attr pin, return return_value
-                    return source_node.return_value
-                elseif pin_type == "output" and source_node.hook_arg_attrs then
-                    for i, pin in ipairs(source_node.hook_arg_attrs) do
-                        if pin == link.from_pin then
-                            return source_node.hook_arg_values and source_node.hook_arg_values[i]
-                        end
-                    end
-                else
-                    -- Regular output pin, return ending_value
-                    return source_node.ending_value
+                -- Get value from the source pin
+                local from_pin = State.pin_map[link.from_pin]
+                if from_pin and from_pin.pin then
+                    return from_pin.pin.value
                 end
             end
             break
         end
     end
     
+    -- No connection found, check if the pin itself has a value stored
+    local pin = State.pin_map[pin_id]
+    if pin then
+        return pin.value
+    end
+    
     return nil
 end
 
-function Nodes.get_connected_param_value(node, param_index)
-    local connected_node_id = node.param_connections[param_index]
-    if not connected_node_id then
+-- Generic pin-based value retrieval
+function Nodes.get_input_pin_value(node, pin_index)
+    if type(pin_index) ~= "number" then
         return nil
     end
     
-    local connected_node = Nodes.find_node_by_id(connected_node_id)
-    if connected_node then
-        return connected_node.ending_value
-    end
+    local pin = node.pins.inputs[pin_index]
     
-    return nil
-end
-
-function Nodes.get_connected_field_value(node)
-    if not node.value_connection then
+    if not pin then
         return nil
     end
     
-    local connected_node = Nodes.find_node_by_id(node.value_connection)
-    if connected_node then
-        return connected_node.ending_value
-    end
-    
-    return nil
-end
-
-function Nodes.get_operation_input1_value(node)
-    if node.input1_connection then
-        -- Use get_pin_value to properly handle different pin types
-        local value = Nodes.get_pin_value(node.input1_attr)
-        return value
-    elseif node.input1_manual_value and node.input1_manual_value ~= "" then
-        return Utils.parse_primitive_value(node.input1_manual_value)
-    end
-    
-    return nil
-end
-
-function Nodes.get_operation_input2_value(node)
-    if node.input2_connection then
-        -- Use get_pin_value to properly handle different pin types
-        local value = Nodes.get_pin_value(node.input2_attr)
-        return value
-    elseif node.input2_manual_value and node.input2_manual_value ~= "" then
-        return Utils.parse_primitive_value(node.input2_manual_value)
-    end
-    
-    return nil
-end
-
-function Nodes.get_control_input_value(node, attr_name)
-    local connection_name = attr_name:gsub("_attr", "_connection")
-    local manual_name = attr_name:gsub("_attr", "_manual_value")
-    
-    if node[connection_name] then
-        local connected_node = Nodes.find_node_by_id(node[connection_name])
-        if connected_node then
-            return connected_node.ending_value
+    -- If pin has a connection, get value from source
+    if pin.connection then
+        local source_pin_info = State.pin_map[pin.connection.pin]
+        if source_pin_info then
+            local source_pin = source_pin_info.pin
+            return source_pin.value
         end
-    elseif node[manual_name] and node[manual_name] ~= "" then
-        return Utils.parse_primitive_value(node[manual_name])
     end
     
-    return nil
-end
-
-function Nodes.is_param_connected(node, param_index)
-    return node.param_connections[param_index] ~= nil
-end
-
-function Nodes.is_param_connected_for_return_override(node)
-    return node.return_override_connection ~= nil
-end
-
-function Nodes.get_connected_return_override_value(node)
-    if not node.return_override_connection then return nil end
-    local connected_node = Nodes.find_node_by_id(node.return_override_connection)
-    if connected_node then
-        return connected_node.ending_value
-    end
-    return nil
-end
-
-function Nodes.is_field_value_connected(node)
-    return node.value_connection ~= nil
+    -- No connection, return manual value
+    return pin.value
 end
 
 function Nodes.is_output_connected(node)
-    for _, link in ipairs(State.all_links) do
-        if link.from_node == node.id and link.from_pin == node.output_attr then
-            return true
+    -- Check if any of the node's output pins have connections
+    if not node.pins or not node.pins.outputs then
+        return false
+    end
+    
+    for _, output_pin in ipairs(node.pins.outputs) do
+        for _, link in ipairs(State.all_links) do
+            if link.from_node == node.id and link.from_pin == output_pin.id then
+                return true
+            end
         end
     end
+    
     return false
 end
 
@@ -1437,105 +996,31 @@ function Nodes.get_field_from_combo_index(type_def, combo_index)
     return nil
 end
 
-function Nodes.get_param_pin_id(node, param_index)
-    if not node.param_input_attrs then
-        node.param_input_attrs = {}
-    end
-    
-    if not node.param_input_attrs[param_index] then
-        node.param_input_attrs[param_index] = State.next_pin_id()
-    end
-    
-    return node.param_input_attrs[param_index]
-end
-
-function Nodes.set_param_pin_id(node, param_index, pin_id)
-    if not node.param_input_attrs then
-        node.param_input_attrs = {}
-    end
-    
-    node.param_input_attrs[param_index] = pin_id
-end
-
-function Nodes.get_field_value_pin_id(node)
-    if not node.value_input_attr then
-        node.value_input_attr = State.next_pin_id()
-    end
-    
-    return node.value_input_attr
-end
-
-function Nodes.get_array_index_pin_id(node)
-    if not node.index_input_attr then
-        node.index_input_attr = State.next_pin_id()
-    end
-    
-    return node.index_input_attr
-end
-
-function Nodes.is_array_index_connected(node)
-    return node.index_connection ~= nil
-end
-
-function Nodes.get_connected_array_index_value(node)
-    if not node.index_connection then
-        return nil
-    end
-    
-    local connected_node = Nodes.find_node_by_id(node.index_connection)
-    if connected_node then
-        return connected_node.ending_value
-    end
-    
-    return nil
-end
-
 function Nodes.ensure_node_pin_ids(node)
-    -- Ensure main input attribute exists
-    if not node.input_attr then
-        node.input_attr = State.next_pin_id()
+    -- Initialize pin arrays if they don't exist
+    if not node.pins then
+        node.pins = {inputs = {}, outputs = {}}
+    end
+    if not node.pins.inputs then
+        node.pins.inputs = {}
+    end
+    if not node.pins.outputs then
+        node.pins.outputs = {}
     end
     
-    -- Ensure output attribute exists - preserve from config or create for operations
-    if not node.output_attr then
-        node.output_attr = State.next_pin_id()
+    -- Ensure at least one input pin exists (for parent connection)
+    if #node.pins.inputs == 0 then
+        Nodes.add_input_pin(node, "Parent", nil)
     end
     
-    -- Ensure parameter input attributes exist based on stored data
-    if node.param_manual_values then
-        for i = 1, #node.param_manual_values do
-            Nodes.get_param_pin_id(node, i) -- This creates the pin ID if it doesn't exist
-        end
+    -- Ensure output pin exists for nodes that should have one
+    if #node.pins.outputs == 0 and node.category ~= Constants.CATEGORY_CONTROL then
+        Nodes.add_output_pin(node, "Output", nil)
     end
     
-    -- Ensure field value input attribute exists for Set operations
-    if node.type == Constants.FOLLOWER_TYPE_FIELD and node.action_type == Constants.ACTION_SET then
-        if not node.value_input_attr then
-            node.value_input_attr = State.next_pin_id()
-        end
-    end
-    
-    -- Ensure array index input attribute exists for Array followers
-    if node.type == Constants.FOLLOWER_TYPE_ARRAY then
-        if not node.index_input_attr then
-            node.index_input_attr = State.next_pin_id()
-        end
-    end
+    -- Note: Parameter pins, value pins, and index pins are created dynamically
+    -- by their respective node types during rendering
 end
-
-function Nodes.get_param_index_from_pin(node, pin_id)
-    if not node.param_input_attrs then
-        return nil
-    end
-    
-    for index, pin in pairs(node.param_input_attrs) do
-        if pin == pin_id then
-            return index
-        end
-    end
-    return nil
-end
-
 
 function Nodes.validate_and_restore_starter_node(node)
     if node.category == Constants.NODE_CATEGORY_STARTER then
@@ -1552,28 +1037,16 @@ function Nodes.validate_and_restore_starter_node(node)
         elseif node.type == Constants.STARTER_TYPE_HOOK then
             -- Hooks need to be re-initialized manually
             node.status = "Requires re-initialization"
-            -- Create placeholder attributes for hooks that were previously initialized
-            -- (indicated by having a method_name) so follower nodes can connect properly
+            -- Create placeholder pins for hooks that were previously initialized
             if node.method_name and node.method_name ~= "" then
-                if not node.output_attr then
-                    node.output_attr = State.next_pin_id()
-                end
-                if not node.return_attr then
-                    node.return_attr = State.next_pin_id()
-                end
-                if not node.return_override_attr then
-                    node.return_override_attr = State.next_pin_id()
-                end
+                Nodes.ensure_node_pin_ids(node)
             end
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             -- Native nodes need to be re-initialized manually
             node.status = "Requires re-initialization"
-            -- Create placeholder output attribute for native starters that were previously executed
-            -- (indicated by having a method_name) so follower nodes can connect properly
+            -- Create placeholder pins for native starters that were previously executed
             if node.method_name and node.method_name ~= "" then
-                if not node.output_attr then
-                    node.output_attr = State.next_pin_id()
-                end
+                Nodes.ensure_node_pin_ids(node)
             end
         elseif node.type == Constants.STARTER_TYPE_TYPE then
             if node.path and node.path ~= "" then
@@ -1588,10 +1061,8 @@ function Nodes.validate_and_restore_starter_node(node)
         end
     elseif node.category == Constants.NODE_CATEGORY_DATA then
         if node.type == Constants.DATA_TYPE_ENUM then
-            -- Ensure input_attr exists for enum nodes
-            if not node.input_attr then
-                node.input_attr = State.next_pin_id()
-            end
+            -- Ensure pins exist for enum nodes
+            Nodes.ensure_node_pin_ids(node)
         elseif node.type == Constants.DATA_TYPE_PRIMITIVE then
             -- Restore the value as ending_value
             node.ending_value = Utils.parse_primitive_value(node.value)
@@ -1607,6 +1078,103 @@ function Nodes.validate_and_restore_starter_node(node)
             node.status = "Ready"
         end
     end
+end
+
+-- ========================================
+-- Pin Helper APIs
+-- ========================================
+
+function Nodes.create_pin(name, value)
+    local pin = {
+        id = State.next_pin_id(),
+        name = name,
+        value = value
+    }
+    return pin
+end
+
+function Nodes.add_input_pin(node, name, value)
+    local pin = Nodes.create_pin(name, value)
+    pin.connection = nil
+    table.insert(node.pins.inputs, pin)
+    State.pin_map[pin.id] = { node_id = node.id, pin = pin }
+    return pin
+end
+
+function Nodes.add_output_pin(node, name, value)
+    local pin = Nodes.create_pin(name, value)
+    pin.connections = {}
+    table.insert(node.pins.outputs, pin)
+    State.pin_map[pin.id] = { node_id = node.id, pin = pin }
+    return pin
+end
+
+function Nodes.find_pin_by_id(pin_id)
+    return State.pin_map[pin_id]
+end
+
+function Nodes.find_pin_by_name(node, side, name)
+    local pins = (side == "inputs") and node.pins.inputs or node.pins.outputs
+    for i, pin in ipairs(pins) do
+        if pin.name == name then
+            return pin, i
+        end
+    end
+    return nil
+end
+
+function Nodes.connect_pins(from_pin_id, to_pin_id)
+    local from_info = State.pin_map[from_pin_id]
+    local to_info = State.pin_map[to_pin_id]
+    if not from_info or not to_info then return nil end
+    
+    local from_node = State.node_map[from_info.node_id]
+    local to_node = State.node_map[to_info.node_id]
+    local from_pin = from_info.pin
+    local to_pin = to_info.pin
+    
+    local link = {
+        id = State.next_link_id(),
+        from_node = from_node.id,
+        from_pin = from_pin.id,
+        to_node = to_node.id,
+        to_pin = to_pin.id
+    }
+    
+    table.insert(State.all_links, link)
+    State.link_map[link.id] = link
+    
+    to_pin.connection = { node = from_node.id, pin = from_pin.id, link = link.id }
+    table.insert(from_pin.connections, { node = to_node.id, pin = to_pin.id, link = link.id })
+    
+    return link
+end
+
+function Nodes.disconnect_link(link_id)
+    local link = State.link_map[link_id]
+    if not link then return end
+    
+    local from_info = State.pin_map[link.from_pin]
+    local to_info = State.pin_map[link.to_pin]
+    
+    if to_info and to_info.pin.connection and to_info.pin.connection.link == link_id then
+        to_info.pin.connection = nil
+    end
+    
+    if from_info then
+        for i = #from_info.pin.connections, 1, -1 do
+            if from_info.pin.connections[i].link == link_id then
+                table.remove(from_info.pin.connections, i)
+            end
+        end
+    end
+    
+    for i = #State.all_links, 1, -1 do
+        if State.all_links[i].id == link_id then
+            table.remove(State.all_links, i)
+        end
+    end
+    State.link_map[link_id] = nil
 end
 
 return Nodes

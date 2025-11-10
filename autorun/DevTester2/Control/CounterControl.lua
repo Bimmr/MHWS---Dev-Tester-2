@@ -3,29 +3,18 @@
 
 -- CounterControl Node Properties:
 -- This node provides a counter that increments up to a maximum value.
--- The following properties define the state and configuration of a CounterControl node:
 --
--- Input/Output Pins:
--- - max_attr: Number - Pin ID for the max count input attribute
--- - active_attr: Number - Pin ID for the active control input attribute
--- - restart_attr: Number - Pin ID for the restart trigger input attribute
--- - output_attr: Number - Pin ID for the output attribute (provides current count)
---
--- Input Connections:
--- - max_connection: NodeID - ID of the node connected to max input
--- - active_connection: NodeID - ID of the node connected to active input
--- - restart_connection: NodeID - ID of the node connected to restart input
+-- Pins:
+-- - pins.inputs[1]: "max" - Maximum count value
+-- - pins.inputs[2]: "active" - Boolean control for enabling/disabling counting
+-- - pins.inputs[3]: "restart" - Boolean trigger to restart counter when at max
+-- - pins.outputs[1]: "output" - The current count value
 --
 -- Manual Input Values:
 -- - max_manual_value: String - Manual text input for max count when not connected
--- - active_manual_value: String - Manual text input for active control when not connected
--- - restart_manual_value: String - Manual text input for restart trigger when not connected
+-- - active_manual_value: Boolean - Manual checkbox for active control when not connected
+-- - restart_manual_value: Boolean - Manual checkbox for restart trigger when not connected
 -- - delay_ms: Number - Delay in milliseconds between increments (manual input only)
---
--- Runtime Values:
--- - ending_value: Number - The current count value
--- - current_count: Number - Internal counter state
--- - last_increment_time: Number - Timestamp of last increment for delay tracking
 --
 -- Runtime Values:
 -- - ending_value: Number - The current count value
@@ -36,6 +25,7 @@
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
+local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
 local BaseControl = require("DevTester2.Control.BaseControl")
 local imgui = imgui
@@ -49,10 +39,15 @@ local CounterControl = {}
 -- ========================================
 
 function CounterControl.execute(node)
-    -- Get input values
-    local max_value = Nodes.get_control_input_value(node, "max_attr")
-    local active_value = Nodes.get_control_input_value(node, "active_attr")
-    local restart_value = Nodes.get_control_input_value(node, "restart_attr")
+    -- Get input pins
+    local max_pin = node.pins.inputs[1]
+    local active_pin = node.pins.inputs[2]
+    local restart_pin = node.pins.inputs[3]
+    
+    -- Get input values using pin system
+    local max_value = Nodes.get_input_pin_value(node, 1)  -- First input pin
+    local active_value = Nodes.get_input_pin_value(node, 2)  -- Second input pin
+    local restart_value = Nodes.get_input_pin_value(node, 3)  -- Third input pin
 
     -- Initialize counter if not set
     if node.current_count == nil then
@@ -66,20 +61,30 @@ function CounterControl.execute(node)
 
     -- Convert max_value to number
     local max_count = 10 -- default
-    if max_value ~= nil then
+    if max_pin.connection then
         max_count = tonumber(max_value) or 10
+    elseif node.max_manual_value then
+        max_count = tonumber(node.max_manual_value) or 10
     end
 
-    -- Determine active state: use input if connected, otherwise use manual checkbox
-    local is_active = node.active_manual_value -- default to manual value
-    if active_value ~= nil then
-        is_active = not not active_value -- input takes precedence
+    -- Determine active state
+    -- If pin is connected, use the connected value
+    -- If not connected, use manual checkbox value (defaults to false)
+    local is_active = false
+    if active_pin.connection then
+        is_active = not not active_value
+    else
+        is_active = not not node.active_manual_value
     end
 
-    -- Determine restart state: use input if connected, otherwise use manual checkbox
-    local should_restart = node.restart_manual_value -- default to manual value
-    if restart_value ~= nil then
-        should_restart = not not restart_value -- input takes precedence
+    -- Determine restart state
+    -- If pin is connected, use the connected value
+    -- If not connected, use manual checkbox value (defaults to false)
+    local should_restart = false
+    if restart_pin.connection then
+        should_restart = not not restart_value
+    else
+        should_restart = not not node.restart_manual_value
     end
 
     -- Handle restart - only when triggered AND counter reached max
@@ -117,25 +122,96 @@ function CounterControl.execute(node)
 end
 
 function CounterControl.render(node)
+    -- Ensure pins exist (3 inputs, 1 output)
+    if #node.pins.inputs < 3 then
+        if #node.pins.inputs == 0 then
+            Nodes.add_input_pin(node, "max", nil)
+        end
+        if #node.pins.inputs == 1 then
+            Nodes.add_input_pin(node, "active", nil)
+        end
+        if #node.pins.inputs == 2 then
+            Nodes.add_input_pin(node, "restart", nil)
+        end
+    end
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
+    local max_pin = node.pins.inputs[1]
+    local active_pin = node.pins.inputs[2]
+    local restart_pin = node.pins.inputs[3]
+    local output_pin = node.pins.outputs[1]
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     imnodes.begin_node_titlebar()
     imgui.text("Counter")
     imnodes.end_node_titlebar()
 
-    -- Get input values for display
-    local max_value = Nodes.get_control_input_value(node, "max_attr")
-    local active_value = Nodes.get_control_input_value(node, "active_attr")
-    local restart_value = Nodes.get_control_input_value(node, "restart_attr")
-
     -- Execute to update ending_value
     CounterControl.execute(node)
 
-    -- Input pins
-    BaseControl.render_input_pin(node, "Max Count", "max_attr", max_value, max_value, "text")
-    BaseControl.render_input_pin(node, "Active", "active_attr", active_value, active_value, "checkbox")
-    BaseControl.render_input_pin(node, "Restart", "restart_attr", restart_value, restart_value, "checkbox")
+    -- Max count input pin
+    imnodes.begin_input_attribute(max_pin.id)
+    local has_max_connection = max_pin.connection ~= nil
+    if has_max_connection then
+        -- Look up connected pin via State.pin_map
+        local source_pin_info = State.pin_map[max_pin.connection.pin]
+        local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_value = connected_value ~= nil and tostring(connected_value) or "10"
+        imgui.begin_disabled()
+        imgui.input_text("Max Count", display_value)
+        imgui.end_disabled()
+    else
+        node.max_manual_value = node.max_manual_value or "10"
+        local max_changed, new_value = imgui.input_text("Max Count", node.max_manual_value)
+        if max_changed then
+            node.max_manual_value = new_value
+            State.mark_as_modified()
+        end
+    end
+    imnodes.end_input_attribute()
+
+    -- Active input pin (checkbox)
+    imnodes.begin_input_attribute(active_pin.id)
+    local has_active_connection = active_pin.connection ~= nil
+    if has_active_connection then
+        -- Look up connected pin via State.pin_map
+        local source_pin_info = State.pin_map[active_pin.connection.pin]
+        local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_value = not not connected_value
+        imgui.begin_disabled()
+        imgui.checkbox("Active", display_value)
+        imgui.end_disabled()
+    else
+        local active_changed, new_value = imgui.checkbox("Active", node.active_manual_value or false)
+        if active_changed then
+            node.active_manual_value = new_value
+            State.mark_as_modified()
+        end
+    end
+    imnodes.end_input_attribute()
+
+    -- Restart input pin (checkbox)
+    imnodes.begin_input_attribute(restart_pin.id)
+    local has_restart_connection = restart_pin.connection ~= nil
+    if has_restart_connection then
+        -- Look up connected pin via State.pin_map
+        local source_pin_info = State.pin_map[restart_pin.connection.pin]
+        local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_value = not not connected_value
+        imgui.begin_disabled()
+        imgui.checkbox("Restart", display_value)
+        imgui.end_disabled()
+    else
+        local restart_changed, new_value = imgui.checkbox("Restart", node.restart_manual_value or false)
+        if restart_changed then
+            node.restart_manual_value = new_value
+            State.mark_as_modified()
+        end
+    end
+    imnodes.end_input_attribute()
 
     -- Manual delay input (no linking)
     imgui.spacing()
@@ -151,16 +227,57 @@ function CounterControl.render(node)
         imgui.set_tooltip("Delay in milliseconds between counter increments.\nManual input only - cannot be linked to other nodes.")
     end
 
-    -- Create tooltip for output
-    local active_display = active_value ~= nil and tostring(active_value) or ("manual:" .. tostring(node.active_manual_value))
-    local restart_display = restart_value ~= nil and tostring(restart_value) or ("manual:" .. tostring(node.restart_manual_value))
-    local tooltip_text = string.format("Counter Control\nCurrent: %s\nMax: %s\nActive: %s\nRestart: %s\nDelay: %sms\nStatus: %s",
-        tostring(node.current_count or 0), tostring(max_value or 10), active_display, restart_display, tostring(node.delay_ms or 1000), tostring(node.status or "Ready"))
+    -- Update output pin value
+    output_pin.value = node.ending_value
 
-    BaseControl.render_output_attribute(node, tostring(node.ending_value or 0), tooltip_text)
+    -- Output pin with tooltip
+    imgui.spacing()
+    imnodes.begin_output_attribute(output_pin.id)
+    local display_value = tostring(node.ending_value or 0)
+    local output_display = display_value .. " (?)"
+    local pos = Utils.get_right_cursor_pos(node.id, output_display)
+    imgui.set_cursor_pos(pos)
+    imgui.text(display_value)
+    imgui.same_line()
+    imgui.text("(?)")
+    if imgui.is_item_hovered() then
+        local max_display = "10"
+        if has_max_connection then
+            local source_pin_info = State.pin_map[max_pin.connection.pin]
+            local connected_value = source_pin_info and source_pin_info.pin.value
+            max_display = tostring(connected_value or "10")
+        else
+            max_display = node.max_manual_value or "10"
+        end
+        
+        local active_display = "false"
+        if has_active_connection then
+            local source_pin_info = State.pin_map[active_pin.connection.pin]
+            local connected_value = source_pin_info and source_pin_info.pin.value
+            active_display = tostring(connected_value)
+        else
+            active_display = tostring(node.active_manual_value or false)
+        end
+        
+        local restart_display = "false"
+        if has_restart_connection then
+            local source_pin_info = State.pin_map[restart_pin.connection.pin]
+            local connected_value = source_pin_info and source_pin_info.pin.value
+            restart_display = tostring(connected_value)
+        else
+            restart_display = tostring(node.restart_manual_value or false)
+        end
+        
+        local tooltip_text = string.format("Counter Control\nCurrent: %s\nMax: %s\nActive: %s\nRestart: %s\nDelay: %sms\nStatus: %s",
+            tostring(node.current_count or 0), max_display, active_display, restart_display, tostring(node.delay_ms or 1000), tostring(node.status or "Ready"))
+        imgui.set_tooltip(tooltip_text)
+    end
+    imnodes.end_output_attribute()
 
-    BaseControl.render_action_buttons(node)
-    BaseControl.render_debug_info(node)
+    imgui.spacing()
+    if imgui.button("- Remove Node") then
+        Nodes.remove_control_node(node)
+    end
 
     imnodes.end_node()
 end

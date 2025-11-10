@@ -14,10 +14,6 @@
 -- - input2_attr: Number - Pin ID for the second input attribute (not used by InvertOperation)
 -- - output_attr: Number - Pin ID for the output attribute (provides operation result)
 --
--- Input Connections:
--- - input1_connection: NodeID - ID of the node connected to input1
--- - input2_connection: NodeID - ID of the node connected to input2
---
 -- Manual Input Values:
 -- - input1_manual_value: String - Manual text input for input1 when not connected
 -- - input2_manual_value: String - Manual text input for input2 when not connected
@@ -41,33 +37,10 @@ local BaseOperation = {}
 -- Base Operation Node Rendering Functions
 -- ========================================
 
-function BaseOperation.render_output_attribute(node, display_value, tooltip_text)
-    -- Create output attribute if needed
-    if not node.output_attr then
-        node.output_attr = State.next_pin_id()
-    end
-
-    imgui.spacing()
-    imnodes.begin_output_attribute(node.output_attr)
-
-    -- Display value with tooltip
-    local display = display_value .. " (?)"
-    local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
-    imgui.set_cursor_pos(debug_pos)
-    imgui.text(display_value)
-    imgui.same_line()
-    imgui.text("(?)")
-    if imgui.is_item_hovered() and tooltip_text then
-        imgui.set_tooltip(tooltip_text)
-    end
-
-    imnodes.end_output_attribute()
-end
-
 function BaseOperation.render_action_buttons(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_starter_node(node)  -- Operations nodes use the same removal logic as data nodes
+        Nodes.remove_node(node)
     end
 
     -- Operations nodes typically don't add child nodes since they're operation providers
@@ -92,12 +65,9 @@ function BaseOperation.render_debug_info(node)
         end
 
         debug_info = debug_info .. string.format(
-            "\n\nNode ID: %s\nSelected Operation: %s\nInput1 Attr: %s\nInput2 Attr: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            "\n\nNode ID: %s\nSelected Operation: %s\nInput Links: %s\nOutput Links: %s",
             tostring(node.node_id),
             tostring(node.selected_operation or "None"),
-            tostring(node.input1_attr or "None"),
-            tostring(node.input2_attr or "None"),
-            tostring(node.output_attr or "None"),
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
         )
@@ -125,41 +95,6 @@ function BaseOperation.render_debug_info(node)
     end
 end
 
-function BaseOperation.render_input_pin(node, label, attr_name, converted_value, original_value)
-    -- Create input attribute if needed
-    if not node[attr_name] then
-        node[attr_name] = State.next_pin_id()
-    end
-
-    imnodes.begin_input_attribute(node[attr_name])
-    imgui.text(label)
-    imnodes.end_input_attribute()
-
-    imgui.same_line()
-    
-    -- Check if this input is connected
-    local connection_name = attr_name:gsub("_attr", "_connection")
-    local manual_name = attr_name:gsub("_attr", "_manual_value")
-    local has_connection = node[connection_name] ~= nil
-    
-    if has_connection then
-        -- Show connected value in disabled input
-        local display_value = original_value ~= nil and tostring(converted_value) or "(no input)"
-        imgui.begin_disabled()
-        imgui.input_text("##" .. attr_name, display_value)
-        imgui.end_disabled()
-    else
-        -- Show manual input field
-        node[manual_name] = node[manual_name] or ""
-        local input_changed, new_value = imgui.input_text("##" .. attr_name, node[manual_name])
-        -- Always update the stored value with the current input text
-        if new_value ~= node[manual_name] then
-            node[manual_name] = new_value
-            State.mark_as_modified()
-        end
-    end
-end
-
 function BaseOperation.render_operation_dropdown(node, operations, default_operation)
     -- Initialize operation if not set
     if not node.selected_operation then
@@ -174,6 +109,34 @@ function BaseOperation.render_operation_dropdown(node, operations, default_opera
     end
 
     return node.selected_operation
+end
+
+-- ========================================
+-- Operation Node Creation
+-- ========================================
+
+function BaseOperation.create(node_type, position)
+    local Constants = require("DevTester2.Constants")
+    local node_id = State.next_node_id()
+
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_OPERATIONS,
+        type = node_type,
+        position = position or {x = 50, y = 50},
+        ending_value = nil,
+        status = nil,
+        pins = { inputs = {}, outputs = {} },
+        selected_operation = 0,
+        input1_manual_value = "",
+        input2_manual_value = ""
+    }
+
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node
+    State.mark_as_modified()
+    return node
 end
 
 return BaseOperation

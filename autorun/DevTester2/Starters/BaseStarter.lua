@@ -10,33 +10,10 @@ local BaseStarter = {}
 -- Base Starter Node Rendering Functions
 -- ========================================
 
-function BaseStarter.render_output_attribute(node, display_value, tooltip_text)
-    -- Create output attribute if needed
-    if not node.output_attr then
-        node.output_attr = State.next_pin_id()
-    end
-
-    imgui.spacing()
-    imnodes.begin_output_attribute(node.output_attr)
-
-    -- Display value with tooltip
-    local display = display_value .. " (?)"
-    local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
-    imgui.set_cursor_pos(debug_pos)
-    imgui.text(display_value)
-    imgui.same_line()
-    imgui.text("(?)")
-    if imgui.is_item_hovered() and tooltip_text then
-        imgui.set_tooltip(tooltip_text)
-    end
-
-    imnodes.end_output_attribute()
-end
-
 function BaseStarter.render_action_buttons(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_starter_node(node)
+        Nodes.remove_node(node)
     end
 
     -- Only show Add Child Node if result is valid
@@ -99,6 +76,44 @@ function BaseStarter.render_node_hover_tooltip(node, tooltip_text)
     if imnodes.is_node_hovered(node.node_id) then
         imgui.set_tooltip(tooltip_text)
     end
+end
+
+-- ========================================
+-- Node Creation
+-- ========================================
+
+function BaseStarter.create(node_type, position)
+    local Constants = require("DevTester2.Constants")
+    local node_id = State.next_node_id()
+
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_STARTER,
+        type = node_type,
+        path = "",
+        position = position or {x = 50, y = 50},
+        ending_value = nil,
+        status = nil,
+        pins = { inputs = {}, outputs = {} },
+        -- Parameter support for starters that need it (like Native)
+        param_manual_values = {},
+        -- Enum-specific
+        selected_enum_index = 1,
+        enum_names = nil,
+        enum_values = nil,
+        -- Hook-specific
+        method_name = "",
+        hook_id = nil,
+        is_initialized = false,
+        return_override_manual = "",
+        is_return_overridden = false
+    }
+    
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
+    State.mark_as_modified()
+    return node
 end
 
 return BaseStarter

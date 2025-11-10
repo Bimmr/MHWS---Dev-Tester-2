@@ -21,33 +21,10 @@ local BaseData = {}
 -- Base Data Node Rendering Functions
 -- ========================================
 
-function BaseData.render_output_attribute(node, display_value, tooltip_text)
-    -- Create output attribute if needed
-    if not node.output_attr then
-        node.output_attr = State.next_pin_id()
-    end
-
-    imgui.spacing()
-    imnodes.begin_output_attribute(node.output_attr)
-
-    -- Display value with tooltip
-    local display = display_value .. " (?)"
-    local debug_pos = Utils.get_right_cursor_pos(node.node_id, display)
-    imgui.set_cursor_pos(debug_pos)
-    imgui.text(display_value)
-    imgui.same_line()
-    imgui.text("(?)")
-    if imgui.is_item_hovered() and tooltip_text then
-        imgui.set_tooltip(tooltip_text)
-    end
-
-    imnodes.end_output_attribute()
-end
-
 function BaseData.render_action_buttons(node)
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_starter_node(node)  -- Data and Operations nodes use the same removal logic
+        Nodes.remove_node(node)
     end
 
     -- Data nodes typically don't add child nodes since they're data providers
@@ -71,10 +48,18 @@ function BaseData.render_debug_info(node)
             end
         end
 
+        -- Collect pin info
+        local output_pins = {}
+        if node.pins and node.pins.outputs then
+            for _, pin in ipairs(node.pins.outputs) do
+                table.insert(output_pins, tostring(pin.id))
+            end
+        end
+
         debug_info = debug_info .. string.format(
-            "\n\nNode ID: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            "\n\nNode ID: %s\nOutput Pins: %s\nInput Links: %s\nOutput Links: %s",
             tostring(node.node_id),
-            tostring(node.output_attr or "None"),
+            #output_pins > 0 and table.concat(output_pins, ", ") or "None",
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
         )
@@ -106,6 +91,43 @@ function BaseData.render_node_hover_tooltip(node, tooltip_text)
     if imnodes.is_node_hovered(node.node_id) then
         imgui.set_tooltip(tooltip_text)
     end
+end
+
+-- ========================================
+-- Node Creation
+-- ========================================
+
+function BaseData.create(node_type, position)
+    local Constants = require("DevTester2.Constants")
+    local node_id = State.next_node_id()
+
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_DATA,
+        type = node_type,
+        path = "",
+        position = position or {x = 50, y = 50},
+        ending_value = nil,
+        status = nil,
+        pins = { inputs = {}, outputs = {} },
+        -- Enum-specific
+        selected_enum_index = 1,
+        enum_names = nil,
+        enum_values = nil,
+        -- Value-specific
+        value = "",
+        -- Variable-specific
+        variable_name = "",
+        default_value = "",
+        input_manual_value = "",
+        pending_reset = false
+    }
+    
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
+    State.mark_as_modified()
+    return node
 end
 
 return BaseData

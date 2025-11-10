@@ -146,12 +146,14 @@ function Utils.parse_category_and_type(category, type)
             return "OPERATIONS", "COMPARE"
         end
     elseif category == Constants.NODE_CATEGORY_CONTROL then
-        if type == Constants.CONTROL_TYPE_SELECT then
-            return "CONTROL", "SELECT"
+        if type == Constants.CONTROL_TYPE_SWITCH then
+            return "CONTROL", "SWITCH"
         elseif type == Constants.CONTROL_TYPE_TOGGLE then
             return "CONTROL", "TOGGLE"
         elseif type == Constants.CONTROL_TYPE_COUNTER then
             return "CONTROL", "COUNTER"
+        elseif type == Constants.CONTROL_TYPE_CONDITION then
+            return "CONTROL", "CONDITION"
         end
     elseif category == Constants.NODE_CATEGORY_UTILITY then
         if type == Constants.UTILITY_TYPE_LABEL then

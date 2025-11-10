@@ -13,8 +13,6 @@ State.is_modified = false
 
 -- Node storage
 State.all_nodes = {}
-State.starter_nodes = {}
-State.data_nodes = {}
 State.all_links = {}
 
 -- Variable storage (shared across all Variable nodes)
@@ -26,6 +24,7 @@ State.reset_variables = {}  -- variable_name -> true (reset this frame)
 -- Hash maps for fast lookups
 State.node_map = {}  -- node_id -> node
 State.link_map = {}  -- link_id -> link
+State.pin_map = {}   -- pin_id -> {node_id = node.id, pin = pin}
 
 -- Caching
 State.type_cache = {}  -- type_full_name -> {methods = {...}, fields = {...}, last_accessed = timestamp}
@@ -94,8 +93,6 @@ end
 -- Reset Functions
 -- ========================================
 function State.reset_nodes()
-    State.starter_nodes = {}
-    State.data_nodes = {}
     State.all_nodes = {}
 end
 

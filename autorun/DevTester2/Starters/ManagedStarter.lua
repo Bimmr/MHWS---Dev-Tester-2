@@ -1,15 +1,17 @@
 -- ManagedStarter Node Properties:
 -- This node retrieves a managed singleton object from the game's memory.
--- The following properties define the state and configuration of a ManagedStarter node:
 --
 -- Configuration:
--- - path: String - The full type path (e.g., "app.SomeClass") of the managed singleton to retrieve
+-- - path: String - The full type path (e.g., "app.SomeClass") of the managed singleton
+--
+-- Pins:
+-- - pins.outputs[1]: "output" - The managed singleton object
 --
 -- Runtime Values:
--- - ending_value: Object - The managed singleton object retrieved from the specified path
+-- - ending_value: Object - The managed singleton object retrieved
 --
 -- UI/Debug:
--- - status: String - Current status message ("Success", "Managed singleton not found", "Enter a path")
+-- - status: String - Current status message
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -23,8 +25,17 @@ local sdk = sdk
 local ManagedStarter = {}
 
 function ManagedStarter.render(node)
+    -- Ensure pin exists
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
+    local output_pin = node.pins.outputs[1]
+    
+    -- Always sync output pin value with ending_value on every render
+    output_pin.value = node.ending_value
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     imnodes.begin_node_titlebar()
     imgui.text("Managed Starter")
@@ -39,18 +50,21 @@ function ManagedStarter.render(node)
     if path_changed then
         node.path = new_path
         State.mark_as_modified()
-        -- Only update ending_value when path changes
+        -- Update ending_value when path changes
         if node.path and node.path ~= "" then
             local managed_obj = sdk.get_managed_singleton(node.path)
             if managed_obj then
                 node.ending_value = managed_obj
+                output_pin.value = managed_obj
                 node.status = "Success"
             else
                 node.ending_value = nil
+                output_pin.value = nil
                 node.status = "Managed singleton not found"
             end
         else
             node.ending_value = nil
+            output_pin.value = nil
             node.status = "Path cannot be empty"
         end
     end
@@ -76,7 +90,18 @@ function ManagedStarter.render(node)
             type_info:get_full_name()
         )
 
-        BaseStarter.render_output_attribute(node, display_value, tooltip_text)
+        -- Output pin
+        imgui.spacing()
+        imnodes.begin_output_attribute(output_pin.id)
+        local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
+        imgui.set_cursor_pos(debug_pos)
+        imgui.text(display_value)
+        imgui.same_line()
+        imgui.text("(?)")
+        if imgui.is_item_hovered() and tooltip_text then
+            imgui.set_tooltip(tooltip_text)
+        end
+        imnodes.end_output_attribute()
     elseif node.status == "Managed singleton not found" then
         imgui.text_colored("Managed singleton not found", Constants.COLOR_TEXT_WARNING)
     end

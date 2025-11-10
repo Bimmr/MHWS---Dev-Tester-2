@@ -10,23 +10,30 @@ local Constants = require("DevTester2.Constants")
 local Dialogs = require("DevTester2.Dialogs")
 
 -- Node type modules
+local BaseStarter = require("DevTester2.Starters.BaseStarter")
 local ManagedStarter = require("DevTester2.Starters.ManagedStarter")
 local HookStarter = require("DevTester2.Starters.HookStarter")
 local NativeStarter = require("DevTester2.Starters.NativeStarter")
 local TypeStarter = require("DevTester2.Starters.TypeStarter")
+local BaseData = require("DevTester2.Datas.BaseData")
 local EnumData = require("DevTester2.Datas.EnumData")
 local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
 local VariableData = require("DevTester2.Datas.VariableData")
+local BaseFollower = require("DevTester2.Followers.BaseFollower")
 local MethodFollower = require("DevTester2.Followers.MethodFollower")
 local FieldFollower = require("DevTester2.Followers.FieldFollower")
 local ArrayFollower = require("DevTester2.Followers.ArrayFollower")
+local BaseOperation = require("DevTester2.Operations.BaseOperation")
 local InvertOperation = require("DevTester2.Operations.InvertOperation")
 local MathOperation = require("DevTester2.Operations.MathOperation")
 local LogicOperation = require("DevTester2.Operations.LogicOperation")
 local CompareOperation = require("DevTester2.Operations.CompareOperation")
-local SelectControl = require("DevTester2.Control.SelectControl")
+local BaseControl = require("DevTester2.Control.BaseControl")
+local SwitchControl = require("DevTester2.Control.SwitchControl")
 local ToggleControl = require("DevTester2.Control.ToggleControl")
 local CounterControl = require("DevTester2.Control.CounterControl")
+local ConditionControl = require("DevTester2.Control.ConditionControl")
+local BaseUtility = require("DevTester2.Utility.BaseUtility")
 local Label = require("DevTester2.Utility.Label")
 
 -- Local references
@@ -117,8 +124,8 @@ end)
 -- Cleanup on script unload
 re.on_script_reset(function()
     -- Remove all hooks
-    for _, node in ipairs(State.starter_nodes) do
-        if node.type == 2 and node.hook_id then -- Hook type
+    for _, node in ipairs(State.all_nodes) do
+        if node.category == Constants.NODE_CATEGORY_STARTER and node.type == 2 and node.hook_id then -- Hook type
             -- sdk.hook_remove(node.hook_id)
         end
     end
@@ -127,25 +134,25 @@ end)
 -- Shared functions for node creation menu items
 function render_starter_menu_items(position)
     if imgui.menu_item("Managed") then
-        Nodes.create_starter_node(Constants.STARTER_TYPE_MANAGED, position)
+        BaseStarter.create(Constants.STARTER_TYPE_MANAGED, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Managed node | sdk.get_managed_singleton")
     end
     if imgui.menu_item("Native") then
-        Nodes.create_starter_node(Constants.STARTER_TYPE_NATIVE, position)
+        BaseStarter.create(Constants.STARTER_TYPE_NATIVE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Native node | sdk.get_native_singleton")
     end
     if imgui.menu_item("Hook") then
-        Nodes.create_starter_node(Constants.STARTER_TYPE_HOOK, position)
+        BaseStarter.create(Constants.STARTER_TYPE_HOOK, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Hook node to hook native functions")
     end
     if imgui.menu_item("Type") then
-        Nodes.create_starter_node(Constants.STARTER_TYPE_TYPE, position)
+        BaseStarter.create(Constants.STARTER_TYPE_TYPE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Type node to get type definitions")
@@ -154,21 +161,21 @@ end
 
 function render_data_menu_items(position)
     if imgui.menu_item("Primitive") then
-        Nodes.create_data_node(Constants.DATA_TYPE_PRIMITIVE, position)
+        BaseData.create(Constants.DATA_TYPE_PRIMITIVE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Primitive node for basic values (numbers, strings, booleans)")
     end
     
     if imgui.menu_item("Enum") then
-        Nodes.create_data_node(Constants.DATA_TYPE_ENUM, position)
+        BaseData.create(Constants.DATA_TYPE_ENUM, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create an Enum node for enumerated values")
     end
     
     if imgui.menu_item("Variable") then
-        Nodes.create_data_node(Constants.DATA_TYPE_VARIABLE, position)
+        BaseData.create(Constants.DATA_TYPE_VARIABLE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Variable node for storing and retrieving values across the node graph")
@@ -177,28 +184,28 @@ end
 
 function render_operation_menu_items(position)
     if imgui.menu_item("Invert") then
-        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_INVERT, position)
+        BaseOperation.create(Constants.OPERATIONS_TYPE_INVERT, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create an Invert node that inverts boolean values")
     end
     
     if imgui.menu_item("Math") then
-        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_MATH, position)
+        BaseOperation.create(Constants.OPERATIONS_TYPE_MATH, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Math node that performs mathematical operations on two numbers")
     end
     
     if imgui.menu_item("Logic") then
-        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_LOGIC, position)
+        BaseOperation.create(Constants.OPERATIONS_TYPE_LOGIC, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Logic node that performs boolean logic operations (AND/OR/NAND/NOR)")
     end
     
     if imgui.menu_item("Compare") then
-        Nodes.create_operation_node(Constants.OPERATIONS_TYPE_COMPARE, position)
+        BaseOperation.create(Constants.OPERATIONS_TYPE_COMPARE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Compare node that performs comparison operations (Equals/Not Equals/Greater/Less)")
@@ -206,31 +213,38 @@ function render_operation_menu_items(position)
 end
 
 function render_control_menu_items(position)
-    if imgui.menu_item("Select") then
-        Nodes.create_control_node(Constants.CONTROL_TYPE_SELECT, position)
+    if imgui.menu_item("Switch") then
+        BaseControl.create(Constants.CONTROL_TYPE_SWITCH, position)
     end
     if imgui.is_item_hovered() then
-        imgui.set_tooltip("Create a Select node that selects between two values based on a condition")
+        imgui.set_tooltip("Create a Switch node that works like a switch statement, comparing an input against multiple cases")
     end
     
     if imgui.menu_item("Toggle") then
-        Nodes.create_control_node(Constants.CONTROL_TYPE_TOGGLE, position)
+        BaseControl.create(Constants.CONTROL_TYPE_TOGGLE, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Toggle node that controls data flow with an on/off switch")
     end
     
     if imgui.menu_item("Counter") then
-        Nodes.create_control_node(Constants.CONTROL_TYPE_COUNTER, position)
+        BaseControl.create(Constants.CONTROL_TYPE_COUNTER, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Counter node that counts up to a maximum value and can be restarted")
+    end
+    
+    if imgui.menu_item("Condition") then
+        BaseControl.create(Constants.CONTROL_TYPE_CONDITION, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Condition node that returns one of two values based on a boolean condition (if-then-else)")
     end
 end
 
 function render_utility_menu_items(position)
     if imgui.menu_item("Label") then
-        Nodes.create_utility_node(Constants.UTILITY_TYPE_LABEL, position)
+        BaseUtility.create(Constants.UTILITY_TYPE_LABEL, position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Label node for adding text comments and documentation to your node graph")
@@ -239,7 +253,7 @@ end
 
 function render_follower_menu_item(position)
     if imgui.menu_item("Add Follower") then
-        Nodes.create_follower_node(position)
+        BaseFollower.create(position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Method Follower node (Requires following another node)")
@@ -360,26 +374,8 @@ function render_node_editor()
     -- Set node width
     imgui.push_item_width(Constants.NODE_WIDTH)
     
-    -- Create combined list of all nodes for unified rendering
-    local all_nodes_to_render = {}
-    
-    -- Add starter nodes
-    for _, node in ipairs(State.starter_nodes) do
-        table.insert(all_nodes_to_render, node)
-    end
-    
-    -- Add data nodes
-    for _, node in ipairs(State.data_nodes) do
-        table.insert(all_nodes_to_render, node)
-    end
-    
-    -- Add operation/follower/control nodes
-    for _, node in ipairs(State.all_nodes) do
-        table.insert(all_nodes_to_render, node)
-    end
-    
     -- Unified rendering loop for all nodes
-    for _, node in ipairs(all_nodes_to_render) do
+    for _, node in ipairs(State.all_nodes) do
         -- Render based on category
         if node.category == Constants.NODE_CATEGORY_STARTER then
             local category, type = Utils.parse_category_and_type(node.category, node.type)
@@ -454,12 +450,14 @@ function render_node_editor()
             imgui.push_item_width(Nodes.get_node_width(category, type))
             Nodes.set_node_titlebar_color(Nodes.get_node_titlebar_color(category, type))
 
-            if node.type == Constants.CONTROL_TYPE_SELECT then
-                SelectControl.render(node)
+            if node.type == Constants.CONTROL_TYPE_SWITCH then
+                SwitchControl.render(node)
             elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
                 ToggleControl.render(node)
             elseif node.type == Constants.CONTROL_TYPE_COUNTER then
                 CounterControl.render(node)
+            elseif node.type == Constants.CONTROL_TYPE_CONDITION then
+                ConditionControl.render(node)
             end
 
             imgui.pop_item_width()

@@ -42,11 +42,13 @@ local BaseFollower = {}
 function BaseFollower.check_parent_connection(node)
     local parent_value = Nodes.get_parent_value(node)
 
-    if not node.parent_node_id then
-        Nodes.render_disconnected_operation_node(node, "no_parent")
-        return nil
-    elseif parent_value == nil then
-        Nodes.render_disconnected_operation_node(node, "parent_nil")
+    if parent_value == nil then
+        -- Check if there's actually a connection
+        if not node.pins or not node.pins.inputs or #node.pins.inputs == 0 or not node.pins.inputs[1].connection then
+            Nodes.render_disconnected_operation_node(node, "no_parent")
+        else
+            Nodes.render_disconnected_operation_node(node, "parent_nil")
+        end
         return nil
     end
 
@@ -88,11 +90,19 @@ function BaseFollower.render_title_bar(node, parent_type, custom_title)
     imnodes.begin_node_titlebar()
 
     -- Main input pin with type name inside
-    if not node.input_attr then
-        node.input_attr = State.next_pin_id()
+    local parent_pin = node.pins.inputs[1]
+    if not parent_pin then
+        -- Should not happen if node is properly initialized, but handle gracefully
+        if custom_title then
+            imgui.text(custom_title)
+        else
+            imgui.text("Follower")
+        end
+        imnodes.end_node_titlebar()
+        return
     end
 
-    imnodes.begin_input_attribute(node.input_attr)
+    imnodes.begin_input_attribute(parent_pin.id)
 
     if custom_title then
         imgui.text(custom_title)
@@ -197,22 +207,10 @@ function BaseFollower.render_debug_info(node)
                 table.insert(output_links, string.format("(Pin %s, Link %s)", tostring(link.from_pin), tostring(link.id)))
             end
         end
-            
-        -- Collect all input attributes (main + params)
-        local input_attrs = {}
-        if node.input_attr then table.insert(input_attrs, tostring(node.input_attr)) end
-        if node.param_manual_values then
-            for i = 1, #(node.param_manual_values) do
-                local param_pin_id = Nodes.get_param_pin_id(node, i)
-                if param_pin_id then table.insert(input_attrs, tostring(param_pin_id)) end
-            end
-        end
 
         debug_info = debug_info .. string.format(
-            "\n\nNode ID: %s\nInput Attrs: %s\nOutput Attr: %s\nInput Links: %s\nOutput Links: %s",
+            "\n\nNode ID: %s\nInput Links: %s\nOutput Links: %s",
             tostring(node.node_id),
-            #input_attrs > 0 and table.concat(input_attrs, ", ") or "None",
-            tostring(node.output_attr or "None"),
             #input_links > 0 and table.concat(input_links, ", ") or "None",
             #output_links > 0 and table.concat(output_links, ", ") or "None"
         )
@@ -245,7 +243,7 @@ function BaseFollower.render_action_buttons(node, can_add_child)
     imgui.spacing()
     local pos = imgui.get_cursor_pos()
     if imgui.button("- Remove Node") then
-        Nodes.remove_operation_node(node)
+        Nodes.remove_node(node)
     end
     
     -- Show Add Child Node if condition is met (can_add_child can be a function or boolean)
@@ -268,69 +266,43 @@ function BaseFollower.render_action_buttons(node, can_add_child)
     end
 end
 
-function BaseFollower.render_output_attribute(node, result, can_continue)
-    -- Create output attribute only if we should show the pin
-    local should_show_output_pin = result ~= nil or node.output_attr
+-- ========================================
+-- Node Creation
+-- ========================================
+
+function BaseFollower.create(position)
+    local Constants = require("DevTester2.Constants")
+    local node_id = State.next_node_id()
+    local node = {
+        id = node_id,
+        node_id = node_id,
+        category = Constants.NODE_CATEGORY_FOLLOWER,
+        type = Constants.FOLLOWER_TYPE_METHOD, -- Default to Method
+        position = position or {x = 0, y = 0},
+        pins = { inputs = {}, outputs = {} },
+        -- Method-specific
+        selected_method_combo = 1, -- 1-based indexing for combo
+        method_group_index = nil, -- Parsed from selection
+        method_index = nil, -- Parsed from selection
+        param_manual_values = {},
+        -- Field-specific
+        selected_field_combo = 1, -- 1-based indexing for combo
+        field_group_index = nil, -- Parsed from selection
+        field_index = nil, -- Parsed from selection
+        value_manual_input = "",
+        -- Array-specific
+        selected_element_index = 0,
+        index_manual_value = "",
+        -- Common
+        starting_value = nil,
+        ending_value = nil,
+        status = nil
+    }
     
-    if should_show_output_pin then
-        if not node.output_attr then
-            node.output_attr = State.next_pin_id()
-        end
-        imgui.spacing()
-        imnodes.begin_output_attribute(node.output_attr)
-    else
-        imgui.spacing()
-    end
-    
-    if result ~= nil then
-        -- Display the actual result
-        local display_value = "Object"
-        if type(result) == "userdata" then
-            local success, type_info = pcall(function() return result:get_type_definition() end)
-            if success and type_info then
-                display_value = type_info:get_name()
-            end
-        else
-            display_value = tostring(result)
-        end
-        local output_display = display_value .. " (?)"
-        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
-        imgui.set_cursor_pos(pos)
-        imgui.text(display_value)
-        if can_continue then
-            imgui.same_line()
-            imgui.text("(?)")
-            if imgui.is_item_hovered() then
-                if type(result) == "userdata" and result.get_type_definition then
-                    local type_info = result:get_type_definition()
-                    local address = result.get_address and string.format("0x%X", result:get_address()) or "N/A"
-                    local tooltip_text = string.format(
-                        "Type: %s\nAddress: %s\nFull Name: %s",
-                        type_info:get_name(), address, type_info:get_full_name()
-                    )
-                    imgui.set_tooltip(tooltip_text)
-                else
-                    imgui.set_tooltip(tostring(result))
-                end
-            end
-        end
-    else
-        -- Display "nil" when result is nil
-        local display_value = "nil"
-        local output_display = display_value .. " (?)"
-        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
-        imgui.set_cursor_pos(pos)
-        imgui.text(display_value)
-        imgui.same_line()
-        imgui.text("(?)")
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("nil")
-        end
-    end
-    
-    if should_show_output_pin then
-        imnodes.end_output_attribute()
-    end
+    table.insert(State.all_nodes, node)
+    State.node_map[node_id] = node  -- Add to hash map
+    State.mark_as_modified()
+    return node
 end
 
 return BaseFollower

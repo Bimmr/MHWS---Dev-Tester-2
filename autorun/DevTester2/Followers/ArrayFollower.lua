@@ -1,16 +1,19 @@
 -- ArrayFollower Node Properties:
 -- This node accesses elements of array/collection objects by index.
--- The following properties define the state and configuration of an ArrayFollower node:
+--
+-- Pins:
+-- - pins.inputs[1]: "parent" - Connection to parent array
+-- - pins.inputs[2]: "index" - Index value (optional connection)
+-- - pins.outputs[1]: "output" - The array element value
 --
 -- Array Navigation:
 -- - selected_element_index: Number - Index of the currently selected array element (0-based)
 -- - index_manual_value: String - Manual text input for the array index
--- - index_input_attr: Number - Pin ID for the index input attribute (for connected index values)
 --
 -- Runtime Values:
 -- - ending_value: Any - The value of the selected array element
 --
--- Inherits all BaseFollower properties (input_attr, output_attr, type, status, etc.)
+-- Inherits all BaseFollower properties (type, status, etc.)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -28,6 +31,19 @@ local ArrayFollower = {}
 -- ========================================
 
 function ArrayFollower.render(node)
+    -- Ensure pins exist
+    if #node.pins.inputs < 2 then
+        if #node.pins.inputs == 0 then
+            Nodes.add_input_pin(node, "parent", nil)
+        end
+        if #node.pins.inputs == 1 then
+            Nodes.add_input_pin(node, "index", nil)
+        end
+    end
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
     local parent_value = BaseFollower.check_parent_connection(node)
     if not parent_value then 
         node.status = "Waiting for parent connection"
@@ -41,7 +57,7 @@ function ArrayFollower.render(node)
         return
     end
 
-    imnodes.begin_node(node.node_id)
+    imnodes.begin_node(node.id)
 
     -- Get actual array size for display
     local display_size = 0
@@ -119,9 +135,12 @@ function ArrayFollower.render(node)
     local display_index = node.selected_element_index -- Default from dropdown
     local has_index_input = false
     
-    -- Check for connected index value
-    if Nodes.is_array_index_connected(node) then
-        local connected_index = Nodes.get_connected_array_index_value(node)
+    -- Check for connected index value using pin system
+    local index_pin = node.pins.inputs[2]
+    if index_pin.connection then
+        -- Look up connected pin via State.pin_map
+        local source_pin_info = State.pin_map[index_pin.connection.pin]
+        local connected_index = source_pin_info and source_pin_info.pin.value
         if connected_index ~= nil then
             -- Try to convert to number
             local num_index = tonumber(connected_index)
@@ -147,8 +166,7 @@ function ArrayFollower.render(node)
     end
     
     -- Display current index and navigation controls within input attribute
-    local index_pin_id = Nodes.get_array_index_pin_id(node)
-    imnodes.begin_input_attribute(index_pin_id)
+    imnodes.begin_input_attribute(index_pin.id)
         
     -- Left arrow button (disabled if at first element, array is empty, or index input is provided)
     local left_disabled = display_index <= 0 or array_size == 0 or has_index_input
@@ -220,6 +238,9 @@ function ArrayFollower.render(node)
         node.ending_value_full_name = result:get_type_definition():get_full_name()
     end
     
+    -- Update output pin value
+    node.pins.outputs[1].value = result
+    
     -- Check if result is userdata (can continue to child nodes)
     local can_continue = type(result) == "userdata"
     
@@ -235,7 +256,58 @@ function ArrayFollower.render(node)
         end
     end
     
-    BaseFollower.render_output_attribute(node, result, can_continue)
+    -- Render output pin
+    local output_pin = node.pins.outputs[1]
+    imgui.spacing()
+    imnodes.begin_output_attribute(output_pin.id)
+    
+    if result ~= nil then
+        -- Display the actual result
+        local display_value = "Object"
+        if type(result) == "userdata" then
+            local success, type_info = pcall(function() return result:get_type_definition() end)
+            if success and type_info then
+                display_value = type_info:get_name()
+            end
+        else
+            display_value = tostring(result)
+        end
+        local output_display = display_value .. " (?)"
+        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+        imgui.set_cursor_pos(pos)
+        imgui.text(display_value)
+        if can_continue then
+            imgui.same_line()
+            imgui.text("(?)")
+            if imgui.is_item_hovered() then
+                if type(result) == "userdata" and result.get_type_definition then
+                    local type_info = result:get_type_definition()
+                    local address = result.get_address and string.format("0x%X", result:get_address()) or "N/A"
+                    local tooltip_text = string.format(
+                        "Type: %s\nAddress: %s\nFull Name: %s",
+                        type_info:get_name(), address, type_info:get_full_name()
+                    )
+                    imgui.set_tooltip(tooltip_text)
+                else
+                    imgui.set_tooltip(tostring(result))
+                end
+            end
+        end
+    else
+        -- Display "nil" when result is nil
+        local display_value = "nil"
+        local output_display = display_value .. " (?)"
+        local pos = Utils.get_right_cursor_pos(node.node_id, output_display)
+        imgui.set_cursor_pos(pos)
+        imgui.text(display_value)
+        imgui.same_line()
+        imgui.text("(?)")
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("nil")
+        end
+    end
+    
+    imnodes.end_output_attribute()
     
     -- Action buttons
     BaseFollower.render_action_buttons(node, type(node.ending_value) == "userdata")
@@ -265,21 +337,26 @@ function ArrayFollower.execute(node, parent_value)
     -- Determine which index to use: connected value takes priority over manual input, which takes priority over dropdown
     local selected_index = node.selected_element_index -- Default from dropdown
     
-    -- Check for connected index value
-    if Nodes.is_array_index_connected(node) then
-        local connected_index = Nodes.get_connected_array_index_value(node)
-        if connected_index ~= nil then
-            -- Try to convert to number
-            local num_index = tonumber(connected_index)
+    -- Check for connected index value using pin system
+    if #node.pins.inputs >= 2 then
+        local index_pin = node.pins.inputs[2]
+        if index_pin.connection then
+            -- Look up connected pin via State.pin_map
+            local source_pin_info = State.pin_map[index_pin.connection.pin]
+            local connected_index = source_pin_info and source_pin_info.pin.value
+            if connected_index ~= nil then
+                -- Try to convert to number
+                local num_index = tonumber(connected_index)
+                if num_index then
+                    selected_index = math.floor(num_index)
+                end
+            end
+        -- Check for manual index input
+        elseif node.index_manual_value and node.index_manual_value ~= "" then
+            local num_index = tonumber(node.index_manual_value)
             if num_index then
                 selected_index = math.floor(num_index)
             end
-        end
-    -- Check for manual index input
-    elseif node.index_manual_value and node.index_manual_value ~= "" then
-        local num_index = tonumber(node.index_manual_value)
-        if num_index then
-            selected_index = math.floor(num_index)
         end
     end
     
@@ -300,6 +377,12 @@ function ArrayFollower.execute(node, parent_value)
         return nil
     else
         node.status = "Array access: index " .. selected_index
+        
+        -- Update output pin value
+        if #node.pins.outputs > 0 then
+            node.pins.outputs[1].value = result
+        end
+        
         return result
     end
 end

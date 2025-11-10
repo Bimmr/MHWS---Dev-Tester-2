@@ -6,12 +6,9 @@
 -- - variable_name: String - Name of the variable in the global variables store
 -- - default_value: String - Default value as string (parsed to primitive when used)
 --
--- Input/Output Pins:
--- - input_attr: Number - Pin ID for the input attribute (receives values to set the variable)
--- - output_attr: Number - Pin ID for the output attribute (provides current variable value)
---
--- Connections:
--- - input_connection: NodeID - ID of the connected input node (for setting variable values)
+-- Pins:
+-- - pins.inputs[1]: "input" - Receives values to set the variable (optional)
+-- - pins.outputs[1]: "output" - Provides current variable value (optional)
 --
 -- State:
 -- - pending_reset: Boolean - Whether a reset operation was requested this frame
@@ -34,7 +31,18 @@ function VariableData.render(node)
     -- Execute the node to update ending_value based on inputs
     VariableData.execute(node)
     
-    imnodes.begin_node(node.node_id)
+    -- Ensure pins exist
+    if #node.pins.inputs == 0 then
+        Nodes.add_input_pin(node, "input", nil)
+    end
+    if #node.pins.outputs == 0 then
+        Nodes.add_output_pin(node, "output", nil)
+    end
+    
+    local input_pin = node.pins.inputs[1]
+    local output_pin = node.pins.outputs[1]
+    
+    imnodes.begin_node(node.id)
     imnodes.begin_node_titlebar()
     imgui.text("Variable")
     imnodes.end_node_titlebar()
@@ -79,35 +87,37 @@ function VariableData.render(node)
     end
 
     -- Check connection states
-    local input_connected = node.input_connection ~= nil
+    local input_connected = input_pin.connection ~= nil
     local output_connected = Nodes.is_output_connected(node)
     local neutral_mode = not input_connected and not output_connected
     local get_mode = output_connected and not input_connected
     local set_mode = input_connected and not output_connected
 
     -- Get mode: Show output attribute with current variable value and tooltip
-        local current_value = VariableData.get_variable_value(node.variable_name, node.default_value)
+    local current_value = VariableData.get_variable_value(node.variable_name, node.default_value)
+    output_pin.value = current_value
+    node.ending_value = current_value
         
-        -- Create tooltip for output
-        local tooltip_text = nil
-        if current_value ~= nil then
-            local value_type = type(current_value)
-            local type_description = "Unknown"
-            if value_type == "number" then
-                type_description = "Number"
-            elseif value_type == "boolean" then
-                type_description = "Boolean"
-            elseif value_type == "string" then
-                type_description = "String"
-            end
-            tooltip_text = string.format("Name: %s\nType: %s\nValue: %s",
-                node.variable_name or "None",
-                type_description,
-                tostring(current_value))
-        else
-            tooltip_text = string.format("Variable\nName: %s\nValue: nil",
-                node.variable_name or "None")
+    -- Create tooltip for output
+    local tooltip_text = nil
+    if current_value ~= nil then
+        local value_type = type(current_value)
+        local type_description = "Unknown"
+        if value_type == "number" then
+            type_description = "Number"
+        elseif value_type == "boolean" then
+            type_description = "Boolean"
+        elseif value_type == "string" then
+            type_description = "String"
         end
+        tooltip_text = string.format("Name: %s\nType: %s\nValue: %s",
+            node.variable_name or "None",
+            type_description,
+            tostring(current_value))
+    else
+        tooltip_text = string.format("Variable\nName: %s\nValue: nil",
+            node.variable_name or "None")
+    end
 
     -- Default value input with Reset button (only show in neutral or get mode)
     if neutral_mode or get_mode then
@@ -127,17 +137,9 @@ function VariableData.render(node)
 
     -- Value display/input based on mode
     if neutral_mode then
-
-        -- Neutral mode: Show input attribute with disabled display of connected value
-        if not node.input_attr then
-            node.input_attr = State.next_pin_id()
-        end
-
-        imnodes.begin_input_attribute(node.input_attr)
+        -- Neutral mode: Show input and output
+        imnodes.begin_input_attribute(input_pin.id)
         
-        if not node.output_attr then
-            node.output_attr = State.next_pin_id()
-        end
         local display_value = tostring(node.ending_value or "nil")
         imgui.begin_disabled()
         imgui.input_text("Value", display_value)
@@ -149,17 +151,13 @@ function VariableData.render(node)
         imnodes.end_input_attribute()
         imgui.same_line()
 
-        -- Neutral mode: Show output attribute with ending_valu
-        imnodes.begin_output_attribute(node.output_attr)
+        imnodes.begin_output_attribute(output_pin.id)
         imgui.text("")
         imnodes.end_output_attribute()
         
     elseif get_mode then
-        
-        if not node.output_attr then
-            node.output_attr = State.next_pin_id()
-        end
-        imnodes.begin_output_attribute(node.output_attr)
+        -- Get mode: Show output only
+        imnodes.begin_output_attribute(output_pin.id)
         local display_value = tostring(current_value or "nil")
         imgui.begin_disabled()
         imgui.input_text("Value", display_value)
@@ -170,17 +168,13 @@ function VariableData.render(node)
         imnodes.end_output_attribute()
         
     elseif set_mode then
-        -- Set mode: Show input attribute with disabled display of connected value
-        if not node.input_attr then
-            node.input_attr = State.next_pin_id()
-        end
-        imnodes.begin_input_attribute(node.input_attr)
+        -- Set mode: Show input only
+        imnodes.begin_input_attribute(input_pin.id)
         
         -- Display connected value (disabled)
-        local connected_node = Nodes.find_node_by_id(node.input_connection)
         local display_value = "Connected"
-        if connected_node and connected_node.ending_value ~= nil then
-            display_value = tostring(connected_node.ending_value)
+        if input_pin.value ~= nil then
+            display_value = tostring(input_pin.value)
         end
         imgui.begin_disabled()
         imgui.input_text("Value", display_value) 
@@ -191,6 +185,7 @@ function VariableData.render(node)
         
         imnodes.end_input_attribute()
     end
+    
     if neutral_mode or get_mode then
         -- Reset button
         imgui.same_line()
@@ -292,14 +287,19 @@ function VariableData.execute(node)
         return
     end
     
-    -- Check if there's an input connection
+    -- Check if there's an input via pins
     local input_value = nil
-    if node.input_connection then
+    if #node.pins.inputs > 0 then
+        input_value = Nodes.get_input_pin_value(node, 1)
+    end
+    
+    -- Fallback to legacy connection check for nodes not yet migrated
+    if not input_value and node.input_connection then
         local connected_node = Nodes.find_node_by_id(node.input_connection)
         if connected_node and connected_node.ending_value ~= nil then
             input_value = connected_node.ending_value
         end
-    elseif node.input_manual_value and node.input_manual_value ~= "" then
+    elseif not input_value and node.input_manual_value and node.input_manual_value ~= "" then
         -- Use manual input value if no connection
         input_value = Utils.parse_primitive_value(node.input_manual_value)
     end

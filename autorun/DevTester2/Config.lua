@@ -16,7 +16,7 @@ local Config = {}
 -- ========================================
 
 function Config.get_config_directory()
-    return "DevTester2/"
+    return "DevTester2/Configs"
 end
 
 -- ========================================
@@ -64,17 +64,7 @@ end
 function Config.serialize_all_nodes()
     local nodes = {}
     
-    -- Serialize starter nodes
-    for _, node in ipairs(State.starter_nodes) do
-        table.insert(nodes, Config.serialize_node(node))
-    end
-    
-    -- Serialize data nodes
-    for _, node in ipairs(State.data_nodes) do
-        table.insert(nodes, Config.serialize_node(node))
-    end
-    
-    -- Serialize operation nodes
+    -- Serialize all nodes
     for _, node in ipairs(State.all_nodes) do
         table.insert(nodes, Config.serialize_node(node))
     end
@@ -85,21 +75,36 @@ end
 function Config.serialize_node(node)
     local data = {
         id = node.id,
-        node_id = node.node_id,
         category = node.category,
         position = {x = node.position.x, y = node.position.y},
-        input_attr = node.input_attr,
-        output_attr = node.output_attr
+        pins = { inputs = {}, outputs = {} }
     }
+    
+    -- Serialize pins
+    if node.pins then
+        for _, pin in ipairs(node.pins.inputs) do
+            table.insert(data.pins.inputs, {
+                id = pin.id,
+                name = pin.name,
+                value = pin.value,
+                connection = pin.connection
+            })
+        end
+        for _, pin in ipairs(node.pins.outputs) do
+            table.insert(data.pins.outputs, {
+                id = pin.id,
+                name = pin.name,
+                value = pin.value,
+                connections = pin.connections
+            })
+        end
+    end
     
     -- Add type-specific data
     if node.category == Constants.NODE_CATEGORY_STARTER then
         data.category = node.category
         data.type = node.type
         data.path = node.path
-        -- Parameter support for starters that need it (like Native)
-        data.param_connections = node.param_connections
-        data.param_input_attrs = node.param_input_attrs
         data.param_manual_values = node.param_manual_values
 
         if node.type == Constants.STARTER_TYPE_HOOK then
@@ -112,11 +117,8 @@ function Config.serialize_node(node)
             data.return_type_full_name = node.return_type_full_name
             data.is_initialized = node.is_initialized
             data.return_override_manual = node.return_override_manual
-            data.return_override_connection = node.return_override_connection
-            data.return_override_attr = node.return_override_attr
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
-            data.hook_arg_attrs = node.hook_arg_attrs
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
             data.selected_method_combo = node.selected_method_combo
@@ -133,25 +135,15 @@ function Config.serialize_node(node)
         elseif node.type == Constants.DATA_TYPE_ENUM then
             data.path = node.path
             data.selected_enum_index = node.selected_enum_index
-            data.path_input_connection = node.path_input_connection
-            data.path_input_attr = node.path_input_attr
-            data.value_input_connection = node.value_input_connection
-            data.value_input_attr = node.value_input_attr
         elseif node.type == Constants.DATA_TYPE_VARIABLE then
             data.variable_name = node.variable_name
             data.default_value = node.default_value
-            data.input_connection = node.input_connection
             data.input_manual_value = node.input_manual_value
             data.pending_reset = node.pending_reset
         end
     elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
         data.category = node.category
         data.type = node.type
-        -- Operations nodes have input/output attributes
-        data.input_attr = node.input_attr
-        data.input1_attr = node.input1_attr  -- For math operations
-        data.input2_attr = node.input2_attr  -- For math operations
-        data.output_attr = node.output_attr
         data.selected_operation = node.selected_operation  -- For math operations
         -- Manual values
         data.input1_manual_value = node.input1_manual_value
@@ -161,27 +153,19 @@ function Config.serialize_node(node)
         data.type = node.type
         
         -- Type-specific attributes
-        if node.type == Constants.CONTROL_TYPE_SELECT then
-            data.condition_attr = node.condition_attr
-            data.true_attr = node.true_attr
-            data.false_attr = node.false_attr
-            data.output_attr = node.output_attr
-            -- Manual values
+        if node.type == Constants.CONTROL_TYPE_SWITCH then
+            -- Enhanced Select Control properties
+            data.num_conditions = node.num_conditions
+            data.show_compare_input = node.show_compare_input
+            -- Legacy manual values (for backward compatibility)
             data.condition_manual_value = node.condition_manual_value
             data.true_manual_value = node.true_manual_value
             data.false_manual_value = node.false_manual_value
         elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
-            data.input_attr = node.input_attr
-            data.enabled_attr = node.enabled_attr
-            data.output_attr = node.output_attr
             -- Manual values
             data.input_manual_value = node.input_manual_value
             data.enabled_manual_value = node.enabled_manual_value
         elseif node.type == Constants.CONTROL_TYPE_COUNTER then
-            data.max_attr = node.max_attr
-            data.active_attr = node.active_attr
-            data.restart_attr = node.restart_attr
-            data.output_attr = node.output_attr
             -- Manual values
             data.max_manual_value = node.max_manual_value
             data.active_manual_value = node.active_manual_value
@@ -190,31 +174,32 @@ function Config.serialize_node(node)
             data.current_count = node.current_count
             data.delay_ms = node.delay_ms
             data.last_increment_time = node.last_increment_time
+        elseif node.type == Constants.CONTROL_TYPE_CONDITION then
+            -- Manual values
+            data.condition_manual_value = node.condition_manual_value
+            data.true_manual_value = node.true_manual_value
+            data.false_manual_value = node.false_manual_value
         end
     elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
         data.category = node.category
         data.type = node.type
-        data.parent_node_id = node.parent_node_id
         data.action_type = node.action_type
 
         if node.type == Constants.FOLLOWER_TYPE_METHOD then
             data.selected_method_combo = node.selected_method_combo
             data.method_group_index = node.method_group_index
             data.method_index = node.method_index
-            data.param_input_attrs = node.param_input_attrs
             data.param_manual_values = node.param_manual_values
         elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
             data.selected_field_combo = node.selected_field_combo
             data.field_group_index = node.field_group_index
             data.field_index = node.field_index
-            data.value_input_attr = node.value_input_attr
             if node.action_type == 1 then -- Set
                 data.value_manual_input = node.value_manual_input
                 data.set_active = node.set_active
             end
         elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
             data.selected_element_index = node.selected_element_index
-            data.index_input_attr = node.index_input_attr
         end
     end
     
@@ -323,59 +308,44 @@ function Config.load_configuration(config_path)
     -- Restore ID counters from config BEFORE creating nodes
     State.node_id_counter = config.node_id_counter or 1
     State.link_id_counter = config.link_id_counter or 1
+    State.pin_id_counter = config.pin_id_counter or 1
 
     -- Calculate the correct next pin ID value based on the highest pin ID used in the config
     local max_pin_id = 0
     for _, node_data in ipairs(config.nodes or {}) do
-        if node_data.input_attr and node_data.input_attr > max_pin_id then
-            max_pin_id = node_data.input_attr
-        end
-        if node_data.output_attr and node_data.output_attr > max_pin_id then
-            max_pin_id = node_data.output_attr
-        end
-        if node_data.param_input_attrs then
-            for _, pin_id in pairs(node_data.param_input_attrs) do
-                if pin_id > max_pin_id then
-                    max_pin_id = pin_id
+        if node_data.pins then
+            if node_data.pins.inputs then
+                for _, pin in ipairs(node_data.pins.inputs) do
+                    if pin.id > max_pin_id then max_pin_id = pin.id end
+                end
+            end
+            if node_data.pins.outputs then
+                for _, pin in ipairs(node_data.pins.outputs) do
+                    if pin.id > max_pin_id then max_pin_id = pin.id end
                 end
             end
         end
-        -- Check other pin types that might exist
-        if node_data.value_input_attr and node_data.value_input_attr > max_pin_id then
-            max_pin_id = node_data.value_input_attr
-        end
-        if node_data.index_input_attr and node_data.index_input_attr > max_pin_id then
-            max_pin_id = node_data.index_input_attr
-        end
-        if node_data.param_input_attrs then
-            for _, pin_id in pairs(node_data.param_input_attrs) do
-                if pin_id > max_pin_id then
-                    max_pin_id = pin_id
+    end
+    if max_pin_id > 0 then
+        State.pin_id_counter = max_pin_id + 1
+    end
+    for _, node_data in ipairs(config.nodes or {}) do
+        -- Check pins for max pin ID
+        if node_data.pins then
+            if node_data.pins.inputs then
+                for _, pin in ipairs(node_data.pins.inputs) do
+                    if pin.id > max_pin_id then
+                        max_pin_id = pin.id
+                    end
                 end
             end
-        end
-        if node_data.return_attr and node_data.return_attr > max_pin_id then
-            max_pin_id = node_data.return_attr
-        end
-        if node_data.return_override_attr and node_data.return_override_attr > max_pin_id then
-            max_pin_id = node_data.return_override_attr
-        end
-        if node_data.hook_arg_attrs then
-            for _, pin_id in pairs(node_data.hook_arg_attrs) do
-                if pin_id > max_pin_id then
-                    max_pin_id = pin_id
+            if node_data.pins.outputs then
+                for _, pin in ipairs(node_data.pins.outputs) do
+                    if pin.id > max_pin_id then
+                        max_pin_id = pin.id
+                    end
                 end
             end
-        end
-        -- Check control node pins
-        if node_data.condition_attr and node_data.condition_attr > max_pin_id then
-            max_pin_id = node_data.condition_attr
-        end
-        if node_data.true_attr and node_data.true_attr > max_pin_id then
-            max_pin_id = node_data.true_attr
-        end
-        if node_data.false_attr and node_data.false_attr > max_pin_id then
-            max_pin_id = node_data.false_attr
         end
     end
     State.pin_id_counter = max_pin_id + 1
@@ -391,30 +361,10 @@ function Config.load_configuration(config_path)
             -- Validate and restore node state (especially for starters that need to reconnect to managed objects)
             Nodes.validate_and_restore_starter_node(node)
             
-            -- Special handling for operations: if the config data indicates this node should have an output
-            -- (either from saved output_attr or from operation type), ensure it exists
-            if node.category == Constants.NODE_CATEGORY_FOLLOWER and not node.output_attr then
-                -- Check if this operation type should have output
-                if node.type == Constants.FOLLOWER_TYPE_METHOD or node.type == Constants.FOLLOWER_TYPE_ARRAY or (node.type == Constants.FOLLOWER_TYPE_FIELD and node.action_type == 0) then
-                    node.output_attr = State.next_pin_id()
-                end
-            end
-            
             node_map[node_data.id] = node
-            -- Add node to appropriate state array
-            if node.category == Constants.NODE_CATEGORY_STARTER then
-                table.insert(State.starter_nodes, node)
-                State.node_map[node.node_id] = node  -- Add to hash map
-            elseif node.category == Constants.NODE_CATEGORY_DATA then
-                table.insert(State.data_nodes, node)
-                State.node_map[node.node_id] = node  -- Add to hash map
-            elseif node.category == Constants.NODE_CATEGORY_OPERATIONS or node.category == Constants.NODE_CATEGORY_CONTROL then
-                table.insert(State.all_nodes, node)
-                State.node_map[node.node_id] = node  -- Add to hash map
-            elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
-                table.insert(State.all_nodes, node)
-                State.node_map[node.node_id] = node  -- Add to hash map
-            end
+            -- Add node to state
+            table.insert(State.all_nodes, node)
+            State.node_map[node.id] = node  -- Add to hash map
         end
     end
     
@@ -427,10 +377,10 @@ function Config.load_configuration(config_path)
     for _, node_data in ipairs(config.nodes or {}) do
         local node = node_map[node_data.id]
         if node and node_data.position then
-            imnodes.set_node_editor_space_pos(node.node_id, node_data.position.x, node_data.position.y)
+            imnodes.set_node_editor_space_pos(node.id, node_data.position.x, node_data.position.y)
             -- Mark as positioned so render function doesn't reposition
             State.nodes_positioned = State.nodes_positioned or {}
-            State.nodes_positioned[node.node_id] = true
+            State.nodes_positioned[node.id] = true
         end
     end
     
@@ -453,21 +403,45 @@ end
 function Config.deserialize_node(data)
     local node
     
+    -- Restore pins
+    local pins = { inputs = {}, outputs = {} }
+    if data.pins then
+        if data.pins.inputs then
+            for _, pin_data in ipairs(data.pins.inputs) do
+                local pin = {
+                    id = pin_data.id,
+                    name = pin_data.name,
+                    value = pin_data.value,
+                    connection = pin_data.connection
+                }
+                table.insert(pins.inputs, pin)
+                State.pin_map[pin.id] = { node_id = data.id, pin = pin }
+            end
+        end
+        if data.pins.outputs then
+            for _, pin_data in ipairs(data.pins.outputs) do
+                local pin = {
+                    id = pin_data.id,
+                    name = pin_data.name,
+                    value = pin_data.value,
+                    connections = pin_data.connections or {}
+                }
+                table.insert(pins.outputs, pin)
+                State.pin_map[pin.id] = { node_id = data.id, pin = pin }
+            end
+        end
+    end
+    
     if data.category == Constants.NODE_CATEGORY_STARTER then
         node = {
             id = data.id,
-            node_id = data.node_id or data.id,
             category = data.category,
+            pins = pins,
             type = data.type,
             path = data.path,
             position = data.position or {x = 0, y = 0},
-            input_attr = data.input_attr,
-            output_attr = data.output_attr,
             ending_value = nil,
             status = nil,
-            -- Parameter support for starters that need it (like Native)
-            param_connections = data.param_connections or {},
-            param_input_attrs = data.param_input_attrs or {},
             param_manual_values = data.param_manual_values or {},
             -- Hook-specific
             method_name = data.method_name or "",
@@ -480,52 +454,38 @@ function Config.deserialize_node(data)
             hook_id = nil,
             is_initialized = data.is_initialized or false,
             return_override_manual = data.return_override_manual,
-            return_override_connection = data.return_override_connection,
-            return_override_attr = data.return_override_attr,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
-            hook_arg_attrs = data.hook_arg_attrs or {},
             -- Native-specific
             native_method_result = data.native_method_result
         }
     elseif data.category == Constants.NODE_CATEGORY_DATA then
         node = {
             id = data.id,
-            node_id = data.node_id or data.id,
             category = data.category,
+            pins = pins,
             type = data.type,
             path = data.path or "",
             position = data.position or {x = 0, y = 0},
-            input_attr = data.input_attr,
-            output_attr = data.output_attr,
             ending_value = nil,
             status = nil,
             -- Enum-specific
             selected_enum_index = data.selected_enum_index or 1,
-            path_input_connection = data.path_input_connection,
-            path_input_attr = data.path_input_attr,
-            value_input_connection = data.value_input_connection,
-            value_input_attr = data.value_input_attr,
             -- Value-specific
             value = data.value or "",
             -- Variable-specific
             variable_name = data.variable_name or "",
             default_value = data.default_value or "",
-            input_connection = data.input_connection,
             input_manual_value = data.input_manual_value or "",
             pending_reset = data.pending_reset or false
         }
     elseif data.category == Constants.NODE_CATEGORY_OPERATIONS then
         node = {
             id = data.id,
-            node_id = data.node_id or data.id,
             category = data.category,
+            pins = pins,
             type = data.type,
             position = data.position or {x = 0, y = 0},
-            input_attr = data.input_attr,
-            input1_attr = data.input1_attr,  -- For math operations
-            input2_attr = data.input2_attr,  -- For math operations
-            output_attr = data.output_attr,
             selected_operation = data.selected_operation or 
                 (data.type == Constants.OPERATIONS_TYPE_COMPARE and Constants.COMPARE_OPERATION_EQUALS) or
                 (data.type == Constants.OPERATIONS_TYPE_LOGIC and Constants.LOGIC_OPERATION_AND) or
@@ -541,8 +501,8 @@ function Config.deserialize_node(data)
     elseif data.category == Constants.NODE_CATEGORY_CONTROL then
         node = {
             id = data.id,
-            node_id = data.node_id or data.id,
             category = data.category,
+            pins = pins,
             type = data.type,
             position = data.position or {x = 0, y = 0},
             ending_value = nil,
@@ -550,27 +510,19 @@ function Config.deserialize_node(data)
         }
         
         -- Type-specific attributes
-        if data.type == Constants.CONTROL_TYPE_SELECT then
-            node.condition_attr = data.condition_attr
-            node.true_attr = data.true_attr
-            node.false_attr = data.false_attr
-            node.output_attr = data.output_attr
-            -- Manual values
+        if data.type == Constants.CONTROL_TYPE_SWITCH then
+            -- Enhanced Select Control properties
+            node.num_conditions = data.num_conditions or 1
+            node.show_compare_input = data.show_compare_input or false
+            -- Legacy manual values (for backward compatibility)
             node.condition_manual_value = data.condition_manual_value or ""
             node.true_manual_value = data.true_manual_value or ""
             node.false_manual_value = data.false_manual_value or ""
         elseif data.type == Constants.CONTROL_TYPE_TOGGLE then
-            node.input_attr = data.input_attr
-            node.enabled_attr = data.enabled_attr
-            node.output_attr = data.output_attr
             -- Manual values
             node.input_manual_value = data.input_manual_value or ""
             node.enabled_manual_value = data.enabled_manual_value or false
         elseif data.type == Constants.CONTROL_TYPE_COUNTER then
-            node.max_attr = data.max_attr
-            node.active_attr = data.active_attr
-            node.restart_attr = data.restart_attr
-            node.output_attr = data.output_attr
             -- Manual values
             node.max_manual_value = data.max_manual_value or "10"
             node.active_manual_value = data.active_manual_value or false
@@ -579,39 +531,35 @@ function Config.deserialize_node(data)
             node.current_count = data.current_count or 0
             node.delay_ms = data.delay_ms or 1000
             node.last_increment_time = data.last_increment_time
+        elseif data.type == Constants.CONTROL_TYPE_CONDITION then
+            -- Manual values
+            node.condition_manual_value = data.condition_manual_value or ""
+            node.true_manual_value = data.true_manual_value or ""
+            node.false_manual_value = data.false_manual_value or ""
         end
         
     elseif data.category == Constants.NODE_CATEGORY_FOLLOWER then
         node = {
             id = data.id,
-            node_id = data.node_id or data.id,
             category = data.category,
+            pins = pins,
             type = data.type or Constants.FOLLOWER_TYPE_METHOD,
             position = data.position or {x = 0, y = 0},
-            input_attr = data.input_attr,
-            output_attr = data.output_attr,
-            parent_node_id = data.parent_node_id,
             action_type = data.action_type,
             -- Method-specific
             selected_method_combo = data.selected_method_combo or 1,
             method_group_index = data.method_group_index,
             method_index = data.method_index,
             param_manual_values = data.param_manual_values or {},
-            param_connections = {},
-            param_input_attrs = data.param_input_attrs or {},
             -- Field-specific
             selected_field_combo = data.selected_field_combo or 1,
             field_group_index = data.field_group_index,
             field_index = data.field_index,
             value_manual_input = data.value_manual_input or "",
-            value_connection = nil,
-            value_input_attr = data.value_input_attr,
             set_active = data.set_active or false,
             -- Array-specific
             selected_element_index = data.selected_element_index or 0,
-            index_connection = nil,
             index_manual_value = "",
-            index_input_attr = data.index_input_attr,
             -- Common
             starting_value = nil,
             ending_value = nil,
@@ -625,13 +573,7 @@ function Config.deserialize_node(data)
 end
 
 function Config.add_node_to_graph(node)
-    if node.category == Constants.NODE_CATEGORY_STARTER then
-        table.insert(State.starter_nodes, node)
-    elseif node.category == Constants.NODE_CATEGORY_DATA then
-        table.insert(State.data_nodes, node)
-    elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
-        table.insert(State.all_nodes, node)
-    end
+    table.insert(State.all_nodes, node)
 end
 
 function Config.deserialize_link(data, node_map)
@@ -643,9 +585,9 @@ function Config.deserialize_link(data, node_map)
         return
     end
     
-    -- Create link
+    -- Create link with the original ID from the config
     local link = {
-        id = State.next_link_id(),
+        id = data.id,  -- Use the original link ID from config
         connection_type = data.connection_type,
         from_node = from_node.id,
         from_pin = data.from_pin,
@@ -656,44 +598,31 @@ function Config.deserialize_link(data, node_map)
     }
     
     table.insert(State.all_links, link)
+    State.link_map[link.id] = link  -- Add to hash map
     
-    -- Update node connections
-    if data.connection_type == "parameter" and data.parameter_index then
-        to_node.param_connections[data.parameter_index] = from_node.id
-    elseif data.connection_type == "value" then
-        to_node.value_connection = from_node.id
-    elseif data.connection_type == "array_index" then
-        to_node.index_connection = from_node.id
-    elseif data.connection_type == "operation_input1" then
-        to_node.input1_connection = from_node.id
-    elseif data.connection_type == "operation_input2" then
-        to_node.input2_connection = from_node.id
-    elseif data.connection_type == "data_input" then
-        to_node.input_connection = from_node.id
-    elseif data.connection_type == "main" then
-        to_node.parent_node_id = from_node.id
-    elseif data.connection_type == "control_condition" then
-        to_node.condition_connection = from_node.id
-    elseif data.connection_type == "control_true" then
-        to_node.true_connection = from_node.id
-    elseif data.connection_type == "control_false" then
-        to_node.false_connection = from_node.id
-    elseif data.connection_type == "control_input" then
-        to_node.input_connection = from_node.id
-    elseif data.connection_type == "control_enabled" then
-        to_node.enabled_connection = from_node.id
-    elseif data.connection_type == "control_active" then
-        to_node.active_connection = from_node.id
-    elseif data.connection_type == "control_restart" then
-        to_node.restart_connection = from_node.id
-    elseif data.connection_type == "control_max" then
-        to_node.max_connection = from_node.id
-    elseif data.connection_type == "return_override" then
-        to_node.return_override_connection = from_node.id
-    elseif data.connection_type == "enum_path" then
-        to_node.path_input_connection = from_node.id
-    elseif data.connection_type == "enum_value" then
-        to_node.value_input_connection = from_node.id
+    -- Update pin connection fields (CRITICAL for new pin system)
+    local from_pin_info = State.pin_map[data.from_pin]
+    local to_pin_info = State.pin_map[data.to_pin]
+    
+    if to_pin_info and to_pin_info.pin then
+        -- Set the input pin's connection field
+        to_pin_info.pin.connection = { 
+            node = from_node.id, 
+            pin = data.from_pin, 
+            link = link.id 
+        }
+    end
+    
+    if from_pin_info and from_pin_info.pin then
+        -- Add to output pin's connections array
+        if not from_pin_info.pin.connections then
+            from_pin_info.pin.connections = {}
+        end
+        table.insert(from_pin_info.pin.connections, { 
+            node = to_node.id, 
+            pin = data.to_pin, 
+            link = link.id 
+        })
     end
     
     return link
@@ -746,7 +675,7 @@ function Config.save_data_config()
         window_open = State.window_open
     }
     
-    local file_path = Config.get_config_directory() .. "Data.json"
+    local file_path = "DevTester2/Data.json"
     local success = json.dump_file(file_path, data)
     
     if success then
@@ -757,7 +686,7 @@ function Config.save_data_config()
 end
 
 function Config.load_data_config()
-    local file_path = Config.get_config_directory() .. "Data.json"
+    local file_path = "DevTester2/Data.json"
     
     -- Load using REFramework's json.load_file (same as regular configs)
     local data = json.load_file(file_path)
