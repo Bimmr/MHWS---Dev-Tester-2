@@ -108,57 +108,24 @@ end
 -- ========================================
 -- Category/Type Parsing
 -- ========================================
+Utils.CATEGOREY_MAP = {}
+Utils.TYPE_MAP = {}
+local function create_maps()
+    for k, v in pairs(Constants) do
+        if k:find("NODE_CATEGORY_") then
+            Utils.CATEGOREY_MAP[v] = k:match("NODE_CATEGORY_(.+)")
+        elseif k:find("_TYPE_") then
+            Utils.TYPE_MAP[v] = k:match(".+_TYPE_(.+)")
+        end
+    end
+end
+
 function Utils.parse_category_and_type(category, type)
-    if category == Constants.NODE_CATEGORY_STARTER then
-        if type == Constants.STARTER_TYPE_NATIVE then
-            return "STARTER", "NATIVE"
-        elseif type == Constants.STARTER_TYPE_MANAGED then
-            return "STARTER", "MANAGED"
-        elseif type == Constants.STARTER_TYPE_HOOK then
-            return "STARTER", "HOOK"
-        elseif type == Constants.STARTER_TYPE_TYPE then
-            return "STARTER", "TYPE"
-        end
-    elseif category == Constants.NODE_CATEGORY_DATA then
-        if type == Constants.DATA_TYPE_PRIMITIVE then
-            return "DATA", "PRIMITIVE"
-        elseif type == Constants.DATA_TYPE_ENUM then
-            return "DATA", "ENUM"
-        elseif type == Constants.DATA_TYPE_VARIABLE then
-            return "DATA", "VARIABLE"
-        end
-    elseif category == Constants.NODE_CATEGORY_FOLLOWER then
-        if type == Constants.FOLLOWER_TYPE_METHOD then
-            return "FOLLOWER", "METHOD"
-        elseif type == Constants.FOLLOWER_TYPE_FIELD then
-            return "FOLLOWER", "FIELD"
-        elseif type == Constants.FOLLOWER_TYPE_ARRAY then
-            return "FOLLOWER", "ARRAY"
-        end
-    elseif category == Constants.NODE_CATEGORY_OPERATIONS then
-        if type == Constants.OPERATIONS_TYPE_INVERT then
-            return "OPERATIONS", "INVERT"
-        elseif type == Constants.OPERATIONS_TYPE_MATH then
-            return "OPERATIONS", "MATH"
-        elseif type == Constants.OPERATIONS_TYPE_LOGIC then
-            return "OPERATIONS", "LOGIC"
-        elseif type == Constants.OPERATIONS_TYPE_COMPARE then
-            return "OPERATIONS", "COMPARE"
-        end
-    elseif category == Constants.NODE_CATEGORY_CONTROL then
-        if type == Constants.CONTROL_TYPE_SWITCH then
-            return "CONTROL", "SWITCH"
-        elseif type == Constants.CONTROL_TYPE_TOGGLE then
-            return "CONTROL", "TOGGLE"
-        elseif type == Constants.CONTROL_TYPE_COUNTER then
-            return "CONTROL", "COUNTER"
-        elseif type == Constants.CONTROL_TYPE_CONDITION then
-            return "CONTROL", "CONDITION"
-        end
-    elseif category == Constants.NODE_CATEGORY_UTILITY then
-        if type == Constants.UTILITY_TYPE_LABEL then
-            return "UTILITY", "LABEL"
-        end
+    if not Utils.CATEGOREY_MAP[category] or not Utils.TYPE_MAP[type] then
+        create_maps()
+    end
+    if Utils.CATEGOREY_MAP[category] and Utils.TYPE_MAP[type] then
+        return Utils.CATEGOREY_MAP[category], Utils.TYPE_MAP[type]
     end
     return "Unknown", "Unknown"
 end
