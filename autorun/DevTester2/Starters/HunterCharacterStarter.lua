@@ -2,7 +2,7 @@
 -- This node retrieves the HunterCharacter object for the player.
 --
 -- Configuration:
--- (None)
+-- - path: String - The SDK path to the HunterCharacter object (default: "app.HunterCharacter")
 --
 -- Pins:
 -- - pins.outputs[1]: "output" - The HunterCharacter object
@@ -27,6 +27,9 @@ local HunterCharacterStarter = {}
 
 
 function HunterCharacterStarter.render(node)
+
+    node.path = "app.HunterCharacter"
+
     -- Ensure output pin exists
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "output", nil)
@@ -65,7 +68,7 @@ function HunterCharacterStarter.render(node)
     imnodes.end_node_titlebar()
 
     imgui.begin_disabled()
-    imgui.input_text("##Path", "(app.HunterCharacter):getMasterPlayerInfo().get_Character()")
+    imgui.input_text("##Path", "app.PlayerManager|getMasterPlayerInfo():get_Character()")
     imgui.end_disabled()
     imgui.spacing()
     imgui.spacing()
