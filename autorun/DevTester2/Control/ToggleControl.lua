@@ -168,8 +168,17 @@ function ToggleControl.render(node)
     imnodes.end_output_attribute()
 
     imgui.spacing()
+    local pos = imgui.get_cursor_pos()
     if imgui.button("- Remove Node") then
         Nodes.remove_node(node)
+    end 
+    imgui.same_line()
+    local display_width = imgui.calc_text_size("+ Add Child Node").x
+    local node_width = imnodes.get_node_dimensions(node.id).x
+    pos.x = pos.x + node_width - display_width - 20
+    imgui.set_cursor_pos(pos)
+    if imgui.button("+ Add Child Node") then
+        Nodes.add_child_node(node)
     end
 
     imnodes.end_node()
