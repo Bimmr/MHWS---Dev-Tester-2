@@ -226,6 +226,7 @@ function ArrayFollower.render(node)
     end
     
     imnodes.end_input_attribute()
+    Nodes.add_context_menu_option(node, "Copy index", tostring(node.selected_element_index))
 
     imgui.spacing()
     
@@ -236,6 +237,7 @@ function ArrayFollower.render(node)
     node.ending_value = result
     if result and result:get_type_definition() then
         node.ending_value_full_name = result:get_type_definition():get_full_name()
+        Nodes.add_context_menu_option(node, "Copy output name", node.ending_value_full_name)
     end
     
     -- Update output pin value

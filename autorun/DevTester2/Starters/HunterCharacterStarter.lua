@@ -82,6 +82,8 @@ function HunterCharacterStarter.render(node)
             display_value = Utils.get_type_display_name(type_info)
         end
 
+        Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
+        
         local tooltip_text = string.format(
             "Type: %s\nAddress: %s\nFull Name: %s",
             "app.HunterCharacter",

@@ -103,7 +103,7 @@ function NativeStarter.render(node)
                 if has_children then
                     imgui.begin_disabled()
                 end
-                local method_changed, new_combo_index = Utils.hybrid_combo("Method", 
+                local method_changed, new_combo_index, is_hovered = Utils.hybrid_combo("Method", 
                     node.selected_method_combo, methods)
                 if method_changed then
                     node.selected_method_combo = new_combo_index
@@ -191,6 +191,8 @@ function NativeStarter.render(node)
             local success_param, param_types = pcall(function() 
                 return selected_method:get_param_types() 
             end)
+            local method_name = Nodes.get_method_signature(selected_method, true)
+            Nodes.add_context_menu_option(node, "Copy method name", method_name)
             
             if success_param and param_types and #param_types > 0 then
                 imgui.spacing()
@@ -244,6 +246,7 @@ function NativeStarter.render(node)
                         local param_value = Utils.parse_value_for_type(node.param_manual_values[i], param_type)
                         table.insert(param_values, param_value)
                     end
+                    Nodes.add_context_menu_option(node, "Copy arg " .. i .. " type", param_type:get_full_name())
                     imnodes.end_input_attribute()
                 end
             end
@@ -279,14 +282,16 @@ function NativeStarter.render(node)
                 local success, type_info = pcall(function() return node.native_method_result:get_type_definition() end)
                 if success and type_info then
                     display_value = Utils.get_type_display_name(type_info)
+                    Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
                 end
             else
                 display_value = tostring(node.native_method_result)
+                Nodes.add_context_menu_option(node, "Copy output name", display_value)
             end
             local output_display = display_value .. " (?)"
             local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
-            imgui.text(display_value)
+            imgui.text(display_value)           
             if can_continue then
                 imgui.same_line()
                 imgui.text("(?)")
@@ -313,7 +318,8 @@ function NativeStarter.render(node)
         end
         imnodes.end_output_attribute()
     imgui.spacing()
-    
+        
+
     BaseStarter.render_action_buttons(node)
     BaseStarter.render_debug_info(node)
     

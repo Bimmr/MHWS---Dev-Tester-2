@@ -187,10 +187,10 @@ function FieldFollower.render(node)
         if node.field_group_index and node.field_index then
             selected_field = Nodes.get_field_by_group_and_index(parent_type, 
                 node.field_group_index, node.field_index, is_static_context)
-        end
-        
+        end        
         -- Handle value input for Set
         if node.action_type == 1 and selected_field then -- Set
+
             -- Ensure value input pin exists
             if #node.pins.inputs == 1 then
                 Nodes.add_input_pin(node, "value", nil)
@@ -248,7 +248,10 @@ function FieldFollower.render(node)
                 table.remove(node.pins.inputs, 2)
             end
         end
-        
+        if selected_field then
+            Nodes.add_context_menu_option(node, "Copy field name", selected_field and selected_field:get_name() or "Unknown")
+            Nodes.add_context_menu_option(node, "Copy field type", selected_field:get_type():get_full_name() or "Unknown")
+        end
         imgui.spacing()
         
         -- Execute and show output
@@ -299,6 +302,8 @@ function FieldFollower.render(node)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             if can_continue then
+                Nodes.add_context_menu_option(node, "Copy output type", 
+                    result:get_type_definition():get_full_name() or "Unknown")
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
@@ -314,6 +319,8 @@ function FieldFollower.render(node)
                         imgui.set_tooltip(tostring(result))
                     end
                 end
+            else
+                Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
             end
         else
             -- Display "nil" when result is nil

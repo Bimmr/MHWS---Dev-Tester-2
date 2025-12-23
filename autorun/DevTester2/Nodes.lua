@@ -893,7 +893,7 @@ end
 -- Signature Generation & Matching
 -- ========================================
 
-function Nodes.get_method_signature(method)
+function Nodes.get_method_signature(method, dont_include_type_def)
     local type_name = method:get_declaring_type():get_full_name()
     local name = method:get_name()
     local param_types = {}
@@ -904,13 +904,21 @@ function Nodes.get_method_signature(method)
             table.insert(param_types, p:get_full_name())
         end
     end
-    
-    return type_name .. ":" .. name .. "(" .. table.concat(param_types, ",") .. ")"
+
+    if dont_include_type_def then
+        return name .. "(" .. table.concat(param_types, ", ") .. ")"
+    else
+        return type_name .. ":" .. name .. "(" .. table.concat(param_types, ", ") .. ")"
+    end
 end
 
-function Nodes.get_field_signature(field)
+function Nodes.get_field_signature(field, dont_include_type_def)
     local type_name = field:get_declaring_type():get_full_name()
-    return type_name .. ":" .. field:get_name()
+    if dont_include_type_def then
+        return field:get_name()
+    else
+        return type_name .. ":" .. field:get_name()
+    end
 end
 
 function Nodes.find_method_indices_by_signature(type_def, signature, is_static_context)
@@ -1244,6 +1252,55 @@ function Nodes.disconnect_link(link_id)
         end
     end
     State.link_map[link_id] = nil
+end
+
+-- ========================================
+-- Context Menu Helpers
+-- ========================================
+function Nodes.add_context_menu_option(node, label, data)
+    -- Accumulate options for the whole node context menu
+    if not node._frame_context_options then
+        node._frame_context_options = {}
+    end
+    
+    table.insert(node._frame_context_options, { label = label, data = data })
+end
+
+function Nodes.check_context_menu(node, options, force_hovered)
+    -- Accumulate options for the whole node context menu
+    if not node._frame_context_options then
+        node._frame_context_options = {}
+    end
+    
+    -- options is an array of {label, data}
+    for _, option in ipairs(options) do
+        table.insert(node._frame_context_options, option)
+    end
+end
+
+function Nodes.render_context_menu(node)
+    
+    -- Have to use selected nodes since imnodes.is_node_hovered() doesn't accept a node ID
+    if imnodes.get_selected_nodes()[1] == node.id and imgui.is_mouse_clicked(1) and #node._frame_context_options > 0 then
+        imgui.open_popup("NodeContextMenu_" .. node.id)
+    end
+
+    if imgui.begin_popup("NodeContextMenu_" .. node.id) then
+        if node._frame_context_options and #node._frame_context_options > 0 then
+            for _, option in ipairs(node._frame_context_options) do
+                -- Display label with data preview to distinguish similar options
+                local display_label = option.label
+                
+                if imgui.menu_item(display_label) then
+                    sdk.copy_to_clipboard(tostring(option.data))
+                end
+            end
+        end
+        imgui.end_popup()
+    end
+    
+    -- Clear options for the next frame
+    node._frame_context_options = nil
 end
 
 return Nodes

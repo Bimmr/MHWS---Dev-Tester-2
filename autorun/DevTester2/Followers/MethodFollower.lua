@@ -184,6 +184,7 @@ function MethodFollower.render(node)
             local success_param, param_types = pcall(function() 
                 return selected_method:get_param_types() 
             end)
+            Nodes.add_context_menu_option(node, "Copy method name", Nodes.get_method_signature(selected_method, true))
             
             if success_param and param_types and #param_types > 0 then
                 -- Ensure correct number of parameter input pins exist
@@ -200,6 +201,8 @@ function MethodFollower.render(node)
                 end
                 
                 for i, param_type in ipairs(param_types) do
+                    Nodes.add_context_menu_option(node, "Copy param type " .. i, param_type:get_full_name())
+
                     -- Get parameter input pin (starts at index 2, after parent)
                     local param_pin = node.pins.inputs[i + 1]
                     
@@ -257,6 +260,7 @@ function MethodFollower.render(node)
                 local return_type_name = return_type:get_name()
                 returns_void = (return_type_name == "Void" or return_type_name == "System.Void")
             end
+            Nodes.add_context_menu_option(node, "Copy return type", return_type and return_type:get_full_name() or "Unknown")
         end
         
         if node.action_type == 0 then -- Run - auto execute
@@ -399,7 +403,7 @@ function MethodFollower.render(node)
 
     -- Action buttons
     BaseFollower.render_action_buttons(node, function(node) 
-        return type(node.ending_value) == "userdata" and not returns_void 
+        return type(node.ending_value) == "userdata"
     end)
 
     -- Debug info

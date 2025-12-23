@@ -380,6 +380,10 @@ function render_node_editor()
     
     -- Unified rendering loop for all nodes
     for _, node in ipairs(State.all_nodes) do
+        -- Reset hover flags
+        node._hovered_region = nil
+        node._hovered_text = nil
+
         -- Render based on category
         if node.category == Constants.NODE_CATEGORY_STARTER then
             local category, type = Utils.parse_category_and_type(node.category, node.type)
@@ -496,6 +500,9 @@ function render_node_editor()
         local current_pos = imnodes.get_node_editor_space_pos(node.id)
         node.position.x = current_pos.x
         node.position.y = current_pos.y
+
+        -- Render context menu if active
+        Nodes.render_context_menu(node)
     end
     
     -- Pop node width

@@ -102,6 +102,7 @@ function EnumData.render(node)
         if imgui.is_item_hovered() then
             imgui.set_tooltip("Path is controlled by input connection")
         end
+        Nodes.add_context_menu_option(node, "Copy path name", node.path)
     end
     imnodes.end_input_attribute()
     if node.path and node.path ~= "" then
@@ -183,6 +184,8 @@ function EnumData.render(node)
             imgui.set_cursor_pos(pos)
             imgui.text(display)
             imnodes.end_output_attribute()
+
+            Nodes.add_context_menu_option(node, "Copy output value", output_pin.value)
         else
             imgui.text_colored("No enum values found", Constants.COLOR_TEXT_WARNING)
             node.status = "No enum values found"

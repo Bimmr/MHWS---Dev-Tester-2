@@ -118,6 +118,10 @@ function VariableData.render(node)
         tooltip_text = string.format("Variable\nName: %s\nValue: nil",
             node.variable_name or "None")
     end
+    if node.variable_name ~= "" then
+        Nodes.add_context_menu_option(node, "Copy variable name", node.variable_name)
+        Nodes.add_context_menu_option(node, "Copy variable value", tostring(current_value))
+    end
 
     -- Default value input with Reset button (only show in neutral or get mode)
     if neutral_mode or get_mode then

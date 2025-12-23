@@ -77,6 +77,8 @@ function TypeStarter.render(node)
     end
 
     if node.ending_value then
+        Nodes.add_context_menu_option(node, "Copy output name", node.ending_value:get_full_name())
+
         -- Display type information
         local display_value = node.ending_value:get_name()
         local tooltip_text = string.format(

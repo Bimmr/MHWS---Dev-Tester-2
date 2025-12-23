@@ -89,13 +89,15 @@ function ManagedStarter.render(node)
             string.format("0x%X", node.ending_value:get_address()),
             type_info:get_full_name()
         )
+        
+        Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
 
         -- Output pin
         imgui.spacing()
         imnodes.begin_output_attribute(output_pin.id)
         local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
         imgui.set_cursor_pos(debug_pos)
-        imgui.text(display_value)
+        imgui.text(display_value)        
         imgui.same_line()
         imgui.text("(?)")
         if imgui.is_item_hovered() and tooltip_text then

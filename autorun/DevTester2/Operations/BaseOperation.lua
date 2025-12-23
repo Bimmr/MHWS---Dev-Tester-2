@@ -75,6 +75,9 @@ function BaseOperation.render_debug_info(node)
         debug_info = debug_info .. "\n\n-- All Node Info --"
         -- Collect all node information for debugging and display
         for key, value in pairs(node) do
+            if tostring(key):sub(1,1) == "_" then
+                goto continue
+            end
             if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
                     value = tostring(value)
             elseif type(value) == "table" then
@@ -83,6 +86,7 @@ function BaseOperation.render_debug_info(node)
             if tostring(value) ~= "" then
                 debug_info = debug_info .. string.format("\n%s: %s", tostring(key), tostring(value))
             end
+            ::continue::
         end
     end
 

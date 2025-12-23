@@ -130,6 +130,7 @@ local function render_argument_outputs(node, is_placeholder)
         imgui.spacing()
         local param_type = node.param_types and node.param_types[i]
         local param_type_name = param_type and param_type:get_name() or "Unknown"
+        Nodes.add_context_menu_option(node, "Copy param type " .. i , param_type and param_type:get_full_name() or "Unknown")
         local arg_pos = imgui.get_cursor_pos()
         imnodes.begin_output_attribute(arg_pin.id)
         imgui.text("Arg " .. i .. " (" .. param_type_name .. "):")
@@ -277,6 +278,7 @@ local function render_return_info(node, is_placeholder)
             local return_pos = imgui.get_cursor_pos()
             imnodes.begin_output_attribute(return_output_pin.id)
             imgui.text("Return (" .. return_type .. "):")
+            Nodes.add_context_menu_option(node, "Copy return type", node.return_type_full_name)
             imgui.same_line()
            
             -- Display return value if available
@@ -543,9 +545,17 @@ function HookStarter.render(node)
             node.status = "Type not found"
         end
     end
+
+    if node.is_initialized then
+        Nodes.add_context_menu_option(node, "Copy path", node.path)
+    end
     
     -- Ensure pins exist based on method configuration
     if node.method_name and node.method_name ~= "" then
+        
+        local method = sdk.find_type_definition(node.path):get_method(node.method_name)
+        Nodes.add_context_menu_option(node, "Copy method name", Nodes.get_method_signature(method, true))
+
         -- Calculate required pins: main_output, return_output (if non-void), arg outputs
         local required_outputs = 1  -- main_output always exists
         if node.return_type_name and node.return_type_name ~= "Void" then
