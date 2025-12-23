@@ -189,10 +189,19 @@ function MethodFollower.render(node)
             
             if success_param and param_types and #param_types > 0 then
                 -- Ensure correct number of parameter input pins exist
-                local needed_pins = 1 + #param_types  -- parent + parameters
-                while #node.pins.inputs < needed_pins do
-                    local param_idx = #node.pins.inputs - 1 + 1  -- -1 for parent, +1 for 1-based
-                    Nodes.add_input_pin(node, "param_" .. (param_idx - 1), nil)
+                for i = 1, #param_types do
+                    local pin_index = i + 1 -- Index 1 is parent
+                    local pin_name = "param_" .. (i - 1)
+                    
+                    if pin_index > #node.pins.inputs then
+                        Nodes.add_input_pin(node, pin_name, nil)
+                    elseif node.pins.inputs[pin_index].name ~= pin_name then
+                        -- Pin mismatch (likely trigger pin is in the way), insert correct pin
+                        local new_pin = Nodes.add_input_pin(node, pin_name, nil)
+                        -- Move it to correct position
+                        table.remove(node.pins.inputs, #node.pins.inputs)
+                        table.insert(node.pins.inputs, pin_index, new_pin)
+                    end
                 end
                 
                 imgui.spacing()
@@ -239,6 +248,38 @@ function MethodFollower.render(node)
             end
         end
 
+        -- Manage Trigger Pin for Call mode
+        local trigger_pin_name = "call_trigger"
+        local trigger_pin = nil
+        local trigger_pin_index = nil
+        
+        for i, pin in ipairs(node.pins.inputs) do
+            if pin.name == trigger_pin_name then
+                trigger_pin = pin
+                trigger_pin_index = i
+                break
+            end
+        end
+
+        if node.action_type == 1 then -- Call mode
+            if not trigger_pin then
+                Nodes.add_input_pin(node, trigger_pin_name, nil)
+                trigger_pin = node.pins.inputs[#node.pins.inputs]
+            else
+                -- Ensure it is at the end
+                if trigger_pin_index ~= #node.pins.inputs then
+                    table.remove(node.pins.inputs, trigger_pin_index)
+                    table.insert(node.pins.inputs, trigger_pin)
+                end
+            end
+        else -- Run mode
+            if trigger_pin then
+                table.remove(node.pins.inputs, trigger_pin_index)
+                trigger_pin = nil
+                State.mark_as_modified()
+            end
+        end
+
         imgui.spacing()
         
         -- Execute and show output
@@ -259,8 +300,43 @@ function MethodFollower.render(node)
         if node.action_type == 0 then -- Run - auto execute
             result = MethodFollower.execute(node, parent_value, selected_method)
         elseif node.action_type == 1 then -- Call - manual button
-            -- Show Call Method button
-            if imgui.button("Call Method") then
+            -- Check trigger pin status
+            local triggered_by_pin = false
+            if trigger_pin and trigger_pin.connection then
+                local source = State.pin_map[trigger_pin.connection.pin]
+                if source and source.pin.value == true then
+                    triggered_by_pin = true
+                end
+            end
+
+            -- Render Call Method button with trigger pin
+            if trigger_pin then
+                imnodes.begin_input_attribute(trigger_pin.id)
+            end
+            
+            local button_disabled = triggered_by_pin or (trigger_pin and trigger_pin.connection ~= nil)
+            if button_disabled then
+                imgui.begin_disabled()
+            end
+
+            local button_clicked = imgui.button("Call Method")
+            
+            if button_disabled then
+                imgui.end_disabled()
+                if imgui.is_item_hovered() then
+                    if triggered_by_pin then
+                        imgui.set_tooltip("Triggered by input pin")
+                    else
+                        imgui.set_tooltip("Disabled: Trigger pin connected")
+                    end
+                end
+            end
+
+            if trigger_pin then
+                imnodes.end_input_attribute()
+            end
+
+            if button_clicked or triggered_by_pin then
                 result = MethodFollower.execute(node, parent_value, selected_method)
                 node.last_call_time = os.clock()  -- Record call time with high precision
             else
