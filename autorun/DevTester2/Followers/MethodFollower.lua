@@ -50,13 +50,16 @@ function MethodFollower.render(node)
     end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
-    if not parent_type then
-        Nodes.render_disconnected_operation_node(node, "type_error")
-        return
-    end
+    -- if not parent_type then
+    --     Nodes.render_disconnected_operation_node(node, "type_error")
+    --     return
+    -- end
 
     -- Determine if we're working with static methods (type definition) or instance methods (managed object)
-    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+    local is_static_context = false
+    if parent_value then
+        is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+    end
 
     imnodes.begin_node(node.id)
 
@@ -68,12 +71,29 @@ function MethodFollower.render(node)
     BaseFollower.render_action_type_dropdown(node, {"Run", "Call"})
 
     -- Method selection
-    local methods = Nodes.get_methods_for_combo(parent_type, is_static_context)
-    local returns_void = false  -- Declare at higher scope
-    if #methods > 0 then
+    if parent_type then
+        local methods = Nodes.get_methods_for_combo(parent_type, is_static_context)
+        local returns_void = false  -- Declare at higher scope
+        if #methods > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
         if not node.selected_method_combo then
             node.selected_method_combo = 1
+        end
+
+        -- Resolve signature if present
+        if node.selected_method_signature then
+            local group, idx = Nodes.find_method_indices_by_signature(parent_type, node.selected_method_signature, is_static_context)
+            if group and idx then
+                node.method_group_index = group
+                node.method_index = idx
+                -- Update combo index to match
+                local combo_idx = Nodes.get_combo_index_for_method(parent_type, group, idx, is_static_context)
+                if combo_idx > 0 then
+                    node.selected_method_combo = combo_idx + 1 -- 1-based for combo
+                end
+                -- Clear signature after successful resolution
+                node.selected_method_signature = nil
+            end
         end
 
         local has_children = Nodes.has_children(node)
@@ -92,10 +112,17 @@ function MethodFollower.render(node)
                 if group_index and method_index then
                     node.method_group_index = tonumber(group_index)
                     node.method_index = tonumber(method_index)
+                    
+                    -- Update signature for persistence
+                    local method = Nodes.get_method_by_group_and_index(parent_type, node.method_group_index, node.method_index, is_static_context)
+                    if method then
+                        node.selected_method_signature = Nodes.get_method_signature(method)
+                    end
                 else
                     -- Selected a separator, not an actual method
                     node.method_group_index = nil
                     node.method_index = nil
+                    node.selected_method_signature = nil
                 end
             else
                 node.method_group_index = nil
@@ -361,6 +388,13 @@ function MethodFollower.render(node)
         imnodes.end_output_attribute()
     else
         imgui.text("No methods available")
+    end
+    else
+        if node.selected_method_signature then
+             imgui.text("Signature: " .. node.selected_method_signature)
+        else
+             imgui.text("Connect parent to select method")
+        end
     end
 
     -- Action buttons

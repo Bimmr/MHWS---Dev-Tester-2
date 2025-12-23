@@ -889,6 +889,54 @@ function Nodes.build_field_list(type_def, is_static_context)
     return fields
 end
 
+-- ========================================
+-- Signature Generation & Matching
+-- ========================================
+
+function Nodes.get_method_signature(method)
+    local type_name = method:get_declaring_type():get_full_name()
+    local name = method:get_name()
+    local param_types = {}
+    
+    local success, params = pcall(function() return method:get_param_types() end)
+    if success and params then
+        for i, p in ipairs(params) do
+            table.insert(param_types, p:get_full_name())
+        end
+    end
+    
+    return type_name .. ":" .. name .. "(" .. table.concat(param_types, ",") .. ")"
+end
+
+function Nodes.get_field_signature(field)
+    local type_name = field:get_declaring_type():get_full_name()
+    return type_name .. ":" .. field:get_name()
+end
+
+function Nodes.find_method_indices_by_signature(type_def, signature, is_static_context)
+    local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
+    for _, item in ipairs(type_info.methods) do
+        if item.type == "method" then
+             if Nodes.get_method_signature(item.method) == signature then
+                 return item.level, item.index
+             end
+        end
+    end
+    return nil, nil
+end
+
+function Nodes.find_field_indices_by_signature(type_def, signature, is_static_context)
+    local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
+    for _, item in ipairs(type_info.fields) do
+        if item.type == "field" then
+             if Nodes.get_field_signature(item.field) == signature then
+                 return item.level, item.index
+             end
+        end
+    end
+    return nil, nil
+end
+
 function Nodes.get_methods_for_combo(type_def, is_static_context)
     local cache_key = type_def:get_full_name() .. (is_static_context and "_static" or "_instance")
     
@@ -941,6 +989,18 @@ function Nodes.get_method_from_combo_index(type_def, combo_index)
     return nil
 end
 
+function Nodes.get_combo_index_for_method(type_def, group_index, method_index, is_static_context)
+    local combo_items = Nodes.get_methods_for_combo(type_def, is_static_context)
+    local prefix = string.format("%d-%d. ", group_index, method_index)
+    
+    for i, item in ipairs(combo_items) do
+        if item:sub(1, #prefix) == prefix then
+            return i - 1 -- Return 0-based index for imgui
+        end
+    end
+    return 0 -- Default to empty
+end
+
 function Nodes.get_fields_for_combo(type_def, is_static_context)
     local cache_key = type_def:get_full_name() .. (is_static_context and "_static" or "_instance") .. "_fields"
     
@@ -991,6 +1051,18 @@ function Nodes.get_field_from_combo_index(type_def, combo_index)
     end
     
     return nil
+end
+
+function Nodes.get_combo_index_for_field(type_def, group_index, field_index, is_static_context)
+    local combo_items = Nodes.get_fields_for_combo(type_def, is_static_context)
+    local prefix = string.format("%d-%d. ", group_index, field_index)
+    
+    for i, item in ipairs(combo_items) do
+        if item:sub(1, #prefix) == prefix then
+            return i - 1 -- Return 0-based index for imgui
+        end
+    end
+    return 0 -- Default to empty
 end
 
 function Nodes.ensure_node_pin_ids(node)

@@ -52,10 +52,10 @@ function FieldFollower.render(node)
     end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
-    if not parent_type then
-        Nodes.render_disconnected_operation_node(node, "type_error")
-        return
-    end
+    -- if not parent_type then
+    --     Nodes.render_disconnected_operation_node(node, "type_error")
+    --     return
+    -- end
 
     -- Determine if we're working with static fields (type definition) or instance fields (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
@@ -80,6 +80,7 @@ function FieldFollower.render(node)
     end
 
     -- Build field list
+    if parent_type then
     local fields = Nodes.get_fields_for_combo(parent_type, is_static_context)
     if #fields > 0 then
         -- Initialize to 1 if not set (imgui.combo is 1-based)
@@ -87,6 +88,22 @@ function FieldFollower.render(node)
             node.selected_field_combo = 1
         end
         
+        -- Resolve signature if present
+        if node.selected_field_signature then
+            local group, idx = Nodes.find_field_indices_by_signature(parent_type, node.selected_field_signature, is_static_context)
+            if group and idx then
+                node.field_group_index = group
+                node.field_index = idx
+                -- Update combo index to match
+                local combo_idx = Nodes.get_combo_index_for_field(parent_type, group, idx, is_static_context)
+                if combo_idx > 0 then
+                    node.selected_field_combo = combo_idx + 1 -- 1-based for combo
+                end
+                -- Clear signature after successful resolution
+                node.selected_field_signature = nil
+            end
+        end
+
         local has_children = Nodes.has_children(node)
         if has_children then
             imgui.begin_disabled()
@@ -103,14 +120,23 @@ function FieldFollower.render(node)
                 if group_index and field_index then
                     node.field_group_index = tonumber(group_index)
                     node.field_index = tonumber(field_index)
+                    
+                    -- Update signature for persistence
+                    local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
+                    if field then
+                        node.selected_field_signature = Nodes.get_field_signature(field)
+                    end
                 else
                     -- Selected a separator, not an actual field
                     node.field_group_index = nil
                     node.field_index = nil
+                    node.selected_field_signature = nil
                 end
             else
+                -- Selected empty/none
                 node.field_group_index = nil
                 node.field_index = nil
+                node.selected_field_signature = nil
             end
             
             node.value_manual_input = "" -- Reset value
@@ -306,6 +332,13 @@ function FieldFollower.render(node)
         imnodes.end_output_attribute()
     else
         imgui.text("No fields available")
+    end
+    else
+        if node.selected_field_signature then
+             imgui.text("Signature: " .. node.selected_field_signature)
+        else
+             imgui.text("Connect parent to select field")
+        end
     end
 
     -- Action buttons

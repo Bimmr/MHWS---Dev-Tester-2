@@ -5,6 +5,7 @@ local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")
 local Utils = require("DevTester2.Utils")
+local BaseFollower = require("DevTester2.Followers.BaseFollower")
 local json = json
 local fs = fs
 local sdk = sdk
@@ -109,9 +110,18 @@ function Config.serialize_node(node)
 
         if node.type == Constants.STARTER_TYPE_HOOK then
             data.method_name = node.method_name
-            data.selected_method_combo = node.selected_method_combo
-            data.method_group_index = node.method_group_index
-            data.method_index = node.method_index
+            
+            -- Generate signature
+            if node.path and node.method_group_index and node.method_index then
+                local type_def = sdk.find_type_definition(node.path)
+                if type_def then
+                    local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
+                    if method then
+                        data.selected_method_signature = Nodes.get_method_signature(method)
+                    end
+                end
+            end
+
             data.pre_hook_result = node.pre_hook_result
             data.return_type_name = node.return_type_name
             data.return_type_full_name = node.return_type_full_name
@@ -121,9 +131,18 @@ function Config.serialize_node(node)
             data.is_return_overridden = node.is_return_overridden
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
-            data.selected_method_combo = node.selected_method_combo
-            data.method_group_index = node.method_group_index
-            data.method_index = node.method_index
+            
+            -- Generate signature
+            if node.path and node.method_group_index and node.method_index then
+                local type_def = sdk.find_type_definition(node.path)
+                if type_def then
+                    local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
+                    if method then
+                        data.selected_method_signature = Nodes.get_method_signature(method)
+                    end
+                end
+            end
+
             data.native_method_result = node.native_method_result
         end
     elseif node.category == Constants.NODE_CATEGORY_DATA then
@@ -186,14 +205,30 @@ function Config.serialize_node(node)
         data.action_type = node.action_type
 
         if node.type == Constants.FOLLOWER_TYPE_METHOD then
-            data.selected_method_combo = node.selected_method_combo
-            data.method_group_index = node.method_group_index
-            data.method_index = node.method_index
+            local parent_value = Nodes.get_parent_value(node)
+            if parent_value then
+                local parent_type = BaseFollower.get_parent_type(parent_value)
+                if parent_type then
+                    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+                    local method = Nodes.get_method_by_group_and_index(parent_type, node.method_group_index, node.method_index, is_static_context)
+                    if method then
+                        data.selected_method_signature = Nodes.get_method_signature(method)
+                    end
+                end
+            end
             data.param_manual_values = node.param_manual_values
         elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
-            data.selected_field_combo = node.selected_field_combo
-            data.field_group_index = node.field_group_index
-            data.field_index = node.field_index
+            local parent_value = Nodes.get_parent_value(node)
+            if parent_value then
+                local parent_type = BaseFollower.get_parent_type(parent_value)
+                if parent_type then
+                    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+                    local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
+                    if field then
+                        data.selected_field_signature = Nodes.get_field_signature(field)
+                    end
+                end
+            end
             if node.action_type == 1 then -- Set
                 data.value_manual_input = node.value_manual_input
                 data.set_active = node.set_active
@@ -446,6 +481,7 @@ function Config.deserialize_node(data)
             -- Hook-specific
             method_name = data.method_name or "",
             selected_method_combo = data.selected_method_combo,
+            selected_method_signature = data.selected_method_signature,
             method_group_index = data.method_group_index,
             method_index = data.method_index,
             pre_hook_result = data.pre_hook_result or "CALL_ORIGINAL",
@@ -548,11 +584,13 @@ function Config.deserialize_node(data)
             action_type = data.action_type,
             -- Method-specific
             selected_method_combo = data.selected_method_combo or 1,
+            selected_method_signature = data.selected_method_signature,
             method_group_index = data.method_group_index,
             method_index = data.method_index,
             param_manual_values = data.param_manual_values or {},
             -- Field-specific
             selected_field_combo = data.selected_field_combo or 1,
+            selected_field_signature = data.selected_field_signature,
             field_group_index = data.field_group_index,
             field_index = data.field_index,
             value_manual_input = data.value_manual_input or "",

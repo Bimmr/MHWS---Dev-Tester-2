@@ -435,6 +435,21 @@ function HookStarter.render(node)
             return sdk.find_type_definition(node.path) 
         end)
         if success_type and type_def then
+            -- Resolve signature if present
+            if node.selected_method_signature then
+                local group, idx = Nodes.find_method_indices_by_signature(type_def, node.selected_method_signature, false)
+                if group and idx then
+                    node.method_group_index = group
+                    node.method_index = idx
+                    -- Update combo index
+                    local combo_idx = Nodes.get_combo_index_for_method(type_def, group, idx, false)
+                    if combo_idx > 0 then
+                        node.selected_method_combo = combo_idx + 1
+                    end
+                    node.selected_method_signature = nil
+                end
+            end
+
             local success_methods, methods = pcall(function() 
                 return Nodes.get_methods_for_combo(type_def) 
             end)
@@ -478,6 +493,9 @@ function HookStarter.render(node)
                             end)
                             if success_get and selected_method then
                                 node.method_name = selected_method:get_name()
+                                -- Update signature for persistence
+                                node.selected_method_signature = Nodes.get_method_signature(selected_method)
+                                
                                 -- Get param types to create arg output pins
                                 local success_params, method_param_types = pcall(function() return selected_method:get_param_types() end)
                                 if success_params and method_param_types then
@@ -493,11 +511,13 @@ function HookStarter.render(node)
                             else
                                 node.method_name = ""
                                 node.param_types = nil
+                                node.selected_method_signature = nil
                             end
                         else
                             node.method_group_index = nil
                             node.method_index = nil
                             node.method_name = ""
+                            node.selected_method_signature = nil
                             node.param_types = nil
                         end
                     else

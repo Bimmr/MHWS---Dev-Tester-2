@@ -75,6 +75,21 @@ function NativeStarter.render(node)
         native_obj = sdk.get_native_singleton(node.path)
         type_def = sdk.find_type_definition(node.path)
         if type_def then
+            -- Resolve signature if present
+            if node.selected_method_signature then
+                local group, idx = Nodes.find_method_indices_by_signature(type_def, node.selected_method_signature, false)
+                if group and idx then
+                    node.method_group_index = group
+                    node.method_index = idx
+                    -- Update combo index
+                    local combo_idx = Nodes.get_combo_index_for_method(type_def, group, idx, false)
+                    if combo_idx > 0 then
+                        node.selected_method_combo = combo_idx + 1
+                    end
+                    node.selected_method_signature = nil
+                end
+            end
+
             local success_methods, methods = pcall(function() 
                 return Nodes.get_methods_for_combo(type_def) 
             end)
@@ -104,6 +119,8 @@ function NativeStarter.render(node)
                             end)
                             if success_get and selected_method then
                                 node.method_name = selected_method:get_name()
+                                -- Update signature for persistence
+                                node.selected_method_signature = Nodes.get_method_signature(selected_method)
                                 
                                 -- Recreate dynamic parameter input pins for new method
                                 node.pins.inputs = {}  -- Clear all input pins
@@ -117,18 +134,21 @@ function NativeStarter.render(node)
                                 end
                             else
                                 node.method_name = ""
+                                node.selected_method_signature = nil
                                 node.pins.inputs = {}  -- Clear pins if method not found
                             end
                         else
                             node.method_group_index = nil
                             node.method_index = nil
                             node.method_name = ""
+                            node.selected_method_signature = nil
                             node.pins.inputs = {}  -- Clear pins
                         end
                     else
                         node.method_group_index = nil
                         node.method_index = nil
                         node.method_name = ""
+                        node.selected_method_signature = nil
                         node.pins.inputs = {}  -- Clear pins when no method selected
                     end
                     node.native_method_result = nil
