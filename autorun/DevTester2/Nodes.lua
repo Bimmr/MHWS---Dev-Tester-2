@@ -11,6 +11,25 @@ local sdk = sdk
 
 local Nodes = {}
 
+function Nodes.is_terminal_type(type_name)
+    if not type_name then return false end
+    if type_name == "System.Boolean" or type_name == "Boolean" then return true end
+    if type_name == "System.Byte" or type_name == "Byte" then return true end
+    if type_name == "System.SByte" or type_name == "SByte" then return true end
+    if type_name == "System.Int16" or type_name == "Int16" then return true end
+    if type_name == "System.UInt16" or type_name == "UInt16" then return true end
+    if type_name == "System.Int32" or type_name == "Int32" then return true end
+    if type_name == "System.UInt32" or type_name == "UInt32" then return true end
+    if type_name == "System.Int64" or type_name == "Int64" then return true end
+    if type_name == "System.UInt64" or type_name == "UInt64" then return true end
+    if type_name == "System.Single" or type_name == "Single" then return true end
+    if type_name == "System.Double" or type_name == "Double" then return true end
+    if type_name == "System.String" or type_name == "String" then return true end
+    if type_name == "System.Void" or type_name == "Void" then return true end
+    if type_name:find("System.Nullable`1") then return true end
+    return false
+end
+
 -- ========================================
 -- Node Titlebar Color and Width Helpers
 -- ========================================

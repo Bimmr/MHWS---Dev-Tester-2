@@ -259,7 +259,21 @@ function FieldFollower.render(node)
         node.pins.outputs[1].value = result
 
         -- Check if result is userdata (can continue to child nodes)
-        local can_continue = type(result) == "userdata"
+        local can_continue = true
+        
+        if selected_field then
+            local field_type = selected_field:get_type()
+            if field_type then
+                local field_type_name = field_type:get_full_name()
+                if Nodes.is_terminal_type(field_type_name) then
+                    can_continue = false
+                end
+            end
+        end
+        
+        if can_continue and result ~= nil then
+            can_continue = type(result) == "userdata"
+        end
         
         -- If result is valid, check if we should unpause child nodes
         if can_continue then

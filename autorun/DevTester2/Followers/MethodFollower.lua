@@ -30,6 +30,7 @@ local sdk = sdk
 
 local HybridCombo = require("DevTester2.HybridCombo")
 local MethodFollower = {}
+
 -- ========================================
 -- Method Follower Node
 -- ========================================
@@ -278,7 +279,26 @@ function MethodFollower.render(node)
         node.pins.outputs[1].value = result
         
         -- Check if result is userdata (can continue to child nodes)
-        local can_continue = type(result) == "userdata"
+        local can_continue = true
+        
+        if returns_void then
+            can_continue = false
+        elseif selected_method then
+            local success_return, return_type = pcall(function()
+                return selected_method:get_return_type()
+            end)
+            if success_return and return_type then
+                local return_type_name = return_type:get_full_name()
+                if Nodes.is_terminal_type(return_type_name) then
+                    can_continue = false
+                end
+            end
+        end
+        
+        if can_continue and result ~= nil then
+            can_continue = type(result) == "userdata"
+        end
+
         -- If result is valid, check if we should unpause child nodes
         if can_continue then
             local success, result_type = pcall(function() 

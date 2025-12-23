@@ -50,24 +50,6 @@ local sdk = sdk
 
 local HookStarter = {}
 
-local function is_terminal_type(type_name)
-    if not type_name then return false end
-    if type_name == "System.Boolean" or type_name == "Boolean" then return true end
-    if type_name == "System.Byte" or type_name == "Byte" then return true end
-    if type_name == "System.SByte" or type_name == "SByte" then return true end
-    if type_name == "System.Int16" or type_name == "Int16" then return true end
-    if type_name == "System.UInt16" or type_name == "UInt16" then return true end
-    if type_name == "System.Int32" or type_name == "Int32" then return true end
-    if type_name == "System.UInt32" or type_name == "UInt32" then return true end
-    if type_name == "System.Int64" or type_name == "Int64" then return true end
-    if type_name == "System.UInt64" or type_name == "UInt64" then return true end
-    if type_name == "System.Single" or type_name == "Single" then return true end
-    if type_name == "System.Double" or type_name == "Double" then return true end
-    if type_name == "System.String" or type_name == "String" then return true end
-    if type_name:find("System.Nullable`1") then return true end
-    return false
-end
-
 -- Render the managed object output attribute
 local function render_managed_output(node, is_placeholder)
     -- Get main output pin (always index 1)
@@ -138,7 +120,7 @@ local function render_argument_outputs(node, is_placeholder)
         local arg_value = node.hook_arg_values and node.hook_arg_values[i]
         
         if param_type then
-             if is_terminal_type(param_full_name) then
+             if Nodes.is_terminal_type(param_full_name) then
                  can_continue = false
              end
         elseif arg_value ~= nil then
