@@ -208,20 +208,12 @@ function FieldFollower.render(node)
                 local source_pin_info = State.pin_map[value_pin.connection.pin]
                 local connected_value = source_pin_info and source_pin_info.pin.value
                 -- Display simplified value without address
-                local display_value = "Object"
-                if type(connected_value) == "userdata" then
-                    local success, type_info = pcall(function() return connected_value:get_type_definition() end)
-                    if success and type_info then
-                        display_value = type_info:get_name()
-                    end
-                else
-                    display_value = tostring(connected_value)
-                end
+                local display_value = Utils.get_value_display_string(connected_value)
                 imgui.begin_disabled()
                 imgui.input_text("Value (" .. field_type:get_name() .. ")", display_value)
                 imgui.end_disabled()
                 if imgui.is_item_hovered() then
-                    imgui.set_tooltip(field_type:get_full_name())
+                    imgui.set_tooltip(field_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value))
                 end
             else
                 node.value_manual_input = node.value_manual_input or ""
@@ -288,15 +280,7 @@ function FieldFollower.render(node)
         
         if result ~= nil then
             -- Display the actual result
-            local display_value = "Object"
-            if type(result) == "userdata" then
-                local success, type_info = pcall(function() return result:get_type_definition() end)
-                if success and type_info then
-                    display_value = type_info:get_name()
-                end
-            else
-                display_value = tostring(result)
-            end
+            local display_value = Utils.get_value_display_string(result)
             local output_display = display_value .. " (?)"
             local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
@@ -307,17 +291,7 @@ function FieldFollower.render(node)
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
-                    if type(result) == "userdata" and result.get_type_definition then
-                        local type_info = result:get_type_definition()
-                        local address = result.get_address and string.format("0x%X", result:get_address()) or "N/A"
-                        local tooltip_text = string.format(
-                            "Type: %s\nAddress: %s\nFull Name: %s",
-                            type_info:get_name(), address, type_info:get_full_name()
-                        )
-                        imgui.set_tooltip(tooltip_text)
-                    else
-                        imgui.set_tooltip(tostring(result))
-                    end
+                    imgui.set_tooltip(Utils.get_tooltip_for_value(result))
                 end
             else
                 Nodes.add_context_menu_option(node, "Copy output value", tostring(result))

@@ -111,23 +111,47 @@ end
 Utils.CATEGOREY_MAP = {}
 Utils.TYPE_MAP = {}
 local function create_maps()
+    -- First pass: Map categories
     for k, v in pairs(Constants) do
         if k:find("NODE_CATEGORY_") then
-            Utils.CATEGOREY_MAP[v] = k:match("NODE_CATEGORY_(.+)")
-        elseif k:find("_TYPE_") then
-            Utils.TYPE_MAP[v] = k:match(".+_TYPE_(.+)")
+            local category_name = k:match("NODE_CATEGORY_(.+)")
+            Utils.CATEGOREY_MAP[v] = category_name
+            -- Initialize type map for this category
+            Utils.TYPE_MAP[v] = {}
+        end
+    end
+    
+    -- Second pass: Map types to categories
+    for k, v in pairs(Constants) do
+        if k:find("_TYPE_") then
+            local category_prefix, type_name = k:match("(.+)_TYPE_(.+)")
+            if category_prefix and type_name then
+                -- Find the category ID for this prefix
+                -- We need to look up NODE_CATEGORY_PREFIX
+                local category_key = "NODE_CATEGORY_" .. category_prefix
+                local category_id = Constants[category_key]
+                
+                if category_id and Utils.TYPE_MAP[category_id] then
+                    Utils.TYPE_MAP[category_id][v] = type_name
+                end
+            end
         end
     end
 end
 
 function Utils.parse_category_and_type(category, type)
-    if not Utils.CATEGOREY_MAP[category] or not Utils.TYPE_MAP[type] then
+    if not next(Utils.CATEGOREY_MAP) then
         create_maps()
     end
-    if Utils.CATEGOREY_MAP[category] and Utils.TYPE_MAP[type] then
-        return Utils.CATEGOREY_MAP[category], Utils.TYPE_MAP[type]
+    
+    local category_name = Utils.CATEGOREY_MAP[category] or "Unknown"
+    local type_name = "Unknown"
+    
+    if Utils.TYPE_MAP[category] and Utils.TYPE_MAP[category][type] then
+        type_name = Utils.TYPE_MAP[category][type]
     end
-    return "Unknown", "Unknown"
+    
+    return category_name, type_name
 end
 
 
@@ -158,6 +182,77 @@ function Utils.get_type_display_name(type_info)
     
     -- Fallback if all else fails
     return "Unknown"
+end
+
+function Utils.get_tooltip_for_value(value)
+    if value == nil then return "nil" end
+    
+    local tooltip_text = ""
+    if type(value) == "userdata" then
+        local success, type_info = pcall(function() return value:get_type_definition() end)
+        if success and type_info then
+            local address = "N/A"
+            local success_addr, addr_val = pcall(function() return value:get_address() end)
+            if success_addr and addr_val then
+                address = string.format("0x%X", addr_val)
+            end
+            
+            tooltip_text = string.format(
+                "Type: %s\nAddress: %s\nFull Name: %s",
+                type_info:get_name(), address, type_info:get_full_name()
+            )
+        else
+            tooltip_text = "userdata (unknown type)"
+        end
+    else
+        tooltip_text = string.format("Value: %s\nType: %s", tostring(value), type(value))
+    end
+    return tooltip_text
+end
+
+function Utils.get_value_display_string(value)
+    if value == nil then return "nil" end
+    
+    if type(value) == "userdata" then
+        local success, type_info = pcall(function() return value:get_type_definition() end)
+        if success and type_info then
+            local type_name = type_info:get_name()
+            
+            -- Handle Vector types
+            if type_name == "vec3" then
+                local x = value.x or 0
+                local y = value.y or 0
+                local z = value.z or 0
+                return string.format("(%.2f, %.2f, %.2f)", x, y, z)
+            elseif type_name == "vec2" then
+                local x = value.x or 0
+                local y = value.y or 0
+                return string.format("(%.2f, %.2f)", x, y)
+            elseif type_name == "vec4" then
+                local x = value.x or 0
+                local y = value.y or 0
+                local z = value.z or 0
+                local w = value.w or 0
+                return string.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w)
+            elseif type_name == "Color" then
+                local r = value.r or 0
+                local g = value.g or 0
+                local b = value.b or 0
+                local a = value.a or 0
+                return string.format("RGBA(%.0f, %.0f, %.0f, %.0f)", r, g, b, a)
+            elseif type_name == "Size" then
+                local w = value.w or 0
+                local h = value.h or 0
+                return string.format("Size(%.2f, %.2f)", w, h)
+            end
+
+            return Utils.get_type_display_name(type_info)
+        else
+            return "Object"
+        end
+    else
+        return tostring(value)
+    end
 end
 
 function Utils.is_array(value)

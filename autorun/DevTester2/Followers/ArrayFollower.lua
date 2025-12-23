@@ -265,15 +265,7 @@ function ArrayFollower.render(node)
     
     if result ~= nil then
         -- Display the actual result
-        local display_value = "Object"
-        if type(result) == "userdata" then
-            local success, type_info = pcall(function() return result:get_type_definition() end)
-            if success and type_info then
-                display_value = type_info:get_name()
-            end
-        else
-            display_value = tostring(result)
-        end
+        local display_value = Utils.get_value_display_string(result)
         local output_display = display_value .. " (?)"
         local pos = Utils.get_right_cursor_pos(node.id, output_display)
         imgui.set_cursor_pos(pos)
@@ -282,17 +274,7 @@ function ArrayFollower.render(node)
             imgui.same_line()
             imgui.text("(?)")
             if imgui.is_item_hovered() then
-                if type(result) == "userdata" and result.get_type_definition then
-                    local type_info = result:get_type_definition()
-                    local address = result.get_address and string.format("0x%X", result:get_address()) or "N/A"
-                    local tooltip_text = string.format(
-                        "Type: %s\nAddress: %s\nFull Name: %s",
-                        type_info:get_name(), address, type_info:get_full_name()
-                    )
-                    imgui.set_tooltip(tooltip_text)
-                else
-                    imgui.set_tooltip(tostring(result))
-                end
+                imgui.set_tooltip(Utils.get_tooltip_for_value(result))
             end
         end
     else

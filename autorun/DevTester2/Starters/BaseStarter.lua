@@ -104,16 +104,6 @@ function BaseStarter.create(node_type, position)
         pins = { inputs = {}, outputs = {} },
         -- Parameter support for starters that need it (like Native)
         param_manual_values = {},
-        -- Enum-specific
-        selected_enum_index = 1,
-        enum_names = nil,
-        enum_values = nil,
-        -- Hook-specific
-        method_name = "",
-        hook_id = nil,
-        is_initialized = false,
-        return_override_manual = "",
-        is_return_overridden = false
     }
     
     table.insert(State.all_nodes, node)

@@ -81,13 +81,7 @@ function TypeStarter.render(node)
 
         -- Display type information
         local display_value = node.ending_value:get_name()
-        local tooltip_text = string.format(
-            "Type: %s\nFull Name: %s\nNamespace: %s",
-            node.ending_value:get_name(),
-            node.ending_value:get_full_name(),
-            node.ending_value:get_namespace() or "global"
-        )
-
+        
         -- Render output pin
         imgui.spacing()
         imnodes.begin_output_attribute(output_pin.id)
@@ -98,7 +92,7 @@ function TypeStarter.render(node)
         imgui.same_line()
         imgui.text("(?)")
         if imgui.is_item_hovered() then
-            imgui.set_tooltip(tooltip_text)
+            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
         end
         imnodes.end_output_attribute()
     elseif node.status == "Type not found" then

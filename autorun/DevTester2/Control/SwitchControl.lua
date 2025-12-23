@@ -10,9 +10,9 @@
 --
 -- Pin Structure:
 -- - pins.inputs[1]: "switch_input" - Value to switch on
--- - pins.inputs[N]: "case_0" through "case_N-1" - Values to compare against
--- - pins.inputs[N+1]: "value_0" through "value_N-1" - Values to return if case matches
--- - pins.inputs[last]: "else" - Fallback value if no cases match
+-- - pins.inputs[...]: "case_N" - Values to compare against (N = 0 to num_conditions-1)
+-- - pins.inputs[...]: "value_N" - Values to return if case matches (N = 0 to num_conditions-1)
+-- - pins.inputs[...]: "else" - Fallback value if no cases match
 -- - pins.outputs[1]: "output" - The selected value
 --
 -- Runtime Values:
@@ -502,7 +502,7 @@ function SwitchControl.render(node)
     imgui.spacing()
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
-    local display = node.ending_value ~= nil and tostring(node.ending_value) or "nil"
+    local display = Utils.get_value_display_string(node.ending_value)
     local debug_pos = Utils.get_right_cursor_pos(node.id, display .. " (?)")
     imgui.set_cursor_pos(debug_pos)
     imgui.text(display)

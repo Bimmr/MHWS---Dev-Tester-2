@@ -100,7 +100,7 @@ function InvertOperation.render(node)
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
     
-    local display_text = output_value ~= nil and tostring(output_value) or "(no input)"
+    local display_text = Utils.get_value_display_string(node.ending_value)
     local tooltip_text = nil
     if output_value ~= nil then
         tooltip_text = string.format("Inverted Value\nInput: %s\nOutput: %s", 

@@ -76,29 +76,19 @@ function HunterCharacterStarter.render(node)
     imnodes.begin_output_attribute(output_pin.id)
 
     if node.ending_value then
-        local display_value = "HunterCharacter"
+        local display_value = Utils.get_value_display_string(node.ending_value)
         local type_info = node.ending_value:get_type_definition()
-        if type_info then
-            display_value = Utils.get_type_display_name(type_info)
-        end
 
         Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
         
-        local tooltip_text = string.format(
-            "Type: %s\nAddress: %s\nFull Name: %s",
-            "app.HunterCharacter",
-            string.format("0x%X", node.ending_value:get_address()),
-            type_info:get_full_name()
-        )
-
         -- Output pin
         local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
         imgui.set_cursor_pos(debug_pos)
         imgui.text(display_value)
         imgui.same_line()
         imgui.text("(?)")
-        if imgui.is_item_hovered() and tooltip_text then
-            imgui.set_tooltip(tooltip_text)
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
         end
     else
         local text = "Output: nil"

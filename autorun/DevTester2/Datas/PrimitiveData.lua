@@ -56,25 +56,15 @@ function PrimitiveData.render(node)
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
     
-    local display_value = tostring(node.value)
+    local display_value = Utils.get_value_display_string(node.ending_value)
     local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
     imgui.set_cursor_pos(debug_pos)
     imgui.text(display_value)
     imgui.same_line()
     imgui.text("(?)")
     
-    if imgui.is_item_hovered() and node.ending_value then
-        local value_type = type(node.ending_value)
-        local type_description = "Unknown"
-        if value_type == "number" then
-            type_description = "Number"
-        elseif value_type == "boolean" then
-            type_description = "Boolean"
-        elseif value_type == "string" then
-            type_description = "String"
-        end
-        local tooltip_text = string.format("Primitive Value\nType: %s\nValue: %s", type_description, tostring(node.ending_value))
-        imgui.set_tooltip(tooltip_text)
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
     end
     
     imnodes.end_output_attribute()

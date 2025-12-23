@@ -233,7 +233,7 @@ function CounterControl.render(node)
     -- Output pin with tooltip
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
-    local display_value = tostring(node.ending_value or 0)
+    local display_value = Utils.get_value_display_string(node.ending_value)
     local output_display = display_value .. " (?)"
     local pos = Utils.get_right_cursor_pos(node.id, output_display)
     imgui.set_cursor_pos(pos)

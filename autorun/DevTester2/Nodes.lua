@@ -253,7 +253,7 @@ function Nodes.add_child_node(parent_node)
     table.insert(parent_output_pin.connections, { node = child.id, pin = child_input_pin.id, link = link.id })
 end
 
-function Nodes.add_child_node_to_arg(parent_node, arg_index)
+function Nodes.add_child_node_to_arg(parent_node, pin_index)
     -- Random Y offset between -150 and +150
     local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
@@ -263,20 +263,21 @@ function Nodes.add_child_node_to_arg(parent_node, arg_index)
         y = parent_node.position.y + random_y_offset
     })
     
-    -- Find the arg output pin (args start at index 2+ in outputs, after main return)
-    local arg_pin_index = arg_index + 1  -- +1 because output[1] is usually the return value
+    -- Find the arg output pin
+    local arg_pin_index = pin_index
     
     if not parent_node.pins or not parent_node.pins.outputs or not parent_node.pins.outputs[arg_pin_index] then
         -- Ensure the arg output pin exists - get value from hook_arg_values if available
-        local arg_value = parent_node.hook_arg_values and parent_node.hook_arg_values[arg_index] or nil
-        Nodes.add_output_pin(parent_node, "Arg " .. arg_index, arg_value)
+        -- Note: We can't easily infer the arg index from pin_index here without more context, 
+        -- but usually the pin should already exist if we are clicking a button on it.
+        Nodes.add_output_pin(parent_node, "Arg", nil)
     end
     local parent_arg_pin = parent_node.pins.outputs[arg_pin_index]
     
     -- Sync arg pin value with hook_arg_values if available
-    if parent_node.hook_arg_values and parent_node.hook_arg_values[arg_index] then
-        parent_arg_pin.value = parent_node.hook_arg_values[arg_index]
-    end
+    -- Note: This sync logic was relying on arg_index. 
+    -- Since we are passing pin_index, we might skip this explicit sync here 
+    -- and rely on the render loop to keep it synced.
     
     -- Ensure child has input pin
     if not child.pins or not child.pins.inputs or #child.pins.inputs == 0 then
@@ -296,7 +297,8 @@ function Nodes.add_child_node_to_arg(parent_node, arg_index)
     table.insert(parent_arg_pin.connections, { node = child.id, pin = child_input_pin.id, link = link.id })
 end
 
-function Nodes.add_child_node_to_return(parent_node)
+function Nodes.add_child_node_to_return(parent_node, pin_index)
+    pin_index = pin_index or 1
     -- Random Y offset between -150 and +150
     local random_y_offset = math.random(Constants.CHILD_NODE_RANDOM_Y_MIN, Constants.CHILD_NODE_RANDOM_Y_MAX)
     
@@ -307,12 +309,12 @@ function Nodes.add_child_node_to_return(parent_node)
     })
     
     -- Find the return output pin (usually first output pin)
-    if not parent_node.pins or not parent_node.pins.outputs or #parent_node.pins.outputs == 0 then
+    if not parent_node.pins or not parent_node.pins.outputs or #parent_node.pins.outputs < pin_index then
         -- Create return pin with return_value or actual_return_value if available
         local return_val = parent_node.return_value or parent_node.actual_return_value or nil
         Nodes.add_output_pin(parent_node, "Return", return_val)
     end
-    local parent_return_pin = parent_node.pins.outputs[1]
+    local parent_return_pin = parent_node.pins.outputs[pin_index]
     
     -- Sync return pin value
     if parent_node.return_value then
@@ -1281,7 +1283,7 @@ end
 function Nodes.render_context_menu(node)
     
     -- Have to use selected nodes since imnodes.is_node_hovered() doesn't accept a node ID
-    if imnodes.get_selected_nodes()[1] == node.id and imgui.is_mouse_clicked(1) and #node._frame_context_options > 0 then
+    if imnodes.get_selected_nodes()[1] == node.id and imgui.is_mouse_clicked(1) and (node._frame_context_options and #node._frame_context_options > 0) then
         imgui.open_popup("NodeContextMenu_" .. node.id)
     end
 

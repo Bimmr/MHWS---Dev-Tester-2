@@ -184,7 +184,7 @@ function MathOperation.render(node)
     -- Output pin
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
-    local display = node.ending_value and tostring(node.ending_value) or "(waiting)"
+    local display = Utils.get_value_display_string(node.ending_value)
     local debug_pos = Utils.get_right_cursor_pos(node.id, display .. " (?)")
     imgui.set_cursor_pos(debug_pos)
     imgui.text(display)

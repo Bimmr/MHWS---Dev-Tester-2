@@ -1,6 +1,23 @@
 -- DevTester v2.0 - Condition Control
 -- Simple condition-based value selector (if-then-else logic)
 
+-- ConditionControl Node Properties:
+-- This node selects between two values based on a condition (if-then-else).
+--
+-- Pins:
+-- - pins.inputs[1]: "Condition" - The condition to evaluate (boolean/truthy)
+-- - pins.inputs[2]: "True Value" - Value to return if condition is true
+-- - pins.inputs[3]: "False Value" - Value to return if condition is false
+-- - pins.outputs[1]: "Output" - The selected value
+--
+-- Manual Input Values:
+-- - Manual values are stored directly in the pins (pin.value) when not connected.
+--
+-- Runtime Values:
+-- - ending_value: Any - The selected value
+--
+-- Inherits status property from BaseControl for debugging
+
 local State = require("DevTester2.State")
 local Constants = require("DevTester2.Constants")
 local Nodes = require("DevTester2.Nodes")
@@ -200,7 +217,7 @@ function ConditionControl.render(node)
     
     -- Output
     imnodes.begin_output_attribute(output_pin.id)
-    local display = node.ending_value ~= nil and tostring(node.ending_value) or "nil"
+    local display = Utils.get_value_display_string(node.ending_value)
     local debug_pos = Utils.get_right_cursor_pos(node.id, display .. " (?)")
     imgui.set_cursor_pos(debug_pos)
     imgui.text(display)

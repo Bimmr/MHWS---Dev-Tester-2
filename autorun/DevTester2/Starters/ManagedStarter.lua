@@ -75,20 +75,20 @@ function ManagedStarter.render(node)
         end
     end
 
+    -- Try to fetch singleton if missing (e.g. level load or initialization)
+    if not node.ending_value and node.path and node.path ~= "" then
+        local managed_obj = sdk.get_managed_singleton(node.path)
+        if managed_obj then
+            node.ending_value = managed_obj
+            output_pin.value = managed_obj
+            node.status = "Success"
+        end
+    end
+
     if node.ending_value then
         -- Display simplified value without address
-        local display_value = "Object"
+        local display_value = Utils.get_value_display_string(node.ending_value)
         local type_info = node.ending_value:get_type_definition()
-        if type_info then
-            display_value = Utils.get_type_display_name(type_info)
-        end
-
-        local tooltip_text = string.format(
-            "Type: %s\nAddress: %s\nFull Name: %s",
-            node.path,
-            string.format("0x%X", node.ending_value:get_address()),
-            type_info:get_full_name()
-        )
         
         Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
 
@@ -100,8 +100,8 @@ function ManagedStarter.render(node)
         imgui.text(display_value)        
         imgui.same_line()
         imgui.text("(?)")
-        if imgui.is_item_hovered() and tooltip_text then
-            imgui.set_tooltip(tooltip_text)
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
         end
         imnodes.end_output_attribute()
     elseif node.status == "Managed singleton not found" then

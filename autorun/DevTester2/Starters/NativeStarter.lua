@@ -74,6 +74,17 @@ function NativeStarter.render(node)
     if node.path and node.path ~= "" then
         native_obj = sdk.get_native_singleton(node.path)
         type_def = sdk.find_type_definition(node.path)
+        
+        -- Action Type Dropdown (Run/Call)
+        if not node.action_type then node.action_type = 0 end -- Default to Run
+        if has_children then imgui.begin_disabled() end
+        local type_changed, new_type = imgui.combo("Mode", node.action_type + 1, {"Run", "Call"})
+        if type_changed then
+            node.action_type = new_type - 1
+            State.mark_as_modified()
+        end
+        if has_children then imgui.end_disabled() end
+
         if type_def then
             -- Resolve signature if present
             if node.selected_method_signature then
@@ -253,21 +264,32 @@ function NativeStarter.render(node)
         end
 
         -- Call the native method with parameters
-        local success, result = pcall(function()
-            if #param_values > 0 then
-                return sdk.call_native_func(native_obj, type_def, node.method_name, table.unpack(param_values))
-            else
-                return sdk.call_native_func(native_obj, type_def, node.method_name)
+        local should_run = false
+        if node.action_type == 0 then -- Run
+            should_run = true
+        elseif node.action_type == 1 then -- Call
+            if imgui.button("Call Method") then
+                should_run = true
             end
-        end)
-        if success then
-            node.native_method_result = result
-            output_pin.value = result
-            node.status = "Success"
-        else
-            node.native_method_result = nil
-            output_pin.value = nil
-            node.status = "Error calling method"
+        end
+
+        if should_run then
+            local success, result = pcall(function()
+                if #param_values > 0 then
+                    return sdk.call_native_func(native_obj, type_def, node.method_name, table.unpack(param_values))
+                else
+                    return sdk.call_native_func(native_obj, type_def, node.method_name)
+                end
+            end)
+            if success then
+                node.native_method_result = result
+                output_pin.value = result
+                node.status = "Success"
+            else
+                node.native_method_result = nil
+                output_pin.value = nil
+                node.status = "Error calling method"
+            end
         end
     end
     
@@ -276,18 +298,18 @@ function NativeStarter.render(node)
     imnodes.begin_output_attribute(output_pin.id)
     if node.native_method_result ~= nil then
             -- Display simplified value without address
-            local display_value = "Object"
+            local display_value = Utils.get_value_display_string(node.native_method_result)
             local can_continue = type(node.native_method_result) == "userdata"
+            
             if can_continue then
                 local success, type_info = pcall(function() return node.native_method_result:get_type_definition() end)
                 if success and type_info then
-                    display_value = Utils.get_type_display_name(type_info)
                     Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
                 end
             else
-                display_value = tostring(node.native_method_result)
                 Nodes.add_context_menu_option(node, "Copy output name", display_value)
             end
+            
             local output_display = display_value .. " (?)"
             local pos = Utils.get_right_cursor_pos(node.id, output_display)
             imgui.set_cursor_pos(pos)
@@ -296,17 +318,7 @@ function NativeStarter.render(node)
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
-                    if type(node.native_method_result) == "userdata" and node.native_method_result.get_type_definition then
-                        local type_info = node.native_method_result:get_type_definition()
-                        local address = node.native_method_result.get_address and string.format("0x%X", node.native_method_result:get_address()) or "N/A"
-                        local tooltip_text = string.format(
-                            "Type: %s\nAddress: %s\nFull Name: %s",
-                            type_info:get_name(), address, type_info:get_full_name()
-                        )
-                        imgui.set_tooltip(tooltip_text)
-                    else
-                        imgui.set_tooltip(tostring(node.native_method_result))
-                    end
+                    imgui.set_tooltip(Utils.get_tooltip_for_value(node.native_method_result))
                 end
             end
         else
