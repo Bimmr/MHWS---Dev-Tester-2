@@ -64,6 +64,7 @@ re.on_draw_ui(function()
     -- Load Data.json on first draw to restore window state
     if not initialized then
         Config.load_data_config()
+        Config.load_autosave()
         initialized = true
     end
     if imgui.button("DevTester v2.0") then
@@ -124,6 +125,9 @@ end)
 
 -- Cleanup on script unload
 re.on_script_reset(function()
+    -- Autosave state
+    Config.save_autosave()
+
     -- Remove all hooks
     for _, node in ipairs(State.all_nodes) do
         if node.category == Constants.NODE_CATEGORY_STARTER and node.type == 2 and node.hook_id then -- Hook type

@@ -62,6 +62,32 @@ function Config.save_configuration(name, description)
     end
 end
 
+function Config.save_autosave()
+    -- Build config data (simplified for autosave)
+    local config = {
+        nodes = Config.serialize_all_nodes(),
+        links = Config.serialize_all_links(),
+        node_id_counter = State.node_id_counter,
+        link_id_counter = State.link_id_counter,
+        pin_id_counter = State.pin_id_counter
+    }
+    
+    -- Save variables
+    local variables = {}
+    for var_name, var_data in pairs(State.variables) do
+        variables[var_name] = var_data.value
+    end
+    config.variables = variables
+    
+    local success = json.dump_file("DevTester2/autosave.json", config)
+    
+    if not success then
+        log.debug("Autosave failed: could not write file")
+    end
+    
+    return success
+end
+
 function Config.serialize_all_nodes()
     local nodes = {}
     
@@ -435,6 +461,86 @@ function Config.load_configuration(config_path)
     return true, nil
 end
 
+function Config.load_autosave()
+    -- Check if autosave exists
+    local config = json.load_file("DevTester2/autosave.json")
+    
+    -- If no config or empty, do nothing
+    if not config or not next(config) then
+        return false
+    end
+    
+    -- Clear existing nodes
+    Nodes.clear_all_nodes()
+    
+    -- Restore ID counters
+    State.node_id_counter = config.node_id_counter or 1
+    State.link_id_counter = config.link_id_counter or 1
+    State.pin_id_counter = config.pin_id_counter or 1
+
+    -- Calculate max pin ID if not saved (legacy support)
+    if not config.pin_id_counter then
+        local max_pin_id = 0
+        for _, node_data in ipairs(config.nodes or {}) do
+            if node_data.pins then
+                if node_data.pins.inputs then
+                    for _, pin in ipairs(node_data.pins.inputs) do
+                        if pin.id > max_pin_id then max_pin_id = pin.id end
+                    end
+                end
+                if node_data.pins.outputs then
+                    for _, pin in ipairs(node_data.pins.outputs) do
+                        if pin.id > max_pin_id then max_pin_id = pin.id end
+                    end
+                end
+            end
+        end
+        State.pin_id_counter = max_pin_id + 1
+    end
+    
+    -- Deserialize nodes
+    local node_map = {}
+    for _, node_data in ipairs(config.nodes or {}) do
+        local node = Config.deserialize_node(node_data)
+        if node then
+            Nodes.ensure_node_pin_ids(node)
+            Nodes.validate_and_restore_starter_node(node)
+            node_map[node_data.id] = node
+            table.insert(State.all_nodes, node)
+            State.node_map[node.id] = node
+        end
+    end
+    
+    -- Deserialize links
+    for _, link_data in ipairs(config.links or {}) do
+        Config.deserialize_link(link_data, node_map)
+    end
+    
+    -- Apply positions
+    for _, node_data in ipairs(config.nodes or {}) do
+        local node = node_map[node_data.id]
+        if node and node_data.position then
+            imnodes.set_node_editor_space_pos(node.id, node_data.position.x, node_data.position.y)
+            State.nodes_positioned = State.nodes_positioned or {}
+            State.nodes_positioned[node.id] = true
+        end
+    end
+    
+    -- Restore variables
+    local variables = config.variables or {}
+    State.variables = {}
+    for var_name, var_value in pairs(variables) do
+        State.variables[var_name] = {value = var_value, persistent = true}
+    end
+    
+    State.mark_as_modified()
+    
+    -- Clear autosave file
+    json.dump_file("DevTester2/autosave.json", {})
+    
+    return true
+end
+
 function Config.deserialize_node(data)
     local node
     
@@ -726,7 +832,6 @@ end
 function Config.load_data_config()
     local file_path = "DevTester2/Data.json"
     
-    -- Load using REFramework's json.load_file (same as regular configs)
     local data = json.load_file(file_path)
     
     if not data then
