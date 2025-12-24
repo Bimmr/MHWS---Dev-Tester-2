@@ -217,18 +217,77 @@ function EnumData.execute(node)
             local source_node = Nodes.find_node_by_id(source_pin_info.node_id)
             
             if source_node then
-                -- Try various ways to get type information
-                if source_node.return_type_full_name then
-                    input_type_name = source_node.return_type_full_name
-                elseif source_node.ending_value_full_name then
-                    input_type_name = source_node.ending_value_full_name
-                elseif path_input_value ~= nil then
-                    -- Try to get type from the value itself
-                    local success, type_def = pcall(function() return path_input_value:get_type_definition() end)
-                    if success and type_def then
-                        local parent = type_def:get_parent_type()
-                        if parent and parent:get_full_name() == "System.Enum" then
-                            input_type_name = type_def:get_full_name()
+                -- Find which output pin is connected
+                local connected_pin_index = nil
+                if source_node.pins and source_node.pins.outputs then
+                    for i, pin in ipairs(source_node.pins.outputs) do
+                        if pin.id == source_pin_info.pin.id then
+                            connected_pin_index = i
+                            break
+                        end
+                    end
+                end
+
+                local handled = false
+                
+                -- Special handling for HookStarter arguments and return values
+                if source_node.param_types and connected_pin_index then
+                    local is_void = source_node.return_type_name == "Void"
+                    local arg_index = nil
+                    
+                    if connected_pin_index == 1 then
+                        -- Main output (this)
+                        input_type_name = source_node.path
+                        path_input_value = source_node.ending_value
+                        handled = true
+                    elseif is_void then
+                        if connected_pin_index > 1 then
+                            arg_index = connected_pin_index - 1
+                        end
+                    else
+                        if connected_pin_index == 2 then
+                            -- Return value
+                            input_type_name = source_node.return_type_full_name
+                            path_input_value = source_node.return_value
+                            handled = true
+                        elseif connected_pin_index > 2 then
+                            arg_index = connected_pin_index - 2
+                        end
+                    end
+                    
+                    if arg_index and source_node.param_types[arg_index] then
+                        local success, type_name = pcall(function() return source_node.param_types[arg_index]:get_full_name() end)
+                        if success then
+                            input_type_name = type_name
+                            handled = true
+                        end
+                        if source_node.hook_arg_values and source_node.hook_arg_values[arg_index] then
+                            path_input_value = source_node.hook_arg_values[arg_index]
+                        end
+                    end
+                end
+
+                if not handled then
+                    -- Try various ways to get type information
+                    -- Special handling for HookStarter (or similar) that has return_value and return_type_full_name
+                    if source_node.return_value and source_node.return_type_full_name then
+                        input_type_name = source_node.return_type_full_name
+                        path_input_value = source_node.return_value
+                    elseif source_node.return_type_full_name then
+                        input_type_name = source_node.return_type_full_name
+                    elseif source_node.ending_value and source_node.ending_value_full_name then
+                        input_type_name = source_node.ending_value_full_name
+                        path_input_value = source_node.ending_value
+                    elseif source_node.ending_value_full_name then
+                        input_type_name = source_node.ending_value_full_name
+                    elseif path_input_value ~= nil then
+                        -- Try to get type from the value itself
+                        local success, type_def = pcall(function() return path_input_value:get_type_definition() end)
+                        if success and type_def then
+                            local parent = type_def:get_parent_type()
+                            if parent and parent:get_full_name() == "System.Enum" then
+                                input_type_name = type_def:get_full_name()
+                            end
                         end
                     end
                 end
