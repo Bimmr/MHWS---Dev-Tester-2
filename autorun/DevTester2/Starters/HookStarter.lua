@@ -115,26 +115,39 @@ local function render_argument_outputs(node, is_placeholder)
         local param_type_name = param_type and param_type:get_name() or "Unknown"
         local param_full_name = param_type and param_type:get_full_name() or "Unknown"
         
+        -- If param_type is unknown but we have a userdata value, try to extract type from the value
+        local arg_value = node.hook_arg_values and node.hook_arg_values[i]
+        if not param_type and arg_value ~= nil and type(arg_value) == "userdata" then
+            local success_type, value_type_def = pcall(function() 
+                return arg_value:get_type_definition() 
+            end)
+            if success_type and value_type_def then
+                param_type_name = value_type_def:get_name()
+                param_full_name = value_type_def:get_full_name()
+            end
+        end
+        
         -- Determine if we should show the pin (can continue)
         local can_continue = true
-        local arg_value = node.hook_arg_values and node.hook_arg_values[i]
         
-        if param_type then
-             if Nodes.is_terminal_type(param_full_name) then
-                 can_continue = false
-             end
-        elseif arg_value ~= nil then
+        -- Check if it's a terminal type using either param_type or dynamically extracted type
+        if param_full_name ~= "Unknown" and Nodes.is_terminal_type(param_full_name) then
+            can_continue = false
+        elseif not param_type and arg_value ~= nil then
             can_continue = type(arg_value) == "userdata"
         end
 
-        Nodes.add_context_menu_option(node, "Copy param type " .. i , param_type and param_type:get_full_name() or "Unknown")
+        -- Determine label: "Param" if it matches param_types, "Arg" if beyond param_types
+        local arg_label = param_type and "Param " .. i or "Arg " .. i
+        
+        Nodes.add_context_menu_option(node, "Copy param type " .. i , param_full_name)
         local arg_pos = imgui.get_cursor_pos()
         
         if can_continue then
             imnodes.begin_output_attribute(arg_pin.id)
         end
         
-        imgui.text("Arg " .. i .. " (" .. param_type_name .. "):")
+        imgui.text(arg_label .. " (" .. param_type_name .. "):")
         imgui.same_line()
         
         if is_placeholder then
@@ -154,16 +167,16 @@ local function render_argument_outputs(node, is_placeholder)
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
-                    -- Build tooltip
+                    -- Build tooltip - use the dynamically extracted type if available
                     local tooltip_text = string.format("Param Type: %s\n%s", 
-                        param_type and param_type:get_full_name() or "Unknown",
+                        param_full_name,
                         Utils.get_tooltip_for_value(node.hook_arg_values[i])
                     )
                     imgui.set_tooltip(tooltip_text)
                 end
                 
                 if node.hook_arg_values[i] ~= nil and type(node.hook_arg_values[i]) == "userdata" then
-                    local arg_button_text = "+ Add Child to Arg " .. i
+                    local arg_button_text = "+ Add Child to " .. arg_label
                     local arg_button_pos = Utils.get_right_cursor_pos(node.id, arg_button_text)
                     imgui.set_cursor_pos(arg_button_pos)
                     if imgui.button(arg_button_text) then
@@ -523,9 +536,14 @@ function HookStarter.render(node)
         if node.return_type_name and node.return_type_name ~= "Void" then
             required_outputs = required_outputs + 1  -- return_output
         end
-        if node.param_types then
-            required_outputs = required_outputs + #node.param_types  -- arg outputs
+        
+        local num_args = 0
+        if node.hook_arg_values and #node.hook_arg_values > 0 then
+             num_args = #node.hook_arg_values
+        elseif node.param_types then
+             num_args = #node.param_types
         end
+        required_outputs = required_outputs + num_args
         
         -- Create output pins if needed
         while #node.pins.outputs < required_outputs do
@@ -698,8 +716,16 @@ function HookStarter.initialize_hook(node)
             end
             
             node.last_hook_time = os.clock()
-            local managed = sdk.to_managed_object(args[2])
-            if managed then
+            
+            -- Determine argument offset and 'this' value
+            local arg_offset = node.is_static and 2 or 3
+            local managed = nil
+            
+            if not node.is_static then
+                managed = sdk.to_managed_object(args[2])
+            end
+            
+            if managed or node.is_static then
                 node.ending_value = managed
                 -- Update main output pin (index 1)
                 if #node.pins.outputs >= 1 then
@@ -713,10 +739,14 @@ function HookStarter.initialize_hook(node)
             
             -- Convert and store method arguments
             node.hook_arg_values = {}
-            for i = 1, #param_types do
-                local arg = args[i + 2]  -- args[3] is param 1, args[4] is param 2, etc.
-                local param_type = param_types[i]
-                local type_name = param_type:get_full_name()
+            local arg_count = #args - arg_offset + 1
+            for i = 1, arg_count do
+                local arg = args[i + arg_offset - 1]
+                local type_name = "System.Object"
+                if param_types and param_types[i] then
+                    type_name = param_types[i]:get_full_name()
+                end
+                
                 log.debug("Converting arg " .. i .. " of type " .. type_name .. ", value: " .. tostring(arg))
                 node.hook_arg_values[i] = convert_ptr(arg, type_name)
                 log.debug("Stored hook_arg_values[" .. i .. "] = " .. tostring(node.hook_arg_values[i]))
