@@ -306,7 +306,7 @@ function FieldFollower.render(node)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             if can_continue then
-                --Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
+                Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
