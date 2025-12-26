@@ -275,15 +275,21 @@ function FieldFollower.render(node)
             can_continue = type(result) == "userdata"
         end
         
-        -- If result is valid, check if we should unpause child nodes
-        if can_continue then
-            local success, result_type = pcall(function() 
-                return result:get_type_definition() 
-            end)
-            if success and result_type then
-                local result_type_name = result_type:get_full_name()
-                -- Try to unpause children if the type matches their expectations
-                -- Nodes.unpause_child_nodes(node, result_type_name)
+        -- Nullables _Value field will be a type of userdata, but can't get the type definition
+        if can_continue and result ~= nil then
+            -- get parent type and check if it's a nullable, if it is then we need to get the current field's "_HasValue" field to see if it has a value
+            local parent_type = BaseFollower.get_parent_type(parent_value)
+
+            if parent_type then
+                local is_nullable = parent_type:get_name():find("Nullable") ~= nil
+                if is_nullable then
+                    local has_value = parent_value:get_field("_HasValue")
+                    if not has_value then
+                        can_continue = false
+                        result = nil
+                        node.ending_value = nil
+                    end
+                end
             end
         end
         
@@ -300,8 +306,7 @@ function FieldFollower.render(node)
             imgui.set_cursor_pos(pos)
             imgui.text(display_value)
             if can_continue then
-                Nodes.add_context_menu_option(node, "Copy output type", 
-                    result:get_type_definition():get_full_name() or "Unknown")
+                --Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then

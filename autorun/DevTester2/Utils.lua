@@ -217,6 +217,14 @@ function Utils.get_value_display_string(value)
         local success, type_info = pcall(function() return value:get_type_definition() end)
         if success and type_info then
             local type_name = type_info:get_name()
+
+            if type_name:find("Nullable") then 
+                local field = type_info:get_field("_Value")
+                local type = field:get_type()
+                local name = type:get_full_name()
+                local value = Utils.get_value_display_string(name)
+                return "Nullable(" .. value .. ")"
+            end
             
             -- Handle Vector types
             if type_name == "vec3" then
@@ -248,7 +256,7 @@ function Utils.get_value_display_string(value)
 
             return Utils.get_type_display_name(type_info)
         else
-            return "Object"
+            return "Unknown"
         end
     else
         return tostring(value)

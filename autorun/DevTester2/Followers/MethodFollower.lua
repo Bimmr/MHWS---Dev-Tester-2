@@ -374,6 +374,24 @@ function MethodFollower.render(node)
         if can_continue and result ~= nil then
             can_continue = type(result) == "userdata"
         end
+        
+        -- Nullables _Value field will be a type of userdata, but can't get the type definition
+        if can_continue and result ~= nil then
+            -- get parent type and check if it's a nullable, if it is then we need to get the current field's "_HasValue" field to see if it has a value
+            local parent_type = BaseFollower.get_parent_type(parent_value)
+
+            if parent_type then
+                local is_nullable = parent_type:get_name():find("Nullable") ~= nil
+                if is_nullable then
+                    local has_value = parent_value:get_field("_HasValue")
+                    if not has_value then
+                        can_continue = false
+                        result = nil
+                        node.ending_value = nil
+                    end
+                end
+            end
+        end
 
         -- If result is valid, check if we should unpause child nodes
         if can_continue then
