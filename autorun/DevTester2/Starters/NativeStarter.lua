@@ -7,6 +7,8 @@
 -- - selected_method_combo: Number - Index for the method selection combo box UI
 -- - method_group_index: Number - Group index for organizing overloaded methods
 -- - method_index: Number - Index of the method within its overload group
+-- - action_type: Number - Execution mode (0: Run every frame, 1: Call on button press)
+-- - selected_method_signature: String - Signature of the selected method for persistence
 --
 -- Pins:
 -- - pins.inputs[]: Dynamic parameter inputs - Created based on selected method signature ("param_0", "param_1", etc.)
@@ -17,6 +19,8 @@
 --
 -- Runtime Values:
 -- - native_method_result: Any - The result returned from calling the native method
+-- - ending_value: Any - The final value to be passed to the output pin
+-- - has_executed: Boolean - Whether the method has been executed at least once
 --
 -- UI/Debug:
 -- - status: String - Current status message
@@ -31,6 +35,12 @@ local imnodes = imnodes
 local sdk = sdk
 
 local NativeStarter = {}
+
+-- Helper to get method info safely
+local function get_method_info(type_def, group_index, method_index)
+    if not group_index or not method_index then return nil end
+    return Nodes.get_method_by_group_and_index(type_def, group_index, method_index)
+end
 
 function NativeStarter.render(node)
     -- Ensure pin exists
@@ -62,6 +72,8 @@ function NativeStarter.render(node)
         node.method_group_index = nil
         node.method_index = nil
         node.native_method_result = nil
+        node.ending_value = nil
+        node.has_executed = false
         State.mark_as_modified()
     end
     if has_children then
@@ -124,11 +136,9 @@ function NativeStarter.render(node)
                         if group_index and method_index then
                             node.method_group_index = tonumber(group_index)
                             node.method_index = tonumber(method_index)
-                            local success_get, selected_method = pcall(function()
-                                return Nodes.get_method_by_group_and_index(type_def, 
-                                    node.method_group_index, node.method_index)
-                            end)
-                            if success_get and selected_method then
+                            
+                            local selected_method = get_method_info(type_def, node.method_group_index, node.method_index)
+                            if selected_method then
                                 node.method_name = selected_method:get_name()
                                 -- Update signature for persistence
                                 node.selected_method_signature = Nodes.get_method_signature(selected_method)
@@ -163,6 +173,8 @@ function NativeStarter.render(node)
                         node.pins.inputs = {}  -- Clear pins when no method selected
                     end
                     node.native_method_result = nil
+                    node.ending_value = nil
+                    node.has_executed = false
                     State.mark_as_modified()
                 end
                 if has_children then
@@ -185,16 +197,7 @@ function NativeStarter.render(node)
     
     if native_obj and type_def and node.method_name and node.method_name ~= "" then
         -- Get the selected method to check for parameters
-        local selected_method = nil
-        if node.method_group_index and node.method_index then
-            local success_get, method = pcall(function()
-                return Nodes.get_method_by_group_and_index(type_def, 
-                    node.method_group_index, node.method_index)
-            end)
-            if success_get and method then
-                selected_method = method
-            end
-        end
+        local selected_method = get_method_info(type_def, node.method_group_index, node.method_index)
 
         -- Handle parameters if the method has any
         local param_values = {}
@@ -281,14 +284,19 @@ function NativeStarter.render(node)
                     return sdk.call_native_func(native_obj, type_def, node.method_name)
                 end
             end)
+            
+            node.has_executed = true
+            
             if success then
                 node.native_method_result = result
+                node.ending_value = result
                 output_pin.value = result
                 node.status = "Success"
             else
                 node.native_method_result = nil
+                node.ending_value = nil
                 output_pin.value = nil
-                node.status = "Error calling method"
+                node.status = "Error: " .. tostring(result)
             end
         end
     end
@@ -296,10 +304,11 @@ function NativeStarter.render(node)
     -- Show output pin
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
-    if node.native_method_result ~= nil then
+    if node.has_executed then
+        if node.native_method_result ~= nil then
             -- Display simplified value without address
             local display_value = Utils.get_value_display_string(node.native_method_result)
-            local can_continue = type(node.native_method_result) == "userdata"
+            local can_continue, _ = Nodes.validate_continuation(node.native_method_result, nil)
             
             if can_continue then
                 local success, type_info = pcall(function() return node.native_method_result:get_type_definition() end)
@@ -322,16 +331,23 @@ function NativeStarter.render(node)
                 end
             end
         else
-            -- No result yet
-            local status_text = "Not executed"
-            local pos = Utils.get_right_cursor_pos(node.id, status_text)
+            -- Result is nil but executed
+            local display_value = "nil"
+            local pos = Utils.get_right_cursor_pos(node.id, display_value)
             imgui.set_cursor_pos(pos)
-            imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
+            imgui.text(display_value)
         end
-        imnodes.end_output_attribute()
+    else
+        -- No result yet
+        local status_text = "Not executed"
+        local pos = Utils.get_right_cursor_pos(node.id, status_text)
+        imgui.set_cursor_pos(pos)
+        imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
+    end
+    imnodes.end_output_attribute()
     imgui.spacing()
         
-
+    -- Use BaseStarter's action buttons which now use Nodes.validate_continuation internally
     BaseStarter.render_action_buttons(node)
     BaseStarter.render_debug_info(node)
     

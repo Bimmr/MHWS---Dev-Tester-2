@@ -76,7 +76,9 @@ local function render_managed_output(node, is_placeholder)
         if imgui.is_item_hovered() then
             imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
         end
-        if type(node.ending_value) == "userdata" then
+        
+        local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
+        if can_continue then
             local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Output")
             imgui.set_cursor_pos(button_pos)
             if imgui.button("+ Add Child to Output") then
@@ -127,25 +129,12 @@ local function render_argument_outputs(node, is_placeholder)
             end
         end
         
-        -- Determine if we should show the pin (can continue)
-        local can_continue = true
-        
-        -- Check if it's a terminal type using either param_type or dynamically extracted type
-        if param_full_name ~= "Unknown" and Nodes.is_terminal_type(param_full_name) then
-            can_continue = false
-        elseif not param_type and arg_value ~= nil then
-            can_continue = type(arg_value) == "userdata"
-        end
-
         -- Determine label: "Param" if it matches param_types, "Arg" if beyond param_types
         local arg_label = param_type and "Param " .. i or "Arg " .. i
         
         Nodes.add_context_menu_option(node, "Copy param type " .. i , param_full_name)
-        local arg_pos = imgui.get_cursor_pos()
         
-        if can_continue then
-            imnodes.begin_output_attribute(arg_pin.id)
-        end
+        imnodes.begin_output_attribute(arg_pin.id)
         
         imgui.text(arg_label .. " (" .. param_type_name .. "):")
         imgui.same_line()
@@ -175,7 +164,8 @@ local function render_argument_outputs(node, is_placeholder)
                     imgui.set_tooltip(tooltip_text)
                 end
                 
-                if node.hook_arg_values[i] ~= nil and type(node.hook_arg_values[i]) == "userdata" then
+                local can_continue, _ = Nodes.validate_continuation(node.hook_arg_values[i], nil)
+                if can_continue then
                     local arg_button_text = "+ Add Child to " .. arg_label
                     local arg_button_pos = Utils.get_right_cursor_pos(node.id, arg_button_text)
                     imgui.set_cursor_pos(arg_button_pos)
@@ -198,9 +188,7 @@ local function render_argument_outputs(node, is_placeholder)
             imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
         end
         
-        if can_continue then
-            imnodes.end_output_attribute()
-        end
+        imnodes.end_output_attribute()
     end
 end
 
@@ -287,7 +275,8 @@ local function render_return_info(node, is_placeholder)
                     imgui.set_tooltip(Utils.get_tooltip_for_value(node.return_value))
                 end
                 
-                if type(node.return_value) == "userdata" then
+                local can_continue, _ = Nodes.validate_continuation(node.return_value, nil)
+                if can_continue then
                     local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Return")
                     imgui.set_cursor_pos(button_pos)
                     if imgui.button("+ Add Child to Return") then
@@ -747,9 +736,7 @@ function HookStarter.initialize_hook(node)
                     type_name = param_types[i]:get_full_name()
                 end
                 
-                log.debug("Converting arg " .. i .. " of type " .. type_name .. ", value: " .. tostring(arg))
                 node.hook_arg_values[i] = convert_ptr(arg, type_name)
-                log.debug("Stored hook_arg_values[" .. i .. "] = " .. tostring(node.hook_arg_values[i]))
                 
                 -- Update arg output pin
                 local arg_pin_index = 2 + i  -- After main_output and return_output

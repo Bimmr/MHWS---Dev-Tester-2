@@ -243,8 +243,9 @@ function ArrayFollower.render(node)
     -- Update output pin value
     node.pins.outputs[1].value = result
     
-    -- Check if result is userdata (can continue to child nodes)
-    local can_continue = type(result) == "userdata"
+    local can_continue
+    can_continue, result = Nodes.validate_continuation(result, parent_value)
+    node.ending_value = result
     
     -- If result is valid, check if we should unpause child nodes
     if can_continue then
@@ -294,7 +295,7 @@ function ArrayFollower.render(node)
     imnodes.end_output_attribute()
     
     -- Action buttons
-    BaseFollower.render_action_buttons(node, type(node.ending_value) == "userdata")
+    BaseFollower.render_action_buttons(node)
 
     BaseFollower.render_debug_info(node)
     

@@ -1,6 +1,7 @@
 local State = require("DevTester2.State")
 local Utils = require("DevTester2.Utils")
 local Nodes = require("DevTester2.Nodes")
+local Constants = require("DevTester2.Constants")
 local imgui = imgui
 local imnodes = imnodes
 
@@ -17,7 +18,8 @@ function BaseStarter.render_action_buttons(node)
     end
 
     -- Only show Add Child Node if result is valid
-    if node.ending_value then
+    local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
+    if can_continue then
         imgui.same_line()
         local pos = Utils.get_right_cursor_pos(node.id, "+ Add Child Node")
         imgui.set_cursor_pos(pos)
@@ -73,7 +75,7 @@ function BaseStarter.render_debug_info(node)
     -- Position debug info in top right
     local pos_for_debug = Utils.get_top_right_cursor_pos(node.id, "[?]")
     imgui.set_cursor_pos(pos_for_debug)
-    imgui.text_colored("[?]", 0xFFDADADA)
+    imgui.text_colored("[?]", Constants.COLOR_TEXT_DEBUG)
     if imgui.is_item_hovered() then
         imgui.set_tooltip(debug_info)
     end
@@ -90,7 +92,6 @@ end
 -- ========================================
 
 function BaseStarter.create(node_type, position)
-    local Constants = require("DevTester2.Constants")
     local node_id = State.next_node_id()
 
     local node = {

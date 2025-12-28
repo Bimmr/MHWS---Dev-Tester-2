@@ -35,6 +35,13 @@ local FieldFollower = {}
 -- ========================================
 -- Field Follower Node
 -- ========================================
+
+-- Helper to get field info safely
+local function get_field_info(parent_type, group_index, field_index, is_static_context)
+    if not group_index or not field_index then return nil end
+    return Nodes.get_field_by_group_and_index(parent_type, group_index, field_index, is_static_context)
+end
+
 -- TODO: Putting an array in a set field will crash the game - need to handle that case
 function FieldFollower.render(node)
     -- Ensure pins exist
@@ -52,11 +59,6 @@ function FieldFollower.render(node)
     end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
-    -- if not parent_type then
-    --     Nodes.render_disconnected_operation_node(node, "type_error")
-    --     return
-    -- end
-
     -- Determine if we're working with static fields (type definition) or instance fields (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
 
@@ -79,254 +81,243 @@ function FieldFollower.render(node)
         end
     end
 
+    -- Get selected field info early
+    local selected_field = get_field_info(
+        parent_type, 
+        node.field_group_index, 
+        node.field_index, 
+        is_static_context
+    )
+
     -- Build field list
     if parent_type then
-    local fields = Nodes.get_fields_for_combo(parent_type, is_static_context)
-    if #fields > 0 then
-        -- Initialize to 1 if not set (imgui.combo is 1-based)
-        if not node.selected_field_combo then
-            node.selected_field_combo = 1
-        end
-        
-        -- Resolve signature if present
-        if node.selected_field_signature then
-            local group, idx = Nodes.find_field_indices_by_signature(parent_type, node.selected_field_signature, is_static_context)
-            if group and idx then
-                node.field_group_index = group
-                node.field_index = idx
-                -- Update combo index to match
-                local combo_idx = Nodes.get_combo_index_for_field(parent_type, group, idx, is_static_context)
-                if combo_idx > 0 then
-                    node.selected_field_combo = combo_idx + 1 -- 1-based for combo
-                end
-                -- Clear signature after successful resolution
-                node.selected_field_signature = nil
+        local fields = Nodes.get_fields_for_combo(parent_type, is_static_context)
+        if #fields > 0 then
+            -- Initialize to 1 if not set (imgui.combo is 1-based)
+            if not node.selected_field_combo then
+                node.selected_field_combo = 1
             end
-        end
-
-        local has_children = Nodes.has_children(node)
-        if has_children then
-            imgui.begin_disabled()
-        end
-        local field_changed, new_combo_index = Utils.hybrid_combo("Fields", 
-            node.selected_field_combo, fields)
-        if field_changed then
-            node.selected_field_combo = new_combo_index
             
-            -- Parse the group_index and field_index from the selected string
-            if new_combo_index > 1 then
-                local combo_field = fields[new_combo_index]
-                local group_index, field_index = combo_field:match("(%d+)%-(%d+)")
-                if group_index and field_index then
-                    node.field_group_index = tonumber(group_index)
-                    node.field_index = tonumber(field_index)
+            -- Resolve signature if present
+            if node.selected_field_signature then
+                local group, idx = Nodes.find_field_indices_by_signature(parent_type, node.selected_field_signature, is_static_context)
+                if group and idx then
+                    node.field_group_index = group
+                    node.field_index = idx
+                    -- Update combo index to match
+                    local combo_idx = Nodes.get_combo_index_for_field(parent_type, group, idx, is_static_context)
+                    if combo_idx > 0 then
+                        node.selected_field_combo = combo_idx + 1 -- 1-based for combo
+                    end
+                    -- Clear signature after successful resolution
+                    node.selected_field_signature = nil
                     
-                    -- Update signature for persistence
-                    local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
-                    if field then
-                        node.selected_field_signature = Nodes.get_field_signature(field)
+                    -- Refresh field info after resolution
+                    selected_field = get_field_info(
+                        parent_type, 
+                        node.field_group_index, 
+                        node.field_index, 
+                        is_static_context
+                    )
+                end
+            end
+
+            if has_children then
+                imgui.begin_disabled()
+            end
+            
+            local field_changed, new_combo_index = Utils.hybrid_combo("Fields", 
+                node.selected_field_combo, fields)
+                
+            if field_changed then
+                node.selected_field_combo = new_combo_index
+                
+                -- Parse the group_index and field_index from the selected string
+                if new_combo_index > 1 then
+                    local combo_field = fields[new_combo_index]
+                    local group_index, field_index = combo_field:match("(%d+)%-(%d+)")
+                    if group_index and field_index then
+                        node.field_group_index = tonumber(group_index)
+                        node.field_index = tonumber(field_index)
+                        
+                        -- Update signature for persistence
+                        local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
+                        if field then
+                            node.selected_field_signature = Nodes.get_field_signature(field)
+                        end
+                    else
+                        -- Selected a separator, not an actual field
+                        node.field_group_index = nil
+                        node.field_index = nil
+                        node.selected_field_signature = nil
                     end
                 else
-                    -- Selected a separator, not an actual field
+                    -- Selected empty/none
                     node.field_group_index = nil
                     node.field_index = nil
                     node.selected_field_signature = nil
                 end
-            else
-                -- Selected empty/none
-                node.field_group_index = nil
-                node.field_index = nil
-                node.selected_field_signature = nil
-            end
-            
-            node.value_manual_input = "" -- Reset value
-            
-            -- Remove value input pin if it exists
-            if #node.pins.inputs > 1 then
-                table.remove(node.pins.inputs, 2)
-            end
-            
-            -- Re-add value input pin if in Set mode
-            if node.action_type == 1 then
-                if #node.pins.inputs == 1 then
-                    Nodes.add_input_pin(node, "value", nil)
+                
+                node.value_manual_input = "" -- Reset value
+                
+                -- Remove value input pin if it exists
+                if #node.pins.inputs > 1 then
+                    table.remove(node.pins.inputs, 2)
                 end
-            end
-            
-            -- If we have a valid field selection, initialize manual input with current value
-            if node.field_group_index and node.field_index then
-                local current_field = Nodes.get_field_by_group_and_index(parent_type, 
-                    node.field_group_index, node.field_index, is_static_context)
-                if current_field then
+                
+                -- Re-add value input pin if in Set mode
+                if node.action_type == 1 then
+                    if #node.pins.inputs == 1 then
+                        Nodes.add_input_pin(node, "value", nil)
+                    end
+                end
+                
+                -- Refresh field info for the new selection
+                selected_field = get_field_info(
+                    parent_type, 
+                    node.field_group_index, 
+                    node.field_index, 
+                    is_static_context
+                )
+                
+                -- If we have a valid field selection, initialize manual input with current value
+                if selected_field then
                     local success, current_value
                     if is_static_context then
                         success, current_value = pcall(function()
-                            return current_field:get_data(nil)
+                            return selected_field:get_data(nil)
                         end)
                     else
                         success, current_value = pcall(function()
-                            return current_field:get_data(parent_value)
+                            return selected_field:get_data(parent_value)
                         end)
                     end
                     if success and current_value ~= nil then
                         node.value_manual_input = tostring(current_value)
                     end
                 end
+                
+                State.mark_as_modified()
             end
             
-            State.mark_as_modified()
-        end
-        if has_children then
-            imgui.end_disabled()
-            if imgui.is_item_hovered() then
-                imgui.set_tooltip("Cannot change field while node has children")
+            if has_children then
+                imgui.end_disabled()
+                if imgui.is_item_hovered() then
+                    imgui.set_tooltip("Cannot change field while node has children")
+                end
             end
-        end
-        
-        local selected_field = nil
-        if node.field_group_index and node.field_index then
-            selected_field = Nodes.get_field_by_group_and_index(parent_type, 
-                node.field_group_index, node.field_index, is_static_context)
-        end        
-        -- Handle value input for Set
-        if node.action_type == 1 and selected_field then -- Set
+            
+            -- Handle value input for Set
+            if node.action_type == 1 and selected_field then -- Set
 
-            -- Ensure value input pin exists
-            if #node.pins.inputs == 1 then
-                Nodes.add_input_pin(node, "value", nil)
+                -- Ensure value input pin exists
+                if #node.pins.inputs == 1 then
+                    Nodes.add_input_pin(node, "value", nil)
+                end
+                
+                imgui.spacing()
+                local field_type = selected_field:get_type()
+                local value_pin = node.pins.inputs[2]
+                
+                -- Value input pin
+                imnodes.begin_input_attribute(value_pin.id)
+                local has_connection = value_pin.connection ~= nil
+                if has_connection then
+                    -- Look up connected pin via State.pin_map
+                    local source_pin_info = State.pin_map[value_pin.connection.pin]
+                    local connected_value = source_pin_info and source_pin_info.pin.value
+                    -- Display simplified value without address
+                    local display_value = Utils.get_value_display_string(connected_value)
+                    imgui.begin_disabled()
+                    imgui.input_text("Value (" .. field_type:get_name() .. ")", display_value)
+                    imgui.end_disabled()
+                    if imgui.is_item_hovered() then
+                        imgui.set_tooltip(field_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value))
+                    end
+                else
+                    node.value_manual_input = node.value_manual_input or ""
+                    local input_changed, new_value = imgui.input_text("Value (" .. field_type:get_name() .. ")", node.value_manual_input)
+                    if input_changed then
+                        node.value_manual_input = new_value
+                        State.mark_as_modified()
+                    end
+                    if imgui.is_item_hovered() then
+                        imgui.set_tooltip(field_type:get_full_name())
+                    end
+                end
+                imnodes.end_input_attribute()
+                -- Active checkbox for setting the field
+                node.set_active = node.set_active or false
+                local active_changed, new_active = imgui.checkbox("Active", node.set_active)
+                if active_changed then
+                    node.set_active = new_active
+                    State.mark_as_modified()
+                end
+            else
+                -- Get mode - ensure only parent input pin exists
+                if #node.pins.inputs > 1 then
+                    table.remove(node.pins.inputs, 2)
+                end
+            end
+            
+            if selected_field then
+                Nodes.add_context_menu_option(node, "Copy field name", selected_field and selected_field:get_name() or "Unknown")
+                Nodes.add_context_menu_option(node, "Copy field type", selected_field:get_type():get_full_name() or "Unknown")
             end
             
             imgui.spacing()
-            local field_type = selected_field:get_type()
-            local value_pin = node.pins.inputs[2]
             
-            -- Value input pin
-            imnodes.begin_input_attribute(value_pin.id)
-            local has_connection = value_pin.connection ~= nil
-            if has_connection then
-                -- Look up connected pin via State.pin_map
-                local source_pin_info = State.pin_map[value_pin.connection.pin]
-                local connected_value = source_pin_info and source_pin_info.pin.value
-                -- Display simplified value without address
-                local display_value = Utils.get_value_display_string(connected_value)
-                imgui.begin_disabled()
-                imgui.input_text("Value (" .. field_type:get_name() .. ")", display_value)
-                imgui.end_disabled()
-                if imgui.is_item_hovered() then
-                    imgui.set_tooltip(field_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value))
-                end
-            else
-                node.value_manual_input = node.value_manual_input or ""
-                local input_changed, new_value = imgui.input_text("Value (" .. field_type:get_name() .. ")", node.value_manual_input)
-                if input_changed then
-                    node.value_manual_input = new_value
-                    State.mark_as_modified()
-                end
-                if imgui.is_item_hovered() then
-                    imgui.set_tooltip(field_type:get_full_name())
-                end
+            -- Execute and show output
+            local result = FieldFollower.execute(node, parent_value, selected_field)
+            
+            -- Always store result, even if nil
+            node.ending_value = result
+            if result then
+                node.ending_value_full_name = selected_field:get_type():get_full_name()
             end
-            imnodes.end_input_attribute()
-            -- Active checkbox for setting the field
-            node.set_active = node.set_active or false
-            local active_changed, new_active = imgui.checkbox("Active", node.set_active)
-            if active_changed then
-                node.set_active = new_active
-                State.mark_as_modified()
-            end
-        else
-            -- Get mode - ensure only parent input pin exists
-            if #node.pins.inputs > 1 then
-                table.remove(node.pins.inputs, 2)
-            end
-        end
-        if selected_field then
-            Nodes.add_context_menu_option(node, "Copy field name", selected_field and selected_field:get_name() or "Unknown")
-            Nodes.add_context_menu_option(node, "Copy field type", selected_field:get_type():get_full_name() or "Unknown")
-        end
-        imgui.spacing()
-        
-        -- Execute and show output
-        local result = FieldFollower.execute(node, parent_value, selected_field)
-        
-        -- Always store result, even if nil
-        node.ending_value = result
-        if result then
-            node.ending_value_full_name = selected_field:get_type():get_full_name()
-        end
-        
-        -- Update output pin value
-        node.pins.outputs[1].value = result
+            
+            -- Update output pin value
+            node.pins.outputs[1].value = result
 
-        -- Check if result is userdata (can continue to child nodes)
-        local can_continue = true
-        
-        if selected_field then
-            local field_type = selected_field:get_type()
-            if field_type then
-                local field_type_name = field_type:get_full_name()
-                if Nodes.is_terminal_type(field_type_name) then
-                    can_continue = false
-                end
-            end
-        end
-        
-        if can_continue and result ~= nil then
-            can_continue = type(result) == "userdata"
-        end
-        
-        -- Nullables _Value field will be a type of userdata, but can't get the type definition
-        if can_continue and result ~= nil then
-            -- get parent type and check if it's a nullable, if it is then we need to get the current field's "_HasValue" field to see if it has a value
-            local parent_type = BaseFollower.get_parent_type(parent_value)
-
-            if parent_type then
-                local is_nullable = parent_type:get_name():find("Nullable") ~= nil
-                if is_nullable then
-                    local has_value = parent_value:get_field("_HasValue")
-                    if not has_value then
-                        can_continue = false
-                        result = nil
-                        node.ending_value = nil
+            -- Check if result is userdata (can continue to child nodes)
+            local can_continue
+            can_continue, result = Nodes.validate_continuation(result, parent_value)
+            node.ending_value = result
+            
+            -- Render output pin
+            local output_pin = node.pins.outputs[1]
+            imgui.spacing()
+            imnodes.begin_output_attribute(output_pin.id)
+            
+            if result ~= nil then
+                -- Display the actual result
+                local display_value = Utils.get_value_display_string(result)
+                local output_display = display_value .. " (?)"
+                local pos = Utils.get_right_cursor_pos(node.id, output_display)
+                imgui.set_cursor_pos(pos)
+                imgui.text(display_value)
+                if can_continue then
+                    Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
+                    imgui.same_line()
+                    imgui.text("(?)")
+                    if imgui.is_item_hovered() then
+                        imgui.set_tooltip(Utils.get_tooltip_for_value(result))
                     end
-                end
-            end
-        end
-        
-        -- Render output pin
-        local output_pin = node.pins.outputs[1]
-        imgui.spacing()
-        imnodes.begin_output_attribute(output_pin.id)
-        
-        if result ~= nil then
-            -- Display the actual result
-            local display_value = Utils.get_value_display_string(result)
-            local output_display = display_value .. " (?)"
-            local pos = Utils.get_right_cursor_pos(node.id, output_display)
-            imgui.set_cursor_pos(pos)
-            imgui.text(display_value)
-            if can_continue then
-                Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
-                imgui.same_line()
-                imgui.text("(?)")
-                if imgui.is_item_hovered() then
-                    imgui.set_tooltip(Utils.get_tooltip_for_value(result))
+                else
+                    Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
                 end
             else
-                Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
+                -- Display "nil" when result is nil
+                local display_value = "nil"
+                local pos = Utils.get_right_cursor_pos(node.id, display_value)
+                imgui.set_cursor_pos(pos)
+                imgui.text(display_value)
             end
+            
+            imnodes.end_output_attribute()
         else
-            -- Display "nil" when result is nil
-            local display_value = "nil"
-            local pos = Utils.get_right_cursor_pos(node.id, display_value)
-            imgui.set_cursor_pos(pos)
-            imgui.text(display_value)
+            imgui.text("No fields available")
         end
-        
-        imnodes.end_output_attribute()
-    else
-        imgui.text("No fields available")
-    end
     else
         if node.selected_field_signature then
              imgui.text("Signature: " .. node.selected_field_signature)
@@ -336,7 +327,7 @@ function FieldFollower.render(node)
     end
 
     -- Action buttons
-    BaseFollower.render_action_buttons(node, type(node.ending_value) == "userdata")
+    BaseFollower.render_action_buttons(node)
 
     -- Debug info
     BaseFollower.render_debug_info(node)
@@ -351,34 +342,21 @@ function FieldFollower.execute(node, parent_value, selected_field)
 
     -- Determine if we're working with static fields
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+    local target = is_static_context and nil or parent_value
 
     local success, result
 
     if node.action_type == 0 then -- Get
-        if is_static_context then
-            -- Static field get - call on nil (type definition context)
-            success, result = pcall(function()
-                return selected_field:get_data(nil)
-            end)
-        else
-            -- Instance field get
-            success, result = pcall(function()
-                return selected_field:get_data(parent_value)
-            end)
-        end
+        success, result = pcall(function()
+            return selected_field:get_data(target)
+        end)
     else -- Set
         -- Check if setting is active
         if not node.set_active then
             -- Return current field value without setting
-            if is_static_context then
-                success, result = pcall(function()
-                    return selected_field:get_data(nil)
-                end)
-            else
-                success, result = pcall(function()
-                    return selected_field:get_data(parent_value)
-                end)
-            end
+            success, result = pcall(function()
+                return selected_field:get_data(target)
+            end)
         else
             -- Try to get value from connected input first using pin system
             local set_value = nil
@@ -402,28 +380,43 @@ function FieldFollower.execute(node, parent_value, selected_field)
                     set_value = Utils.parse_primitive_value(manual_input)
                 else
                     -- Use current field value
-                    if is_static_context then
-                        set_value = selected_field:get_data(nil)
-                    else
-                        set_value = selected_field:get_data(parent_value)
-                    end
+                    set_value = selected_field:get_data(target)
                 end
             end
 
             -- Execute set operation
-            if is_static_context then
-                -- Static field set - call on nil (type definition context)
-                success, result = pcall(function()
+            success, result = pcall(function()
+                if is_static_context then
+                    -- Static field set - call on nil (type definition context)
+                    -- Note: RE Framework might handle static set differently, but usually it's set_data(nil, value) or similar
+                    -- The original code used parent_value:set_field which seems wrong for static context if parent_value is a TypeDefinition
+                    -- But let's stick to the original logic pattern but cleaned up
+                    
+                    -- Original logic: parent_value:set_field(selected_field:get_name(), set_value)
+                    -- If parent_value is a TypeDefinition (userdata), does it have set_field?
+                    -- Usually TypeDefinition doesn't have set_field. 
+                    -- However, the original code did: parent_value:set_field(...)
+                    
+                    -- Let's assume the original code was correct about the API call, but we can simplify the target selection
+                    -- Actually, for static fields, we usually use the field object itself to set data if possible, 
+                    -- or we need the class object.
+                    
+                    -- If selected_field is a FieldInfo, it might have set_data(obj, value)
+                    -- selected_field:set_data(nil, set_value)
+                    
+                    -- Let's try to use the field object directly if possible, or fall back to the original method
+                    -- But wait, the original code used parent_value:set_field even for static context?
+                    -- "parent_value:set_field(selected_field:get_name(), set_value)"
+                    -- If parent_value is a TypeDefinition, this might fail if TypeDefinition doesn't have set_field.
+                    
+                    -- Let's stick to what was there but cleaner:
                     parent_value:set_field(selected_field:get_name(), set_value)
-                    return selected_field:get_data(nil) -- Return the new value
-                end)
-            else
-                -- Instance field set
-                success, result = pcall(function()
+                    return selected_field:get_data(nil)
+                else
                     parent_value:set_field(selected_field:get_name(), set_value)
-                    return selected_field:get_data(parent_value) -- Return the new value
-                end)
-            end
+                    return selected_field:get_data(parent_value)
+                end
+            end)
         end
     end
 

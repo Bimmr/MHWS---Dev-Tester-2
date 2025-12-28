@@ -248,22 +248,18 @@ function BaseFollower.render_debug_info(node)
     end
 end
 
-function BaseFollower.render_action_buttons(node, can_add_child)
+function BaseFollower.render_action_buttons(node)
     imgui.spacing()
     local pos = imgui.get_cursor_pos()
     if imgui.button("- Remove Node") then
         Nodes.remove_node(node)
     end
     
-    -- Show Add Child Node if condition is met (can_add_child can be a function or boolean)
-    local should_show_add = false
-    if type(can_add_child) == "function" then
-        should_show_add = can_add_child(node)
-    else
-        should_show_add = can_add_child
-    end
+    -- Calculate can_continue internally
+    local parent_value = Nodes.get_parent_value(node)
+    local can_continue, _ = Nodes.validate_continuation(node.ending_value, parent_value)
     
-    if should_show_add then
+    if can_continue then
         imgui.same_line()
         local display_width = imgui.calc_text_size("+ Add Child Node").x
         local node_width = imnodes.get_node_dimensions(node.id).x

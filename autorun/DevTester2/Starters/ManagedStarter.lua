@@ -109,7 +109,7 @@ function ManagedStarter.render(node)
     end
 
     imgui.spacing()
-
+    
     BaseStarter.render_action_buttons(node)
     BaseStarter.render_debug_info(node)
 

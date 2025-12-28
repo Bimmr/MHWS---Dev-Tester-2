@@ -30,6 +30,60 @@ function Nodes.is_terminal_type(type_name)
     return false
 end
 
+function Nodes.get_object_type(obj)
+    if not obj then return nil end
+    -- Check if obj is already a type definition
+    if type(obj) == "userdata" and obj.get_full_name then
+        local success, test_name = pcall(function() return obj:get_full_name() end)
+        if success and test_name then
+            return obj
+        end
+    end
+
+    -- Otherwise, try to get type definition from managed object
+    local success, obj_type = pcall(function()
+        return obj:get_type_definition()
+    end)
+
+    if not success or not obj_type then
+        return nil
+    end
+
+    return obj_type
+end
+
+function Nodes.validate_continuation(result, parent_value)
+    if result == nil then return false, nil end
+    
+    local can_continue = false
+    
+    -- Check if userdata
+    if type(result) == "userdata" then
+        can_continue = true
+        
+        -- Check terminal type
+        local success, type_def = pcall(function() return result:get_type_definition() end)
+        if success and type_def then
+            if Nodes.is_terminal_type(type_def:get_full_name()) then
+                can_continue = false
+            end
+        end
+    end
+    
+    -- Nullable check
+    if can_continue and parent_value then
+        local parent_type = Nodes.get_object_type(parent_value)
+        if parent_type and parent_type:get_name():find("Nullable") then
+             local has_value = parent_value:get_field("_HasValue")
+             if not has_value then
+                 return false, nil -- Invalid result
+             end
+        end
+    end
+    
+    return can_continue, result
+end
+
 -- ========================================
 -- Node Titlebar Color and Width Helpers
 -- ========================================
