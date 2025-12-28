@@ -157,6 +157,7 @@ function Config.serialize_node(node)
             data.is_return_overridden = node.is_return_overridden
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
+            data.action_type = node.action_type
             
             -- Generate signature
             if node.path and node.method_group_index and node.method_index then
@@ -599,7 +600,8 @@ function Config.deserialize_node(data)
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
             -- Native-specific
-            native_method_result = data.native_method_result
+            native_method_result = data.native_method_result,
+            action_type = data.action_type
         }
     elseif data.category == Constants.NODE_CATEGORY_DATA then
         node = {
