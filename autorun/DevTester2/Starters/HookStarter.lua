@@ -112,7 +112,6 @@ local function render_argument_outputs(node, is_placeholder)
         local current_pin_index = arg_pin_start_index + i - 1
         local arg_pin = node.pins.outputs[current_pin_index]
         imgui.spacing()
-        imgui.spacing()
         local param_type = node.param_types and node.param_types[i]
         local param_type_name = param_type and param_type:get_name() or "Unknown"
         local param_full_name = param_type and param_type:get_full_name() or "Unknown"
@@ -130,7 +129,13 @@ local function render_argument_outputs(node, is_placeholder)
         end
         
         -- Determine label: "Param" if it matches param_types, "Arg" if beyond param_types
-        local arg_label = param_type and "Param " .. i or "Arg " .. i
+        local is_param = param_type ~= nil
+        local arg_label = is_param and "Param " .. i or "Arg " .. i
+        if not is_param and i == (#node.param_types or 0) + 1 then
+            imgui.spacing()
+            imgui.spacing()
+            imgui.spacing()
+        end
         
         Nodes.add_context_menu_option(node, "Copy param type " .. i , param_full_name)
         
@@ -197,8 +202,7 @@ local function render_return_info(node, is_placeholder)
     -- Display return override input if it exists (only for non-void methods)
     local return_override_pin = #node.pins.inputs > 0 and node.pins.inputs[1] or nil
     if return_override_pin and (not node.return_type_name or node.return_type_name ~= "Void") then
-        imgui.spacing()
-        imgui.spacing()
+        for _=1,5 do imgui.spacing() end
         imnodes.begin_input_attribute(return_override_pin.id)
         local has_return_override_connection = return_override_pin.connection ~= nil
         local return_override_label = "Return Override"
