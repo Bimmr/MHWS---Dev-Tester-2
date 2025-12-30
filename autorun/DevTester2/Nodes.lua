@@ -52,8 +52,16 @@ function Nodes.get_object_type(obj)
     return obj_type
 end
 
-function Nodes.validate_continuation(result, parent_value)
+function Nodes.validate_continuation(result, parent_value, type_full_name)
     if result == nil then return false, nil end
+    
+    -- Attempt to fix value type if we have a type name and get_type_definition fails
+    if type_full_name and type(result) == "userdata" then
+         local success, _ = pcall(function() return result:get_type_definition() end)
+         if not success then
+             result = sdk.to_valuetype(result, type_full_name)
+         end
+    end
     
     local can_continue = false
     
@@ -74,10 +82,10 @@ function Nodes.validate_continuation(result, parent_value)
     if can_continue and parent_value then
         local parent_type = Nodes.get_object_type(parent_value)
         if parent_type and parent_type:get_name():find("Nullable") then
-             local has_value = parent_value:get_field("_HasValue")
-             if not has_value then
-                 return false, nil -- Invalid result
-             end
+            local has_value = parent_value:get_field("_HasValue")
+            if not has_value then
+                return false, nil -- Invalid result
+            end
         end
     end
     
@@ -1337,20 +1345,17 @@ function Nodes.add_context_menu_option(node, label, data)
     if not node._frame_context_options then
         node._frame_context_options = {}
     end
-    
+
     table.insert(node._frame_context_options, { label = label, data = data })
 end
 
-function Nodes.check_context_menu(node, options, force_hovered)
+function Nodes.add_context_menu_seperator(node)
     -- Accumulate options for the whole node context menu
     if not node._frame_context_options then
         node._frame_context_options = {}
     end
-    
-    -- options is an array of {label, data}
-    for _, option in ipairs(options) do
-        table.insert(node._frame_context_options, option)
-    end
+
+    table.insert(node._frame_context_options, { label = "---separator---", data = nil })
 end
 
 function Nodes.render_context_menu(node)
@@ -1365,10 +1370,21 @@ function Nodes.render_context_menu(node)
             for _, option in ipairs(node._frame_context_options) do
                 -- Display label with data preview to distinguish similar options
                 local display_label = option.label
+
+                if option.label == "---separator---" then
+                    imgui.separator()
+                    goto continue
+                end
                 
                 if imgui.menu_item(display_label) then
-                    sdk.copy_to_clipboard(tostring(option.data))
+                    if type(option.data) == "function" then
+                        option.data()
+                    else
+                        sdk.copy_to_clipboard(tostring(option.data))
+                    end
                 end
+
+                ::continue::
             end
         end
         imgui.end_popup()

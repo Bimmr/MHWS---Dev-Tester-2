@@ -738,6 +738,12 @@ function HookStarter.initialize_hook(node)
                 
                 node.hook_arg_values[i] = convert_ptr(arg, type_name)
                 
+                -- Fix value if needed
+                local _, fixed_val = Nodes.validate_continuation(node.hook_arg_values[i], nil, type_name)
+                if fixed_val ~= nil then
+                    node.hook_arg_values[i] = fixed_val
+                end
+                
                 -- Update arg output pin
                 local arg_pin_index = 2 + i  -- After main_output and return_output
                 if node.return_type_name == "Void" then
@@ -760,6 +766,12 @@ function HookStarter.initialize_hook(node)
             local ret_type = method:get_return_type()
             node.retval_vtypename = node.return_type_full_name  -- Pass the full type name for proper conversion
             node.actual_return_value = convert_ptr(retval, node.retval_vtypename)
+            
+            -- Fix value if needed
+            local _, fixed_val = Nodes.validate_continuation(node.actual_return_value, nil, node.retval_vtypename)
+            if fixed_val ~= nil then
+                node.actual_return_value = fixed_val
+            end
             
             -- Build comprehensive status string with both pre and post hook info
             local status_parts = {}

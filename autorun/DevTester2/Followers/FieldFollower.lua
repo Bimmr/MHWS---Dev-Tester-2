@@ -59,6 +59,9 @@ function FieldFollower.render(node)
     end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
+    if parent_type then
+        Nodes.add_context_menu_option(node, "Copy parent type", parent_type:get_full_name())
+    end
     -- Determine if we're working with static fields (type definition) or instance fields (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
 
@@ -276,13 +279,13 @@ function FieldFollower.render(node)
                 node.ending_value_full_name = selected_field:get_type():get_full_name()
             end
             
-            -- Update output pin value
-            node.pins.outputs[1].value = result
-
             -- Check if result is userdata (can continue to child nodes)
             local can_continue
-            can_continue, result = Nodes.validate_continuation(result, parent_value)
+            can_continue, result = Nodes.validate_continuation(result, parent_value, node.ending_value_full_name)
             node.ending_value = result
+
+            -- Update output pin value
+            node.pins.outputs[1].value = result
             
             -- Render output pin
             local output_pin = node.pins.outputs[1]
@@ -297,7 +300,8 @@ function FieldFollower.render(node)
                 imgui.set_cursor_pos(pos)
                 imgui.text(display_value)
                 if can_continue then
-                    Nodes.add_context_menu_option(node, "Copy output type", result:get_type_definition():get_full_name() or "Unknown")
+                    local result_type = nil
+                    Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
                     imgui.same_line()
                     imgui.text("(?)")
                     if imgui.is_item_hovered() then
@@ -387,29 +391,6 @@ function FieldFollower.execute(node, parent_value, selected_field)
             -- Execute set operation
             success, result = pcall(function()
                 if is_static_context then
-                    -- Static field set - call on nil (type definition context)
-                    -- Note: RE Framework might handle static set differently, but usually it's set_data(nil, value) or similar
-                    -- The original code used parent_value:set_field which seems wrong for static context if parent_value is a TypeDefinition
-                    -- But let's stick to the original logic pattern but cleaned up
-                    
-                    -- Original logic: parent_value:set_field(selected_field:get_name(), set_value)
-                    -- If parent_value is a TypeDefinition (userdata), does it have set_field?
-                    -- Usually TypeDefinition doesn't have set_field. 
-                    -- However, the original code did: parent_value:set_field(...)
-                    
-                    -- Let's assume the original code was correct about the API call, but we can simplify the target selection
-                    -- Actually, for static fields, we usually use the field object itself to set data if possible, 
-                    -- or we need the class object.
-                    
-                    -- If selected_field is a FieldInfo, it might have set_data(obj, value)
-                    -- selected_field:set_data(nil, set_value)
-                    
-                    -- Let's try to use the field object directly if possible, or fall back to the original method
-                    -- But wait, the original code used parent_value:set_field even for static context?
-                    -- "parent_value:set_field(selected_field:get_name(), set_value)"
-                    -- If parent_value is a TypeDefinition, this might fail if TypeDefinition doesn't have set_field.
-                    
-                    -- Let's stick to what was there but cleaner:
                     parent_value:set_field(selected_field:get_name(), set_value)
                     return selected_field:get_data(nil)
                 else

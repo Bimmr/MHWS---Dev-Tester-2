@@ -288,6 +288,26 @@ function NativeStarter.render(node)
             node.has_executed = true
             
             if success then
+                -- Try to get return type for validation/fixing
+                local return_type_name = nil
+                local method = nil
+                if node.method_group_index and node.method_index then
+                    method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index)
+                elseif node.method_name then
+                    method = type_def:get_method(node.method_name)
+                end
+                
+                if method then
+                    local success_ret, ret_type = pcall(function() return method:get_return_type() end)
+                    if success_ret and ret_type then
+                        return_type_name = ret_type:get_full_name()
+                    end
+                end
+
+                -- Fix result if needed
+                local _, fixed_val = Nodes.validate_continuation(result, nil, return_type_name)
+                if fixed_val ~= nil then result = fixed_val end
+
                 node.native_method_result = result
                 node.ending_value = result
                 output_pin.value = result

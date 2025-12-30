@@ -24,6 +24,7 @@ local Nodes = require("DevTester2.Nodes")
 local Utils = require("DevTester2.Utils")
 local Constants = require("DevTester2.Constants")
 local BaseFollower = require("DevTester2.Followers.BaseFollower")
+local BaseStarter = require("DevTester2.Starters.BaseStarter")
 local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
@@ -69,6 +70,10 @@ function MethodFollower.render(node)
     end
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
+    if parent_type then
+        Nodes.add_context_menu_option(node, "Copy parent type", parent_type:get_full_name())
+    end
+
     -- Determine if we're working with static methods (type definition) or instance methods (managed object)
     local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
 
@@ -363,14 +368,13 @@ function MethodFollower.render(node)
                 node.ending_value_full_name = return_type:get_full_name()
             end
             
-            -- Update output pin value
-            node.pins.outputs[1].value = result
-
-                        
             if not returns_void then
-                can_continue, result = Nodes.validate_continuation(result, parent_value)
+                can_continue, result = Nodes.validate_continuation(result, parent_value, node.ending_value_full_name)
                 node.ending_value = result
             end
+            
+            -- Update output pin value
+            node.pins.outputs[1].value = result
             
             -- Render output pin
             local output_pin = node.pins.outputs[1]
@@ -445,6 +449,15 @@ function MethodFollower.render(node)
                 imgui.text(output_text)
             end
             
+            Nodes.add_context_menu_seperator(node)
+            Nodes.add_context_menu_option(node, "Create Hook Starter for method", function()
+                    local hook = BaseStarter.create(Constants.STARTER_TYPE_HOOK)
+                    hook.path = parent_type:get_full_name()
+                    hook.method_group_index = node.method_group_index
+                    hook.method_index = node.method_index
+                    hook.method_name = selected_method:get_name()
+                end)
+
             imnodes.end_output_attribute()
         else
             imgui.text("No methods available")

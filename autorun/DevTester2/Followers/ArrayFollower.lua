@@ -69,6 +69,10 @@ function ArrayFollower.render(node)
     end
 
     local custom_title = string.format("%s [%d]", parent_value:get_type_definition():get_full_name(), display_size)
+    if parent_value:get_type_definition() then
+        Nodes.add_context_menu_option(node, "Copy parent type", parent_value:get_type_definition():get_full_name())
+    end
+
     BaseFollower.render_title_bar(node, nil, custom_title)
 
     BaseFollower.render_operation_dropdown(node, parent_value)
@@ -240,12 +244,12 @@ function ArrayFollower.render(node)
         Nodes.add_context_menu_option(node, "Copy output name", node.ending_value_full_name)
     end
     
-    -- Update output pin value
-    node.pins.outputs[1].value = result
-    
     local can_continue
     can_continue, result = Nodes.validate_continuation(result, parent_value)
     node.ending_value = result
+    
+    -- Update output pin value
+    node.pins.outputs[1].value = result
     
     -- If result is valid, check if we should unpause child nodes
     if can_continue then
