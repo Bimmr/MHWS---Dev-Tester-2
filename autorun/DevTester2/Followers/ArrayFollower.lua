@@ -52,6 +52,14 @@ function ArrayFollower.render(node)
 
     -- Verify it's an array by trying to get size
     if not Utils.is_array(parent_value) then
+        -- Clear output pins so children also see nil
+        if node.pins and node.pins.outputs then
+            for _, output_pin in ipairs(node.pins.outputs) do
+                output_pin.value = nil
+            end
+        end
+        node.ending_value = nil
+        
         node.status = "Parent is not an array"
         Nodes.render_disconnected_operation_node(node, "type_error")
         return

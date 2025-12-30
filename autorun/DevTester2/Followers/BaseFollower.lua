@@ -43,6 +43,16 @@ function BaseFollower.check_parent_connection(node)
     local parent_value = Nodes.get_parent_value(node)
 
     if parent_value == nil then
+        -- Clear output pins so children also see nil
+        if node.pins and node.pins.outputs then
+            for _, output_pin in ipairs(node.pins.outputs) do
+                output_pin.value = nil
+            end
+        end
+        
+        -- Also clear ending_value
+        node.ending_value = nil
+
         -- Check if there's actually a connection
         if not node.pins or not node.pins.inputs or #node.pins.inputs == 0 or not node.pins.inputs[1].connection then
             Nodes.render_disconnected_operation_node(node, "no_parent")
