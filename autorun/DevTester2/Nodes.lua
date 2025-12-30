@@ -26,7 +26,6 @@ function Nodes.is_terminal_type(type_name)
     if type_name == "System.Double" or type_name == "Double" then return true end
     if type_name == "System.String" or type_name == "String" then return true end
     if type_name == "System.Void" or type_name == "Void" then return true end
-    if type_name:find("System.Nullable`1") then return true end
     return false
 end
 
