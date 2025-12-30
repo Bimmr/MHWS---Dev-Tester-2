@@ -169,6 +169,8 @@ function MethodFollower.render(node)
 
                 -- Remove all parameter input pins (start from index 2, after parent)
                 while #node.pins.inputs > 1 do
+                    local pin = node.pins.inputs[2]
+                    Nodes.remove_links_for_pin(pin.id)
                     table.remove(node.pins.inputs, 2)
                 end
 
@@ -301,6 +303,7 @@ function MethodFollower.render(node)
                 end
             else -- Run mode
                 if trigger_pin then
+                    Nodes.remove_links_for_pin(trigger_pin.id)
                     table.remove(node.pins.inputs, trigger_pin_index)
                     trigger_pin = nil
                     State.mark_as_modified()

@@ -451,6 +451,21 @@ function HookStarter.render(node)
                     node.selected_method_combo, methods)
                 if method_changed then
                     node.selected_method_combo = new_combo_index
+
+                    -- Remove all output pins except the first one (main_output)
+                    while #node.pins.outputs > 1 do
+                        local pin = node.pins.outputs[2]
+                        Nodes.remove_links_for_pin(pin.id)
+                        table.remove(node.pins.outputs, 2)
+                    end
+
+                    -- Remove return override input pin if it exists
+                    while #node.pins.inputs > 0 do
+                        local pin = node.pins.inputs[1]
+                        Nodes.remove_links_for_pin(pin.id)
+                        table.remove(node.pins.inputs, 1)
+                    end
+
                     if new_combo_index > 1 then
                         local combo_method = methods[new_combo_index]
                         local group_index, method_index = combo_method:match("(%d+)%-(%d+)")
@@ -562,7 +577,11 @@ function HookStarter.render(node)
             end
         else
             -- Void method - remove return override input if exists
-            node.pins.inputs = {}
+            while #node.pins.inputs > 0 do
+                local pin = node.pins.inputs[1]
+                Nodes.remove_links_for_pin(pin.id)
+                table.remove(node.pins.inputs, 1)
+            end
         end
     end
     
