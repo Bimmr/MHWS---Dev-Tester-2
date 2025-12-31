@@ -23,7 +23,7 @@ Constants.STARTER_TYPE_MANAGED = 1
 Constants.STARTER_TYPE_HOOK = 2
 Constants.STARTER_TYPE_NATIVE = 3
 Constants.STARTER_TYPE_TYPE = 4
-Constants.STARTER_TYPE_HUNTER_CHARACTER = 5
+Constants.STARTER_TYPE_PLAYER = 5
 
 -- Data Node Types
 Constants.DATA_TYPE_ENUM = 1
@@ -85,7 +85,7 @@ Constants.NODE_COLOR_STARTER = 0xFF4CAF50               -- Green
 Constants.NODE_COLOR_STARTER_HOOK = 0xFF2196F3          -- Blue
 Constants.NODE_COLOR_STARTER_NATIVE = 0xFFFF9800        -- Orange
 Constants.NODE_COLOR_STARTER_TYPE = 0xFF9C27B0          -- Purple
-Constants.NODE_COLOR_STARTER_HUNTER_CHARACTER = 0xFF795548 -- Off Blue
+Constants.NODE_COLOR_STARTER_PLAYER = 0xFF795548 -- Off Blue
 
 Constants.NODE_COLOR_DATA = 0xFF0097A7                  -- Dark Cyan
 Constants.NODE_COLOR_DATA_ENUM = 0xFFE91E63             -- Magenta

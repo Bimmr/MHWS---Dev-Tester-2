@@ -1,4 +1,4 @@
--- HunterCharacterStarter Hook properties
+-- PlayerStarter Hook properties
 -- This node retrieves the HunterCharacter object for the player.
 --
 -- Configuration:
@@ -23,12 +23,14 @@ local imgui = imgui
 local imnodes = imnodes
 local sdk = sdk
 
-local HunterCharacterStarter = {}
+local PlayerStarter = {}
+local game = reframework:get_game_name()
+log.debug("Loading PlayerStarter for " .. game)
 
 
-function HunterCharacterStarter.render(node)
+function PlayerStarter.render(node)
 
-    node.path = "app.HunterCharacter"
+    
 
     -- Ensure output pin exists
     if #node.pins.outputs == 0 then
@@ -40,23 +42,50 @@ function HunterCharacterStarter.render(node)
     -- Logic to get HunterCharacter
     node.ending_value = nil
     node.status = "Unknown"
-    local player_manager = sdk.get_managed_singleton("app.PlayerManager")
-    if player_manager then
-        local player = player_manager:getMasterPlayerInfo()
-        if player then
-            local character = player:get_Character()
-            if character then
-                node.ending_value = character
-                node.status = "Success"
+    local player_manager = nil
+
+    -- MH WILDS
+    if game == "mhwilds" then 
+        player_manager = sdk.get_managed_singleton("app.PlayerManager")
+        node.path = "app.HunterCharacter"
+        node.process_path = "app.PlayerManager|getMasterPlayerInfo():get_Character()"
+        if player_manager then
+            local player = player_manager:getMasterPlayerInfo()
+            if player then
+                local character = player:get_Character()
+                if character then
+                    node.ending_value = character
+                    node.status = "Success"
+                else
+                    node.status = "HunterCharacter not found"
+                end
             else
-                node.status = "HunterCharacter not found"
+                node.status = "MasterPlayerInfo not found"
             end
         else
-            node.status = "MasterPlayerInfo not found"
+            node.status = "PlayerManager singleton not found"
+        end
+
+    -- MH RISE
+    elseif game == "mhrise" then 
+        player_manager = sdk.get_managed_singleton("snow.player.PlayerManager")
+        if player_manager then
+            local player = player_manager:findMasterPlayer()
+            node.path = "snow.Player.PlayerManager"
+            node.process_path = "snow.Player.PlayerManager|findMasterPlayer()"
+            if player then
+                node.ending_value = player
+                node.status = "Success"
+            else
+                node.status = "MasterPlayer not found"
+            end
+        else
+            node.status = "PlayerManager singleton not found"
         end
     else
-        node.status = "PlayerManager singleton not found"
+        node.status = "Unsupported game: " .. game
     end
+    
 
     -- Always sync output pin value with ending_value on every render
     output_pin.value = node.ending_value
@@ -64,11 +93,11 @@ function HunterCharacterStarter.render(node)
     imnodes.begin_node(node.id)
 
     imnodes.begin_node_titlebar()
-    imgui.text("Hunter Character Starter")
+    imgui.text("Player Starter")
     imnodes.end_node_titlebar()
 
     imgui.begin_disabled()
-    imgui.input_text("##Path", "app.PlayerManager|getMasterPlayerInfo():get_Character()")
+    imgui.input_text("##Path", node.process_path)
     imgui.end_disabled()
     imgui.spacing()
     imgui.spacing()
@@ -106,4 +135,4 @@ function HunterCharacterStarter.render(node)
     imnodes.end_node()
 end
 
-return HunterCharacterStarter
+return PlayerStarter

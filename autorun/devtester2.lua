@@ -15,7 +15,7 @@ local ManagedStarter = require("DevTester2.Starters.ManagedStarter")
 local HookStarter = require("DevTester2.Starters.HookStarter")
 local NativeStarter = require("DevTester2.Starters.NativeStarter")
 local TypeStarter = require("DevTester2.Starters.TypeStarter")
-local HunterCharacterStarter = require("DevTester2.Starters.HunterCharacterStarter")
+local PlayerStarter = require("DevTester2.Starters.PlayerStarter")
 local BaseData = require("DevTester2.Datas.BaseData")
 local EnumData = require("DevTester2.Datas.EnumData")
 local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
@@ -162,8 +162,8 @@ function render_starter_menu_items(position)
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Type node to get type definitions")
     end
-    if imgui.menu_item("Hunter Character") then
-        BaseStarter.create(Constants.STARTER_TYPE_HUNTER_CHARACTER, position)
+    if imgui.menu_item("Player") then
+        BaseStarter.create(Constants.STARTER_TYPE_PLAYER, position)
     end
 end
 
@@ -402,8 +402,8 @@ function render_node_editor()
                 NativeStarter.render(node)
             elseif node.type == Constants.STARTER_TYPE_TYPE then
                 TypeStarter.render(node)
-            elseif node.type == Constants.STARTER_TYPE_HUNTER_CHARACTER then
-                HunterCharacterStarter.render(node)
+            elseif node.type == Constants.STARTER_TYPE_PLAYER then
+                PlayerStarter.render(node)
             end
 
             imgui.pop_item_width()
