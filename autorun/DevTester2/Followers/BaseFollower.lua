@@ -87,6 +87,38 @@ function BaseFollower.get_parent_type(parent_value)
     return parent_type
 end
 
+function BaseFollower.handle_parent_type_change(node, parent_type)
+    if not parent_type then return end
+
+    local current_type_name = parent_type:get_full_name()
+    
+    if node.last_parent_type_name and node.last_parent_type_name ~= current_type_name then
+        -- Type changed, reset selection
+        
+        if node.type == Constants.FOLLOWER_TYPE_METHOD then
+            node.selected_method_combo = nil
+            node.method_group_index = nil
+            node.method_index = nil
+            node.param_manual_values = {}
+            
+            -- Keep first input (parent)
+            if node.pins and node.pins.inputs and #node.pins.inputs > 0 then
+                local parent_pin = node.pins.inputs[1]
+                node.pins.inputs = { parent_pin }
+            end
+            
+        elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
+            node.selected_field_combo = nil
+            node.field_group_index = nil
+            node.field_index = nil
+        elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
+            node.selected_element_index = 0
+        end
+    end
+    
+    node.last_parent_type_name = current_type_name
+end
+
 function BaseFollower.is_parent_type_definition(parent_value)
     -- Check if parent_value is already a type definition
     if type(parent_value) == "userdata" and parent_value.get_full_name then

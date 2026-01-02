@@ -70,6 +70,7 @@ function MethodFollower.render(node)
 
     local parent_type = BaseFollower.get_parent_type(parent_value)
     if parent_type then
+        BaseFollower.handle_parent_type_change(node, parent_type)
         Nodes.add_context_menu_option(node, "Copy parent type", parent_type:get_full_name())
     end
 

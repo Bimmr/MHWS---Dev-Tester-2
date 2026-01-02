@@ -78,6 +78,7 @@ function ArrayFollower.render(node)
 
     local custom_title = string.format("%s [%d]", parent_value:get_type_definition():get_full_name(), display_size)
     if parent_value:get_type_definition() then
+        BaseFollower.handle_parent_type_change(node, parent_value:get_type_definition())
         Nodes.add_context_menu_option(node, "Copy parent type", parent_value:get_type_definition():get_full_name())
     end
 
