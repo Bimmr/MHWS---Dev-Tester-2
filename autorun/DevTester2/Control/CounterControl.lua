@@ -273,7 +273,7 @@ function CounterControl.render(node)
 
     imgui.spacing()
     if imgui.button("- Remove Node") then
-        Nodes.remove_control_node(node)
+        Nodes.remove_node(node)
     end
 
     imnodes.end_node()
