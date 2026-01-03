@@ -751,7 +751,7 @@ function Config.deserialize_link(data, node_map)
     local to_pin_info = State.pin_map[data.to_pin]
     
     if to_pin_info and to_pin_info.pin then
-        -- Set the input pin's connection field
+        -- Set the input pin's connection field (overwrite, should only be one)
         to_pin_info.pin.connection = { 
             node = from_node.id, 
             pin = data.from_pin, 
@@ -760,15 +760,27 @@ function Config.deserialize_link(data, node_map)
     end
     
     if from_pin_info and from_pin_info.pin then
-        -- Add to output pin's connections array
-        if not from_pin_info.pin.connections then
+        -- Check if this connection already exists to prevent duplicates
+        local connection_exists = false
+        if from_pin_info.pin.connections then
+            for _, conn in ipairs(from_pin_info.pin.connections) do
+                if conn.node == to_node.id and conn.pin == data.to_pin then
+                    connection_exists = true
+                    break
+                end
+            end
+        else
             from_pin_info.pin.connections = {}
         end
-        table.insert(from_pin_info.pin.connections, { 
-            node = to_node.id, 
-            pin = data.to_pin, 
-            link = link.id 
-        })
+        
+        -- Only add if it doesn't already exist
+        if not connection_exists then
+            table.insert(from_pin_info.pin.connections, { 
+                node = to_node.id, 
+                pin = data.to_pin, 
+                link = link.id 
+            })
+        end
     end
     
     return link
