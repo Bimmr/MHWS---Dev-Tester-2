@@ -153,8 +153,12 @@ function ConditionControl.render(node)
         imgui.same_line()
         local source_pin_info = State.pin_map[condition_pin.connection.pin]
         local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_val = ""
+        if connected_value ~= nil then
+            display_val = tostring(connected_value)
+        end
         imgui.begin_disabled()
-        imgui.input_text("##condition_display", tostring(connected_value or ""))
+        imgui.input_text("##condition_display", display_val)
         imgui.end_disabled()
     end
     
@@ -179,8 +183,12 @@ function ConditionControl.render(node)
         imgui.same_line()
         local source_pin_info = State.pin_map[true_value_pin.connection.pin]
         local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_val = ""
+        if connected_value ~= nil then
+            display_val = tostring(connected_value)
+        end
         imgui.begin_disabled()
-        imgui.input_text("##true_display", tostring(connected_value or ""))
+        imgui.input_text("##true_display", display_val)
         imgui.end_disabled()
     end
     
@@ -203,8 +211,12 @@ function ConditionControl.render(node)
         imgui.same_line()
         local source_pin_info = State.pin_map[false_value_pin.connection.pin]
         local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_val = ""
+        if connected_value ~= nil then
+            display_val = tostring(connected_value)
+        end
         imgui.begin_disabled()
-        imgui.input_text("##false_display", tostring(connected_value or ""))
+        imgui.input_text("##false_display", display_val)
         imgui.end_disabled()
     end
     

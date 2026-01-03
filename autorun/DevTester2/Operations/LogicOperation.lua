@@ -111,8 +111,12 @@ function LogicOperation.render(node)
         -- Show connected value from source pin
         local source_pin_info = State.pin_map[input1_pin.connection.pin]
         local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_val = ""
+        if connected_value ~= nil then
+            display_val = tostring(connected_value)
+        end
         imgui.begin_disabled()
-        imgui.input_text("##input1", tostring(connected_value or ""))
+        imgui.input_text("##input1", display_val)
         imgui.end_disabled()
     end
 
@@ -134,8 +138,12 @@ function LogicOperation.render(node)
         -- Show connected value from source pin
         local source_pin_info = State.pin_map[input2_pin.connection.pin]
         local connected_value = source_pin_info and source_pin_info.pin.value
+        local display_val = ""
+        if connected_value ~= nil then
+            display_val = tostring(connected_value)
+        end
         imgui.begin_disabled()
-        imgui.input_text("##input2", tostring(connected_value or ""))
+        imgui.input_text("##input2", display_val)
         imgui.end_disabled()
     end
 

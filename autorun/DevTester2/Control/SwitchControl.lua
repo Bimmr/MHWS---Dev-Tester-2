@@ -364,8 +364,12 @@ function SwitchControl.render(node)
             -- Look up connected pin via State.pin_map
             local source_pin_info = State.pin_map[switch_pin.connection.pin]
             local connected_value = source_pin_info and source_pin_info.pin.value
+            local display_val = ""
+            if connected_value ~= nil then
+                display_val = tostring(connected_value)
+            end
             imgui.begin_disabled()
-            imgui.input_text("##switch_input", tostring(connected_value or ""))
+            imgui.input_text("##switch_input", display_val)
             imgui.end_disabled()
         end
     end
@@ -406,8 +410,12 @@ function SwitchControl.render(node)
                 -- Look up connected pin via State.pin_map
                 local source_pin_info = State.pin_map[case_pin.connection.pin]
                 local connected_value = source_pin_info and source_pin_info.pin.value
+                local display_val = ""
+                if connected_value ~= nil then
+                    display_val = tostring(connected_value)
+                end
                 imgui.begin_disabled()
-                imgui.input_text("##case_" .. i, tostring(connected_value or ""))
+                imgui.input_text("##case_" .. i, display_val)
                 imgui.end_disabled()
             end
 
@@ -438,8 +446,12 @@ function SwitchControl.render(node)
                 -- Look up connected pin via State.pin_map
                 local source_pin_info = State.pin_map[value_pin.connection.pin]
                 local connected_value = source_pin_info and source_pin_info.pin.value
+                local display_val = ""
+                if connected_value ~= nil then
+                    display_val = tostring(connected_value)
+                end
                 imgui.begin_disabled()
-                imgui.input_text("##val_" .. i, tostring(connected_value or ""))
+                imgui.input_text("##val_" .. i, display_val)
                 imgui.end_disabled()
             end
             
@@ -484,8 +496,12 @@ function SwitchControl.render(node)
             -- Look up connected pin via State.pin_map
             local source_pin_info = State.pin_map[else_pin.connection.pin]
             local connected_value = source_pin_info and source_pin_info.pin.value
+            local display_val = ""
+            if connected_value ~= nil then
+                display_val = tostring(connected_value)
+            end
             imgui.begin_disabled()
-            imgui.input_text("##else", tostring(connected_value or ""))
+            imgui.input_text("##else", display_val)
             imgui.end_disabled()
         end
     end
