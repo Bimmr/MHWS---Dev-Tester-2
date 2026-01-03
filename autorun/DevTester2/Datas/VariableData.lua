@@ -144,7 +144,7 @@ function VariableData.render(node)
         -- Neutral mode: Show input and output
         imnodes.begin_input_attribute(input_pin.id)
         
-        local display_value = tostring(node.ending_value or "nil")
+        local display_value = node.ending_value ~= nil and tostring(node.ending_value) or "nil"
         imgui.begin_disabled()
         imgui.input_text("Value", display_value)
         if imgui.is_item_hovered(1024) and tooltip_text then
@@ -162,7 +162,7 @@ function VariableData.render(node)
     elseif get_mode then
         -- Get mode: Show output only
         imnodes.begin_output_attribute(output_pin.id)
-        local display_value = tostring(current_value or "nil")
+        local display_value = current_value ~= nil and tostring(current_value) or "nil"
         imgui.begin_disabled()
         imgui.input_text("Value", display_value)
         if imgui.is_item_hovered(1024) and tooltip_text then
@@ -299,12 +299,12 @@ function VariableData.execute(node)
     end
     
     -- Fallback to legacy connection check for nodes not yet migrated
-    if not input_value and node.input_connection then
+    if input_value == nil and node.input_connection then
         local connected_node = Nodes.find_node_by_id(node.input_connection)
         if connected_node and connected_node.ending_value ~= nil then
             input_value = connected_node.ending_value
         end
-    elseif not input_value and node.input_manual_value and node.input_manual_value ~= "" then
+    elseif input_value == nil and node.input_manual_value and node.input_manual_value ~= "" then
         -- Use manual input value if no connection
         input_value = Utils.parse_primitive_value(node.input_manual_value)
     end
