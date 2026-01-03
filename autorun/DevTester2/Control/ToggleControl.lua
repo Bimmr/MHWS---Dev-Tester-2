@@ -63,7 +63,12 @@ function ToggleControl.execute(node)
         result = input_value
         node.status = "Enabled"
     else
-        result = nil
+        -- Special case: if manual input is "true", output false instead of nil
+        if not input_pin.connection and input_value == "true" then
+            result = false
+        else
+            result = nil
+        end
         node.status = "Disabled"
     end
 
