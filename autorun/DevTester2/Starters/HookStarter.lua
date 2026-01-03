@@ -15,9 +15,10 @@
 --
 -- Pins:
 -- - pins.inputs[1]: "return_override" - Optional return override input (only for non-void methods)
--- - pins.outputs[1]: "main_output" - The object instance (this)
--- - pins.outputs[2]: "return_output" - The method return value (only if not void)
--- - pins.outputs[2+ or 3+]: "arg_N" - Dynamic argument outputs (starts at 2 for void, 3 for non-void)
+-- - pins.outputs[1]: "was_called" - Boolean signal indicating hook was called (PRE or POST mode)
+-- - pins.outputs[2]: "main_output" - The object instance (this)
+-- - pins.outputs[3]: "return_output" - The method return value (only if not void)
+-- - pins.outputs[3+ or 4+]: "arg_N" - Dynamic argument outputs (starts at 3 for void, 4 for non-void)
 --
 -- Return Override:
 -- - return_override_manual: String - Manual text input for return override value
@@ -52,9 +53,9 @@ local HookStarter = {}
 
 -- Render the managed object output attribute
 local function render_managed_output(node, is_placeholder)
-    -- Get main output pin (always index 1)
-    if #node.pins.outputs == 0 then return end
-    local main_output_pin = node.pins.outputs[1]
+    -- Get main output pin (always index 2)
+    if #node.pins.outputs < 2 then return end
+    local main_output_pin = node.pins.outputs[2]
     
     imgui.spacing()
     imnodes.begin_output_attribute(main_output_pin.id)
@@ -99,10 +100,10 @@ end
 
 -- Render all argument output attributes
 local function render_argument_outputs(node, is_placeholder)
-    -- Get arg output pins (start at index 3, after main_output and return_output)
-    local arg_pin_start_index = 3
+    -- Get arg output pins (start at index 4, after was_called, main_output and return_output)
+    local arg_pin_start_index = 4
     if node.return_type_name == "Void" then
-        arg_pin_start_index = 2
+        arg_pin_start_index = 3
     end
     local num_arg_pins = #node.pins.outputs - (arg_pin_start_index - 1)
     
@@ -231,8 +232,8 @@ local function render_return_info(node, is_placeholder)
     end
     
     -- Display return type info
-    -- Get return output pin (always index 2 if exists)
-    local return_output_pin = #node.pins.outputs >= 2 and node.pins.outputs[2] or nil
+    -- Get return output pin (always index 3 if exists)
+    local return_output_pin = #node.pins.outputs >= 3 and node.pins.outputs[3] or nil
     
     if is_placeholder then
         -- Show return info for placeholder state
@@ -299,6 +300,59 @@ local function render_return_info(node, is_placeholder)
     end
 end
 
+local function render_was_called_output(node, is_placeholder)
+    -- Get "Was Called" pin (always the first one)
+    if #node.pins.outputs < 1 then return end
+    
+    local pin = node.pins.outputs[1]
+    
+    imgui.spacing()
+    imnodes.begin_output_attribute(pin.id)
+    
+    -- Ensure mode is set
+    if not node.was_called_mode then node.was_called_mode = "PRE" end
+    
+    -- Update pin value based on dirty flags
+    local was_called = false
+    if node.was_called_mode == "PRE" then
+        was_called = node.was_called_pre_dirty or false
+        node.was_called_pre_dirty = false -- Reset
+    else
+        was_called = node.was_called_post_dirty or false
+        node.was_called_post_dirty = false -- Reset
+    end
+    
+    -- Set pin value
+    pin.value = was_called
+    
+    -- Toggle button
+    if imgui.button("Was Called (" .. node.was_called_mode .. ")") then
+        if node.was_called_mode == "PRE" then
+            node.was_called_mode = "POST"
+        else
+            node.was_called_mode = "PRE"
+        end
+        State.mark_as_modified()
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Click to toggle between Pre/Post for the Was Called pin")
+    end
+    
+    -- Visual indicator
+    imgui.same_line()
+    local status_text = was_called and "TRUE" or "FALSE"
+    local pos = Utils.get_right_cursor_pos(node.id, status_text)
+    imgui.set_cursor_pos(pos)
+    
+    if was_called then
+        imgui.text_colored("TRUE", 0xFF00FF00)
+    else
+        imgui.text_colored("FALSE", 0xFF888888)
+    end
+    
+    imnodes.end_output_attribute()
+end
+
 local function convert_ptr(arg, td_name)
 	-- 1. Try to convert to managed object first
 	local success, mobj = pcall(function() return sdk.to_managed_object(arg) end)
@@ -361,15 +415,18 @@ local function convert_ptr(arg, td_name)
 end
 
 function HookStarter.render(node)
-    -- Ensure output pin exists and is synced with ending_value
+    -- Ensure output pins exist
     if #node.pins.outputs == 0 then
-        Nodes.add_output_pin(node, "output", nil)
+        Nodes.add_output_pin(node, "was_called", nil)
+    end
+    if #node.pins.outputs == 1 then
+        Nodes.add_output_pin(node, "main_output", nil)
     end
     
-    local output_pin = node.pins.outputs[1]
+    local main_output_pin = node.pins.outputs[2]
     
-    -- Always sync output pin value with ending_value on every render
-    output_pin.value = node.ending_value
+    -- Always sync main output pin value with ending_value on every render
+    main_output_pin.value = node.ending_value
 
     imnodes.begin_node(node.id)
 
@@ -452,11 +509,11 @@ function HookStarter.render(node)
                 if method_changed then
                     node.selected_method_combo = new_combo_index
 
-                    -- Remove all output pins except the first one (main_output)
-                    while #node.pins.outputs > 1 do
-                        local pin = node.pins.outputs[2]
+                    -- Remove all output pins except the first two (was_called and main_output)
+                    while #node.pins.outputs > 2 do
+                        local pin = node.pins.outputs[3]
                         Nodes.remove_links_for_pin(pin.id)
-                        table.remove(node.pins.outputs, 2)
+                        table.remove(node.pins.outputs, 3)
                     end
 
                     -- Remove return override input pin if it exists
@@ -539,8 +596,8 @@ function HookStarter.render(node)
         local method = sdk.find_type_definition(node.path):get_method(node.method_name)
         Nodes.add_context_menu_option(node, "Copy method name", Nodes.get_method_signature(method, true))
 
-        -- Calculate required pins: main_output, return_output (if non-void), arg outputs
-        local required_outputs = 1  -- main_output always exists
+        -- Calculate required pins: was_called, main_output, return_output (if non-void), arg outputs
+        local required_outputs = 2  -- was_called and main_output always exist
         if node.return_type_name and node.return_type_name ~= "Void" then
             required_outputs = required_outputs + 1  -- return_output
         end
@@ -557,14 +614,16 @@ function HookStarter.render(node)
         while #node.pins.outputs < required_outputs do
             local pin_index = #node.pins.outputs + 1
             if pin_index == 1 then
+                Nodes.add_output_pin(node, "was_called", nil)
+            elseif pin_index == 2 then
                 Nodes.add_output_pin(node, "main_output", nil)
-            elseif pin_index == 2 and node.return_type_name and node.return_type_name ~= "Void" then
+            elseif pin_index == 3 and node.return_type_name and node.return_type_name ~= "Void" then
                 Nodes.add_output_pin(node, "return_output", nil)
             else
                 -- Arg output pins
-                local arg_num = pin_index - 2
+                local arg_num = pin_index - 3
                 if node.return_type_name == "Void" then
-                    arg_num = pin_index - 1
+                    arg_num = pin_index - 2
                 end
                 Nodes.add_output_pin(node, "arg_" .. (arg_num - 1), nil)
             end
@@ -631,6 +690,7 @@ function HookStarter.render(node)
     -- Display placeholder attributes if they exist (created during config loading for nodes with children)
     -- This allows follower nodes to reconnect properly when loading from config
     if #node.pins.outputs > 0 then
+        render_was_called_output(node, true)
         render_managed_output(node, true)
         render_argument_outputs(node, true)
         render_return_info(node, true)
@@ -652,6 +712,10 @@ function HookStarter.render(node)
         local pos = Utils.get_right_cursor_pos(node.id, "Last call: " .. time_since_call)
         imgui.set_cursor_pos(pos)
         imgui.text("Last call: " .. time_since_call)
+        imgui.spacing()
+        
+        render_was_called_output(node, false)
+        
         imgui.spacing()
         imgui.spacing()
         
@@ -704,6 +768,11 @@ function HookStarter.initialize_hook(node)
     node.return_value = nil  -- Initialize return value
     node.actual_return_value = nil  -- Initialize actual return value
     node.is_return_overridden = false  -- Initialize override flag
+    
+    -- Initialize dirty flags for "Was Called" pin
+    node.was_called_pre_dirty = false
+    node.was_called_post_dirty = false
+    
     local param_types = {}
     local success_params, method_param_types = pcall(function() return method:get_param_types() end)
     if success_params and method_param_types then
@@ -728,6 +797,7 @@ function HookStarter.initialize_hook(node)
             end
             
             node.last_hook_time = os.clock()
+            node.was_called_pre_dirty = true
             
             -- Determine argument offset and 'this' value
             local arg_offset = node.is_static and 2 or 3
@@ -739,9 +809,9 @@ function HookStarter.initialize_hook(node)
             
             if managed or node.is_static then
                 node.ending_value = managed
-                -- Update main output pin (index 1)
-                if #node.pins.outputs >= 1 then
-                    node.pins.outputs[1].value = managed
+                -- Update main output pin (index 2)
+                if #node.pins.outputs >= 2 then
+                    node.pins.outputs[2].value = managed
                 end
                 -- Store pre-hook info for combined status
                 node.pre_hook_info = node.pre_hook_result == "SKIP_ORIGINAL" and "skipping original" or "calling original"
@@ -768,9 +838,9 @@ function HookStarter.initialize_hook(node)
                 end
                 
                 -- Update arg output pin
-                local arg_pin_index = 2 + i  -- After main_output and return_output
+                local arg_pin_index = 3 + i  -- After was_called, main_output and return_output
                 if node.return_type_name == "Void" then
-                    arg_pin_index = 1 + i  -- No return_output for void
+                    arg_pin_index = 2 + i  -- No return_output for void
                 end
                 if #node.pins.outputs >= arg_pin_index then
                     node.pins.outputs[arg_pin_index].value = node.hook_arg_values[i]
@@ -784,6 +854,8 @@ function HookStarter.initialize_hook(node)
             if not State.node_map[node.id] then
                 return retval  -- Return original value unchanged
             end
+            node.was_called_post_dirty = true
+            
             
             -- Convert return value to proper type if possible
             local ret_type = method:get_return_type()
@@ -822,9 +894,9 @@ function HookStarter.initialize_hook(node)
                 node.is_return_overridden = false
             end
             
-            -- Update return output pin (index 2, if exists and non-void)
-            if node.return_type_name and node.return_type_name ~= "Void" and #node.pins.outputs >= 2 then
-                node.pins.outputs[2].value = node.return_value
+            -- Update return output pin (index 3, if exists and non-void)
+            if node.return_type_name and node.return_type_name ~= "Void" and #node.pins.outputs >= 3 then
+                node.pins.outputs[3].value = node.return_value
             end
             
             node.status = "Hook: " .. table.concat(status_parts, ", ")
