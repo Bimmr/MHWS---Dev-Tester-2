@@ -250,16 +250,71 @@ function FieldFollower.render(node)
                     end
                 end
                 imnodes.end_input_attribute()
+                
+                -- Manage Active Trigger Pin
+                local trigger_pin_name = "active_trigger"
+                local trigger_pin = nil
+                local trigger_pin_index = nil
+                
+                for i, pin in ipairs(node.pins.inputs) do
+                    if pin.name == trigger_pin_name then
+                        trigger_pin = pin
+                        trigger_pin_index = i
+                        break
+                    end
+                end
+
+                if not trigger_pin then
+                    Nodes.add_input_pin(node, trigger_pin_name, nil)
+                    trigger_pin = node.pins.inputs[#node.pins.inputs]
+                else
+                    -- Ensure it is at the end
+                    if trigger_pin_index ~= #node.pins.inputs then
+                        table.remove(node.pins.inputs, trigger_pin_index)
+                        table.insert(node.pins.inputs, trigger_pin)
+                    end
+                end
+
+                -- Check trigger pin status
+                local triggered_by_pin = false
+                if trigger_pin and trigger_pin.connection then
+                    local source = State.pin_map[trigger_pin.connection.pin]
+                    if source then
+                        -- Update node state based on pin value (truthy check)
+                        node.set_active = source.pin.value and true or false
+                        triggered_by_pin = true
+                    end
+                end
+
                 -- Active checkbox for setting the field
+                imnodes.begin_input_attribute(trigger_pin.id)
+                
                 node.set_active = node.set_active or false
+                
+                local checkbox_disabled = triggered_by_pin
+                if checkbox_disabled then
+                    imgui.begin_disabled()
+                end
+
                 local active_changed, new_active = imgui.checkbox("Active", node.set_active)
                 if active_changed then
                     node.set_active = new_active
                     State.mark_as_modified()
                 end
+                
+                if checkbox_disabled then
+                    imgui.end_disabled()
+                    if imgui.is_item_hovered() then
+                        imgui.set_tooltip("Controlled by input pin")
+                    end
+                end
+
+                imnodes.end_input_attribute()
             else
                 -- Get mode - ensure only parent input pin exists
-                if #node.pins.inputs > 1 then
+                while #node.pins.inputs > 1 do
+                    local pin = node.pins.inputs[2]
+                    Nodes.remove_links_for_pin(pin.id)
                     table.remove(node.pins.inputs, 2)
                 end
             end
