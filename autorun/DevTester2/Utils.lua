@@ -890,4 +890,48 @@ function Utils.generate_enum(typename)
     return enum
 end
 
+-- ========================================
+-- Table Utilities
+-- ========================================
+
+function Utils.get_sorted_keys(t)
+    local keys = {}
+    for k in pairs(t) do
+        table.insert(keys, k)
+    end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    return keys
+end
+
+function Utils.pretty_print_pins(pins)
+    local str = ""
+    if pins.inputs then
+        str = str .. "\n  Inputs:"
+        for _, pin in ipairs(pins.inputs) do
+            str = str .. "\n    { id: " .. tostring(pin.id) .. ", name: \"" .. tostring(pin.name) .. "\""
+            if pin.connection then
+                 str = str .. ", connection: " .. tostring(pin.connection)
+            end
+            str = str .. " }"
+        end
+    end
+    if pins.outputs then
+        str = str .. "\n  Outputs:"
+        for _, pin in ipairs(pins.outputs) do
+             str = str .. "\n    { id: " .. tostring(pin.id) .. ", name: \"" .. tostring(pin.name) .. "\""
+             if pin.connections and #pin.connections > 0 then
+                 str = str .. ", connections: ["
+                 for _, conn in ipairs(pin.connections) do
+                     str = str .. "\n      { node: " .. tostring(conn.node) .. ", pin: " .. tostring(conn.pin) .. ", link: " .. tostring(conn.link) .. " },"
+                 end
+                 str = str .. "\n    ]"
+             else
+                 str = str .. ", connections: []"
+             end
+             str = str .. " }"
+        end
+    end
+    return str
+end
+
 return Utils

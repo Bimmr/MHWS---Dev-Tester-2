@@ -37,21 +37,20 @@ end
 
 function BaseUtility.render_debug_info(node)
     local holding_ctrl = imgui.is_key_down(imgui.ImGuiKey.Key_LeftCtrl) or imgui.is_key_down(imgui.ImGuiKey.Key_RightCtrl)
-    local debug_info = string.format("Status: %s", tostring(node.status or "None"))
+    local debug_info = ""
     if holding_ctrl then
-        debug_info = debug_info .. string.format(
-            "\n\nNode ID: %s\nText: %s",
-            tostring(node.id),
-            tostring(node.text or "")
-        )
 
-        debug_info = debug_info .. "\n\n-- All Node Info --"
+        debug_info = debug_info .. "-- All Node Info --"
         -- Collect all node information for debugging and display
-        for key, value in pairs(node) do
+        local keys = Utils.get_sorted_keys(node)
+        for _, key in ipairs(keys) do
+            local value = node[key]
             if tostring(key):sub(1,1) == "_" then
                 goto continue
             end
-            if type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
+            if key == "pins" and type(value) == "table" then
+                value = Utils.pretty_print_pins(value)
+            elseif type(value) == "string" or type(value) == "number" or type(value) == "boolean" then
                 value = tostring(value)
             elseif type(value) == "table" then
                 value = json.dump_string(value)
@@ -61,6 +60,8 @@ function BaseUtility.render_debug_info(node)
             end
             ::continue::
         end
+    else
+        debug_info = string.format("Status: %s", tostring(node.status or "None"))
     end
 
     -- Position debug info in top right
