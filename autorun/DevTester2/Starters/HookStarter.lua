@@ -363,9 +363,6 @@ end
 local function convert_ptr(arg, td_name)
 	-- 1. Try to convert to managed object first
 	local success, mobj = pcall(function() return sdk.to_managed_object(arg) end)
-	if success and mobj then
-		return mobj:add_ref()
-	end
 
 	local output
 	-- 2. Fallback to basic conversions
