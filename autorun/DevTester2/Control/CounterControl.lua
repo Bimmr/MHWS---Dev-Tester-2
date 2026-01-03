@@ -90,7 +90,7 @@ function CounterControl.execute(node)
     -- Handle restart - only when triggered AND counter reached max
     if should_restart and node.current_count >= max_count then
         node.current_count = 0
-        node.last_increment_time = nil -- Reset timing
+        node.last_increment_time = os.clock() * 1000 -- Start delay timer from restart
         node.status = "Restarted"
         node.restart_triggered = false -- Reset manual trigger
     elseif is_active then
@@ -222,9 +222,6 @@ function CounterControl.render(node)
             node.delay_ms = num_delay
             State.mark_as_modified()
         end
-    end
-    if imgui.is_item_hovered() then
-        imgui.set_tooltip("Delay in milliseconds between counter increments.\nManual input only - cannot be linked to other nodes.")
     end
 
     -- Update output pin value
