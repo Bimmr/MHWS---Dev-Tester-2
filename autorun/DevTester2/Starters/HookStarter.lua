@@ -363,9 +363,14 @@ end
 local function convert_ptr(arg, td_name)
 	-- 1. Try to convert to managed object first
 	local success, mobj = pcall(function() return sdk.to_managed_object(arg) end)
+	
+	-- If we successfully got a managed object, return it
+	if success and mobj and type(mobj) == "userdata" then
+		return mobj
+	end
 
 	local output
-	-- 2. Fallback to basic conversions
+	-- 2. Fallback to basic conversions for primitive types
 	if td_name == "System.Single" or td_name == "Single" then
 		output = sdk.to_float(arg)
 	elseif td_name == "System.Double" or td_name == "Double" then
