@@ -148,6 +148,8 @@ Constants.COLOR_BUTTON_HOVER = 0xFFFA9642  -- Button hover color
 Constants.COLOR_TEXT_WARNING = 0xFF27C2F5   -- Yellow
 Constants.COLOR_TEXT_ERROR = 0xFF0000FF     -- Red
 Constants.COLOR_TEXT_DEBUG = 0xFFDADADA     -- Light Gray
+Constants.COLOR_TEXT_SUCCESS = 0xFF00FF00   -- Green
+Constants.COLOR_TEXT_DARK_GRAY = 0xFF888888 -- Dark Gray
 
 -- ========================================
 -- Color Brightening Factors
