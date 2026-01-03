@@ -88,7 +88,7 @@ local function render_managed_output(node, is_placeholder)
             local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Output")
             imgui.set_cursor_pos(button_pos)
             if imgui.button("+ Add Child to Output") then
-                Nodes.add_child_node(node)
+                Nodes.add_child_node_to_return(node, 2)
             end
             imgui.spacing()
         end
@@ -290,7 +290,7 @@ local function render_return_info(node, is_placeholder)
                     local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Return")
                     imgui.set_cursor_pos(button_pos)
                     if imgui.button("+ Add Child to Return") then
-                        Nodes.add_child_node_to_return(node, 2)
+                        Nodes.add_child_node_to_return(node, 3)
                     end
                 end
             else
