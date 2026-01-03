@@ -57,6 +57,9 @@ local function render_managed_output(node, is_placeholder)
     if #node.pins.outputs < 2 then return end
     local main_output_pin = node.pins.outputs[2]
     
+    -- Hide when initialized (reduce visual noise, but pin still exists for connections)
+    if not node.is_initialized then return end
+    
     imgui.spacing()
     imnodes.begin_output_attribute(main_output_pin.id)
     imgui.text("Managed (this):")
@@ -74,6 +77,8 @@ local function render_managed_output(node, is_placeholder)
         local pos = Utils.get_right_cursor_pos(node.id, display)
         imgui.set_cursor_pos(pos)
         imgui.text(display_value)
+        imgui.same_line()
+        imgui.text("(?)")
         if imgui.is_item_hovered() then
             imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
         end
@@ -200,9 +205,9 @@ end
 
 -- Render return information (handles void vs non-void)
 local function render_return_info(node, is_placeholder)
-    -- Display return override input if it exists (only for non-void methods)
+    -- Display return override input if it exists (only for non-void methods and initialized)
     local return_override_pin = #node.pins.inputs > 0 and node.pins.inputs[1] or nil
-    if return_override_pin and (not node.return_type_name or node.return_type_name ~= "Void") then
+    if return_override_pin and (not node.return_type_name or node.return_type_name ~= "Void") and node.is_initialized then
         for _=1,5 do imgui.spacing() end
         imnodes.begin_input_attribute(return_override_pin.id)
         local has_return_override_connection = return_override_pin.connection ~= nil
@@ -307,50 +312,52 @@ local function render_was_called_output(node, is_placeholder)
     local pin = node.pins.outputs[1]
     
     imgui.spacing()
-    imnodes.begin_output_attribute(pin.id)
+    if node.is_initialized then
+        imnodes.begin_output_attribute(pin.id)
     
-    -- Ensure mode is set
-    if not node.was_called_mode then node.was_called_mode = "PRE" end
-    
-    -- Update pin value based on dirty flags
-    local was_called = false
-    if node.was_called_mode == "PRE" then
-        was_called = node.was_called_pre_dirty or false
-        node.was_called_pre_dirty = false -- Reset
-    else
-        was_called = node.was_called_post_dirty or false
-        node.was_called_post_dirty = false -- Reset
-    end
-    
-    -- Set pin value
-    pin.value = was_called
-    
-    -- Toggle button
-    if imgui.button("Was Called (" .. node.was_called_mode .. ")") then
+        -- Ensure mode is set
+        if not node.was_called_mode then node.was_called_mode = "PRE" end
+        
+        -- Update pin value based on dirty flags
+        local was_called = false
         if node.was_called_mode == "PRE" then
-            node.was_called_mode = "POST"
+            was_called = node.was_called_pre_dirty or false
+            node.was_called_pre_dirty = false -- Reset
         else
-            node.was_called_mode = "PRE"
+            was_called = node.was_called_post_dirty or false
+            node.was_called_post_dirty = false -- Reset
         end
-        State.mark_as_modified()
+        
+        -- Set pin value
+        pin.value = was_called
+        
+        -- Toggle button
+        if imgui.button("Was Called (" .. node.was_called_mode .. ")") then
+            if node.was_called_mode == "PRE" then
+                node.was_called_mode = "POST"
+            else
+                node.was_called_mode = "PRE"
+            end
+            State.mark_as_modified()
+        end
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("Click to toggle between Pre/Post for the Was Called pin")
+        end
+        
+        -- Visual indicator
+        imgui.same_line()
+        local status_text = was_called and "TRUE" or "FALSE"
+        local pos = Utils.get_right_cursor_pos(node.id, status_text)
+        imgui.set_cursor_pos(pos)
+        
+        if was_called then
+            imgui.text_colored("TRUE", Constants.COLOR_TEXT_SUCCESS)
+        else
+            imgui.text_colored("FALSE", Constants.COLOR_TEXT_DARK_GRAY)
+        end
+        
+        imnodes.end_output_attribute()
     end
-    if imgui.is_item_hovered() then
-        imgui.set_tooltip("Click to toggle between Pre/Post for the Was Called pin")
-    end
-    
-    -- Visual indicator
-    imgui.same_line()
-    local status_text = was_called and "TRUE" or "FALSE"
-    local pos = Utils.get_right_cursor_pos(node.id, status_text)
-    imgui.set_cursor_pos(pos)
-    
-    if was_called then
-        imgui.text_colored("TRUE", 0xFF00FF00)
-    else
-        imgui.text_colored("FALSE", 0xFF888888)
-    end
-    
-    imnodes.end_output_attribute()
 end
 
 local function convert_ptr(arg, td_name)
