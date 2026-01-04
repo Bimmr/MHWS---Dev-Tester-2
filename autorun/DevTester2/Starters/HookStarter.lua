@@ -15,7 +15,7 @@
 --
 -- Pins:
 -- - pins.inputs[1]: "return_override" - Optional return override input (only for non-void methods)
--- - pins.outputs[1]: "was_called" - Boolean signal indicating hook was called (PRE or POST mode)
+-- - pins.outputs[1]: "was_called" - Boolean signal that pulses true for one frame when PRE hook fires
 -- - pins.outputs[2]: "main_output" - The object instance (this)
 -- - pins.outputs[3]: "return_output" - The method return value (only if not void)
 -- - pins.outputs[3+ or 4+]: "arg_N" - Dynamic argument outputs (starts at 3 for void, 4 for non-void)
@@ -314,35 +314,16 @@ local function render_was_called_output(node, is_placeholder)
     imgui.spacing()
     if node.is_initialized then
         imnodes.begin_output_attribute(pin.id)
-    
-        -- Ensure mode is set
-        if not node.was_called_mode then node.was_called_mode = "PRE" end
         
-        -- Update pin value based on dirty flags
-        local was_called = false
-        if node.was_called_mode == "PRE" then
-            was_called = node.was_called_pre_dirty or false
-            node.was_called_pre_dirty = false -- Reset
-        else
-            was_called = node.was_called_post_dirty or false
-            node.was_called_post_dirty = false -- Reset
-        end
+        -- Update pin value based on dirty flag
+        local was_called = node.was_called_dirty or false
+        node.was_called_dirty = false -- Reset
         
         -- Set pin value
         pin.value = was_called
         
-        -- Toggle button
-        if imgui.button("Was Called (" .. node.was_called_mode .. ")") then
-            if node.was_called_mode == "PRE" then
-                node.was_called_mode = "POST"
-            else
-                node.was_called_mode = "PRE"
-            end
-            State.mark_as_modified()
-        end
-        if imgui.is_item_hovered() then
-            imgui.set_tooltip("Click to toggle between Pre/Post for the Was Called pin")
-        end
+        -- Label
+        imgui.text("Was Called")
         
         -- Visual indicator
         imgui.same_line()
@@ -778,9 +759,8 @@ function HookStarter.initialize_hook(node)
     node.actual_return_value = nil  -- Initialize actual return value
     node.is_return_overridden = false  -- Initialize override flag
     
-    -- Initialize dirty flags for "Was Called" pin
-    node.was_called_pre_dirty = false
-    node.was_called_post_dirty = false
+    -- Initialize dirty flag for "Was Called" pin
+    node.was_called_dirty = false
     
     local param_types = {}
     local success_params, method_param_types = pcall(function() return method:get_param_types() end)
@@ -806,7 +786,7 @@ function HookStarter.initialize_hook(node)
             end
             
             node.last_hook_time = os.clock()
-            node.was_called_pre_dirty = true
+            node.was_called_dirty = true
             
             -- Determine argument offset and 'this' value
             local arg_offset = node.is_static and 2 or 3
@@ -863,8 +843,6 @@ function HookStarter.initialize_hook(node)
             if not State.node_map[node.id] then
                 return retval  -- Return original value unchanged
             end
-            node.was_called_post_dirty = true
-            
             
             -- Convert return value to proper type if possible
             local ret_type = method:get_return_type()

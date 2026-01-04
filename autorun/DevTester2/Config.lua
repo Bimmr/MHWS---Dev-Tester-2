@@ -155,7 +155,6 @@ function Config.serialize_node(node)
             data.return_override_manual = node.return_override_manual
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
-            data.was_called_mode = node.was_called_mode
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
             data.action_type = node.action_type
@@ -600,7 +599,6 @@ function Config.deserialize_node(data)
             return_override_manual = data.return_override_manual,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
-            was_called_mode = data.was_called_mode or "PRE",
             -- Native-specific
             native_method_result = data.native_method_result,
             action_type = data.action_type
