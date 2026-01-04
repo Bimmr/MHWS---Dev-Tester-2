@@ -1393,4 +1393,130 @@ function Nodes.render_context_menu(node)
     node._frame_context_options = nil
 end
 
+-- ========================================
+-- Copy/Paste Functions
+-- ========================================
+
+-- Copy selected nodes to clipboard
+function Nodes.copy_selected_nodes()
+    -- Get selected nodes from imnodes
+        
+    local selected_ids = {}
+    for _, selected_id in ipairs(imnodes.get_selected_nodes()) do
+        table.insert(selected_ids, selected_id)
+    end
+    
+    -- Clear clipboard
+    State.clipboard.nodes = {}
+    State.clipboard.links = {}
+    
+    -- Copy selected nodes
+    for _, node_id in ipairs(selected_ids) do
+        local node = State.node_map[node_id]
+        if node then
+            local node_copy = Utils.deep_copy_node(node)
+            table.insert(State.clipboard.nodes, node_copy)
+        end
+    end
+    
+    -- Copy input links (links ending at selected nodes)
+    for _, link in ipairs(State.all_links) do
+        -- Check if link ends at a selected node
+        local is_end_selected = false
+        for _, node_id in ipairs(selected_ids) do
+            if link.to_node == node_id then
+                is_end_selected = true
+                break
+            end
+        end
+        
+        if is_end_selected then
+            local link_copy = Utils.deep_copy_node(link)
+            table.insert(State.clipboard.links, link_copy)
+        end
+    end
+end
+
+-- Paste nodes from clipboard
+function Nodes.paste_nodes()
+    if #State.clipboard.nodes == 0 then
+        return
+    end
+    
+    -- Fixed offset for pasted nodes
+    local offset_x = 50
+    local offset_y = 50
+    
+    -- Create ID mapping table
+    local id_map = {
+        nodes = {},  -- old_node_id -> new_node_id
+        pins = {}    -- old_pin_id -> new_pin_id
+    }
+    
+    -- Track pasted node IDs (old IDs) for link filtering
+    local pasted_node_ids = {}
+    for _, node in ipairs(State.clipboard.nodes) do
+        pasted_node_ids[node.id] = true
+    end
+    
+    -- Paste nodes with new IDs
+    local pasted_nodes = {}
+    for _, clipboard_node in ipairs(State.clipboard.nodes) do
+        local node = Utils.deep_copy_node(clipboard_node)
+        
+        -- Generate new IDs and build mapping
+        Utils.generate_new_node_ids(node, id_map)
+        
+        -- Apply fixed offset
+        node.position = node.position or {x = 0, y = 0}
+        node.position.x = node.position.x + offset_x
+        node.position.y = node.position.y + offset_y
+        
+        -- Add to state
+        table.insert(State.all_nodes, node)
+        State.node_map[node.id] = node
+        
+        -- Register pins in pin_map
+        if node.pins then
+            if node.pins.inputs then
+                for _, pin in ipairs(node.pins.inputs) do
+                    State.pin_map[pin.id] = { node_id = node.id, pin = pin }
+                end
+            end
+            if node.pins.outputs then
+                for _, pin in ipairs(node.pins.outputs) do
+                    State.pin_map[pin.id] = { node_id = node.id, pin = pin }
+                end
+            end
+        end
+        
+        table.insert(pasted_nodes, node)
+    end
+    
+    -- Paste ALL links (both internal and external)
+    for _, clipboard_link in ipairs(State.clipboard.links) do
+        local link = Utils.deep_copy_node(clipboard_link)
+        Utils.remap_link_ids(link, id_map)
+        table.insert(State.all_links, link)
+        State.link_map[link.id] = link
+        
+        -- Update pin connections for the new pins
+        local from_pin_info = State.pin_map[link.from_pin]
+        local to_pin_info = State.pin_map[link.to_pin]
+        
+        if to_pin_info and to_pin_info.pin then
+            to_pin_info.pin.connection = { node = link.from_node, pin = link.from_pin, link = link.id }
+        end
+        
+        if from_pin_info and from_pin_info.pin then
+            if not from_pin_info.pin.connections then
+                from_pin_info.pin.connections = {}
+            end
+            table.insert(from_pin_info.pin.connections, { node = link.to_node, pin = link.to_pin, link = link.id })
+        end
+    end
+    
+    State.mark_as_modified()
+end
+
 return Nodes

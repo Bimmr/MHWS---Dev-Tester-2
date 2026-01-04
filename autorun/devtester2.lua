@@ -369,6 +369,7 @@ end
 State.nodes_positioned = State.nodes_positioned or {}
 
 function render_node_editor()
+
     -- Add some styling for the node editor
     imgui.push_style_color(21, Constants.COLOR_BUTTON_NORMAL)
     imgui.push_style_color(22, Constants.COLOR_BUTTON_HOVER)
@@ -574,7 +575,7 @@ function render_node_editor()
     end
     
     -- Handle delete key for selected links
-    if imgui.is_key_pressed(imgui.ImGuiKey.Key_Delete) then
+    if imgui.is_key_pressed(imgui.ImGuiKey.Delete) or imgui.is_key_down(imgui.ImGuiKey.Key_Delete) then
         local selected_links = imnodes.get_selected_links()
         for _, link_id in ipairs(selected_links) do
             local link = Nodes.get_link_by_id(link_id)
@@ -584,6 +585,20 @@ function render_node_editor()
         end
         -- Clear selection after deletion
         imnodes.clear_link_selection()
+    end
+    
+    -- Handle copy/paste keybinds
+    local ctrl_held = imgui.is_key_down(imgui.ImGuiKey.LeftCtrl)
+    if ctrl_held then
+        -- CTRL + C (Copy)
+        if imgui.is_key_pressed(imgui.ImGuiKey.Key_C) then
+            Nodes.copy_selected_nodes()
+        end
+        
+        -- CTRL + V (Paste)
+        if imgui.is_key_pressed(imgui.ImGuiKey.Key_V) then
+            Nodes.paste_nodes()
+        end
     end
     
     -- Pop styles

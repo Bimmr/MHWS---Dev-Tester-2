@@ -934,4 +934,108 @@ function Utils.pretty_print_pins(pins)
     return str
 end
 
+-- ========================================
+-- Copy/Paste Helpers
+-- ========================================
+
+-- Deep copy a node, handling special types
+function Utils.deep_copy_node(node)
+    if type(node) ~= "table" then
+        return node
+    end
+    
+    local copy = {}
+    for key, value in pairs(node) do
+        if type(value) == "table" then
+            -- Recursively copy tables
+            copy[key] = Utils.deep_copy_node(value)
+        elseif type(value) == "userdata" then
+            -- Cannot copy userdata - will need to be re-evaluated on paste
+            copy[key] = nil
+        elseif type(value) == "function" then
+            -- Keep function references
+            copy[key] = value
+        else
+            -- Copy primitives directly
+            copy[key] = value
+        end
+    end
+    
+    return copy
+end
+
+-- Generate new IDs for a node and build ID mapping
+function Utils.generate_new_node_ids(node, id_map)
+    local old_node_id = node.id
+    local new_node_id = State.node_id_counter
+    State.node_id_counter = State.node_id_counter + 1
+    
+    -- Map old to new node ID
+    id_map.nodes[old_node_id] = new_node_id
+    node.id = new_node_id
+    
+    -- Generate new pin IDs
+    if node.input_pin_id then
+        local new_input_pin = State.node_id_counter
+        State.node_id_counter = State.node_id_counter + 1
+        id_map.pins[node.input_pin_id] = new_input_pin
+        node.input_pin_id = new_input_pin
+    end
+    
+    if node.output_pin_id then
+        local new_output_pin = State.node_id_counter
+        State.node_id_counter = State.node_id_counter + 1
+        id_map.pins[node.output_pin_id] = new_output_pin
+        node.output_pin_id = new_output_pin
+    end
+    
+    -- Handle pins.inputs and pins.outputs (standard pin structure)
+    if node.pins then
+        if node.pins.inputs then
+            for _, pin in ipairs(node.pins.inputs) do
+                local old_pin_id = pin.id
+                local new_pin_id = State.node_id_counter
+                State.node_id_counter = State.node_id_counter + 1
+                id_map.pins[old_pin_id] = new_pin_id
+                pin.id = new_pin_id
+                
+                -- Clear connection data (will be remapped from links)
+                pin.connection = nil
+            end
+        end
+        
+        if node.pins.outputs then
+            for _, pin in ipairs(node.pins.outputs) do
+                local old_pin_id = pin.id
+                local new_pin_id = State.node_id_counter
+                State.node_id_counter = State.node_id_counter + 1
+                id_map.pins[old_pin_id] = new_pin_id
+                pin.id = new_pin_id
+                
+                -- Clear connections data (will be remapped from links)
+                pin.connections = {}
+            end
+        end
+    end
+    
+    return node
+end
+
+-- Remap link IDs based on ID mapping
+-- Handles both internal links (both nodes in map) and external links (only target in map)
+function Utils.remap_link_ids(link, id_map)
+    -- Generate new link ID
+    link.id = State.node_id_counter
+    State.node_id_counter = State.node_id_counter + 1
+    
+    -- Remap node and pin IDs if they exist in mapping
+    -- If not in mapping (external node), preserve original ID
+    link.from_node = id_map.nodes[link.from_node] or link.from_node
+    link.to_node = id_map.nodes[link.to_node] or link.to_node
+    link.from_pin = id_map.pins[link.from_pin] or link.from_pin
+    link.to_pin = id_map.pins[link.to_pin] or link.to_pin
+    
+    return link
+end
+
 return Utils

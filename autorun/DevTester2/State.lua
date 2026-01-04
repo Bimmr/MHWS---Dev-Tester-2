@@ -50,6 +50,12 @@ State.hybrid_combo_text = {}
 -- Track which nodes have been positioned in the node editor (UI)
 State.nodes_positioned = {}
 
+-- Clipboard for copy/paste operations
+State.clipboard = {
+    nodes = {},
+    links = {}
+}
+
 -- ========================================
 -- State Management
 -- ========================================
