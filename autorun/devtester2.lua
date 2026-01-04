@@ -112,9 +112,9 @@ re.on_draw_ui(function()
         
         -- ImNode editor
         render_node_editor()
-        
-        imgui.end_window()
     end
+    
+    imgui.end_window()
 
     Dialogs.render()
     
