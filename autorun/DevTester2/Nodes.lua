@@ -396,11 +396,13 @@ function Nodes.add_child_node_to_return(parent_node, pin_index)
     end
     local parent_return_pin = parent_node.pins.outputs[pin_index]
     
-    -- Sync return pin value
+    -- Sync return pin value - check multiple possible value sources
     if parent_node.return_value then
         parent_return_pin.value = parent_node.return_value
     elseif parent_node.actual_return_value then
         parent_return_pin.value = parent_node.actual_return_value
+    elseif parent_node.ending_value then
+        parent_return_pin.value = parent_node.ending_value
     end
     
     -- Ensure child has input pin
