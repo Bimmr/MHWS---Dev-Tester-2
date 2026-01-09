@@ -260,7 +260,7 @@ function VariableData.reset_to_default(node)
     end
     
     -- Mark this variable as reset this frame to prevent updates
-    State.reset_variables[node.variable_name] = true
+    State.reset_variable_tracker[node.variable_name] = true
     
     -- Reset the variable to nothing (nil)
     State.variables[node.variable_name] = {value = node.default_value, persistent = true}
@@ -269,9 +269,9 @@ end
 function VariableData.update_from_input(node, input_value)
     if input_value ~= nil then
         -- Check if this variable was reset this frame - if so, don't update it
-        if State.reset_variables[node.variable_name] then
+        if State.reset_variable_tracker[node.variable_name] then
             -- Variable was reset this frame, don't override the reset
-            State.reset_variables[node.variable_name] = nil  -- Clear the flag
+            State.reset_variable_tracker[node.variable_name] = nil  -- Clear the flag
             return VariableData.get_variable_value(node.variable_name, node.default_value)
         end
         

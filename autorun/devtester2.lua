@@ -60,7 +60,7 @@ end
 re.on_draw_ui(function()
 
     -- Clear reset tracking at the start of each frame
-    State.reset_variables = {}
+    State.reset_variable_tracker = {}
 
     -- Load Data.json on first draw to restore window state
     if not initialized then

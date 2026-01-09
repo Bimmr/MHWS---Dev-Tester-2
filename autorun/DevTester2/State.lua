@@ -19,7 +19,7 @@ State.all_links = {}
 State.variables = {}  -- variable_name -> {value = value, persistent = boolean}
 
 -- Reset tracking (prevents variable updates during reset frame)
-State.reset_variables = {}  -- variable_name -> true (reset this frame)
+State.reset_variable_tracker = {}  -- variable_name -> true (reset this frame)
 
 -- Hash maps for fast lookups
 State.node_map = {}  -- node_id -> node
@@ -108,7 +108,7 @@ end
 
 function State.reset_variables()
     State.variables = {}
-    State.reset_variables = {}
+    State.reset_variable_tracker = {}
 end
 
 function State.reset_id_counters()
