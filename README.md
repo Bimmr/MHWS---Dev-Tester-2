@@ -1,9 +1,16 @@
 # DevTester v2.0
-## Visual Node-Based Editor for Monster Hunter
+## Visual Node-Based Editor for RE Engine Games
 
-![DevTester v2.0](https://i.imgur.com/VpRqTvL.png)
+![DevTester v2.0](https://i.imgur.com/ZJubBDz.png)
 
-DevTester v2.0 is a powerful visual scripting tool for Monster Hunter Wilds modding, built on the REFramework. Create complex mod logic through an intuitive node-based interface without writing code.
+DevTester v2.0 is a powerful visual scripting tool for RE Engine game modding, built on the REFramework. Create complex mod logic through an intuitive node-based interface without writing code.
+
+### Supported Games
+DevTester v2.0 works with **any RE Engine game that supports REFramework**, with primary development and testing focused on:
+- **Monster Hunter Rise (MHRise)**
+- **Monster Hunter Wilds (MHWilds)**
+
+Other RE Engine games may work with varying degrees of compatibility.
 
 ## Features
 
@@ -20,6 +27,7 @@ Entry points for your node graphs - start execution and provide initial data.
 - **Type Starter**: Access static types and their members without instances
 - **Hook Starter**: Intercept and modify method calls in real-time
 - **Native Starter**: Call native game functions directly
+- **Player Starter**: Quick access to the player character object (MHRise/MHWilds)
 
 #### **Data Nodes**
 Source nodes that provide values to your graph.
@@ -50,6 +58,7 @@ Control flow and conditional logic.
 #### **Utility Nodes**
 Helper nodes for organization and documentation.
 - **Label**: Add text labels and comments to your node graph
+- **History Buffer**: Capture and store value history with pause/replay functionality
 
 ### 🎣 **Advanced Hooking**
 - Method hooking with pre/post callbacks
@@ -71,10 +80,10 @@ Helper nodes for organization and documentation.
 
 ## Installation
 
-1. Ensure you have [REFramework](https://github.com/praydog/REFramework) installed for Monster Hunter Wilds
-2. Copy the `autorun` folder to your Monster Hunter Wilds mod directory
+1. Ensure you have [REFramework](https://github.com/praydog/REFramework) installed for your RE Engine game
+2. Copy the `autorun` folder to your game's REFramework directory (typically `<game_directory>/reframework/autorun`)
 3. Launch the game with REFramework
-4. Access DevTester v2.0 from the REFramework menu
+4. Access DevTester v2.0 from the REFramework menu (Script Generated UI)
 
 ## Quick Start
 
@@ -117,13 +126,27 @@ DevTester v2.0 stores configurations in JSON format:
 
 ## Contributing
 
-This project is part of the Monster Hunter Wilds modding community. Contributions are welcome!
+This project is part of the RE Engine modding community. Contributions are welcome!
 
 ### Development Setup
 1. Clone the repository
-2. Ensure REFramework development environment
-3. Test changes in-game
+2. Ensure REFramework development environment with a supported RE Engine game
+3. Test changes in-game (preferably with MHRise or MHWilds)
 4. Submit pull requests with detailed descriptions
+
+### Testing Guidelines
+- Test with Monster Hunter Rise and/or Monster Hunter Wilds when possible
+- Report compatibility issues with other RE Engine games
+- Document game-specific behaviors or limitations
+
+## Compatibility
+
+DevTester v2.0 is designed to work with any RE Engine game that supports REFramework. The node-based system dynamically adapts to the game's type system, allowing you to:
+- Hook any game method
+- Access any game object
+- Manipulate game data in real-time
+
+Primary testing and development is done with Monster Hunter Rise and Monster Hunter Wilds, but the tool should function with other RE Engine titles.
 
 ## Credits
 
