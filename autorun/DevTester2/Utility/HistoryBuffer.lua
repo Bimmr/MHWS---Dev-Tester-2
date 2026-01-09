@@ -17,6 +17,7 @@
 --
 -- Pins:
 -- - pins.inputs[1]: "input" - Value to capture
+-- - pins.inputs[2]: "index" - Index value (optional connection)
 -- - pins.outputs[1]: "output" - Input value (running) or historical value (paused)
 
 local State = require("DevTester2.State")
@@ -112,52 +113,121 @@ local function render_history_navigation(node)
         end
     end
     
-    -- Left arrow button (go to older entry)
-    local can_go_prev = node.current_history_index > 1
-    if not can_go_prev then imgui.begin_disabled() end
-    if imgui.arrow_button("history_left", 0) then
-        node.current_history_index = node.current_history_index - 1
-        State.mark_as_modified()
+    -- Determine which index to use for display: connected value takes priority
+    local display_index = node.current_history_index -- Default from manual selection
+    local has_index_input = false
+    
+    -- Check for connected index value using pin system
+    local index_pin = node.pins.inputs[2]
+    if index_pin and index_pin.connection then
+        -- Look up connected pin via State.pin_map
+        local source_pin_info = State.pin_map[index_pin.connection.pin]
+        local connected_index = source_pin_info and source_pin_info.pin.value
+        if connected_index ~= nil then
+            -- Try to convert to number
+            local num_index = tonumber(connected_index)
+            if num_index then
+                display_index = math.floor(num_index)
+                has_index_input = true
+            end
+        end
     end
-    if not can_go_prev then imgui.end_disabled() end
+    
+    -- Ensure display index is within bounds
+    if display_index < 1 then
+        display_index = 1
+    elseif display_index > node.history_count and node.history_count > 0 then
+        display_index = node.history_count
+    end
+    
+    -- Display current index and navigation controls within input attribute
+    imnodes.begin_input_attribute(index_pin.id)
+    
+    -- Left arrow button (go to older entry) - disabled when index input is provided
+    local can_go_prev = display_index > 1
+    local left_disabled = not can_go_prev or has_index_input
+    if left_disabled then
+        imgui.begin_disabled()
+    end
+    if imgui.arrow_button("history_left", 0) then
+        if can_go_prev then
+            node.current_history_index = display_index - 1
+            State.mark_as_modified()
+        end
+    end
+    if left_disabled then
+        imgui.end_disabled()
+    end
     
     imgui.same_line()
     imgui.set_next_item_width(imgui.calc_item_width() - 24)
     
-    -- History entry dropdown
-    local dropdown_changed, new_selection = imgui.combo("##HistoryEntry", node.current_history_index, dropdown_options)
-    if dropdown_changed then
+    -- History entry dropdown (disabled when index input is provided)
+    if has_index_input then
+        imgui.begin_disabled()
+    end
+    local dropdown_changed, new_selection = imgui.combo("##HistoryEntry", display_index, dropdown_options)
+    if dropdown_changed and not has_index_input then
         node.current_history_index = new_selection
         State.mark_as_modified()
     end
+    if has_index_input then
+        imgui.end_disabled()
+    end
     
     imgui.same_line()
     
-    -- Right arrow button (go to newer entry)
-    local can_go_next = node.current_history_index < node.history_count
-    if not can_go_next then imgui.begin_disabled() end
-    if imgui.arrow_button("history_right", 1) then
-        node.current_history_index = node.current_history_index + 1
-        State.mark_as_modified()
+    -- Right arrow button (go to newer entry) - disabled when index input is provided
+    local can_go_next = display_index < node.history_count
+    local right_disabled = not can_go_next or has_index_input
+    if right_disabled then
+        imgui.begin_disabled()
     end
-    if not can_go_next then imgui.end_disabled() end
+    if imgui.arrow_button("history_right", 1) then
+        if can_go_next then
+            node.current_history_index = display_index + 1
+            State.mark_as_modified()
+        end
+    end
+    if right_disabled then
+        imgui.end_disabled()
+    end
     
+    if has_index_input then
+        imgui.begin_disabled()
+    end
     imgui.same_line()
     imgui.text("History")
+    if has_index_input then
+        imgui.end_disabled()
+    end
+    
+    imnodes.end_input_attribute()
+    
+    -- Update node's current_history_index if using connected index
+    if has_index_input then
+        node.current_history_index = display_index
+    end
 end
 
 function HistoryBuffer.render(node)
     ensure_history_initialized(node)
     
-    -- Ensure pins exist
-    if #node.pins.inputs == 0 then
-        Nodes.add_input_pin(node, "input", nil)
+    -- Ensure pins exist (2 inputs, 1 output)
+    if #node.pins.inputs < 2 then
+        if #node.pins.inputs == 0 then
+            Nodes.add_input_pin(node, "input", nil)
+        end
+        if #node.pins.inputs == 1 then
+            Nodes.add_input_pin(node, "index", nil)
+        end
     end
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "output", nil)
     end
     
     local input_pin = node.pins.inputs[1]
+    local index_pin = node.pins.inputs[2]
     local output_pin = node.pins.outputs[1]
     local input_value = Nodes.get_input_pin_value(node, 1)
     input_pin.value = input_value
@@ -167,8 +237,37 @@ function HistoryBuffer.render(node)
     local display_entry
     
     if node.is_paused then
-        -- When paused, use historical value
-        display_entry = get_history_entry(node, node.current_history_index)
+        -- When paused, check for connected index pin
+        local display_index = node.current_history_index
+        local has_index_input = false
+        
+        if index_pin and index_pin.connection then
+            -- Look up connected pin via State.pin_map
+            local source_pin_info = State.pin_map[index_pin.connection.pin]
+            local connected_index = source_pin_info and source_pin_info.pin.value
+            if connected_index ~= nil then
+                local num_index = tonumber(connected_index)
+                if num_index then
+                    display_index = math.floor(num_index)
+                    has_index_input = true
+                end
+            end
+        end
+        
+        -- Ensure display index is within bounds
+        if display_index < 1 then
+            display_index = 1
+        elseif display_index > node.history_count and node.history_count > 0 then
+            display_index = node.history_count
+        end
+        
+        -- Update node's current_history_index if using connected index
+        if has_index_input then
+            node.current_history_index = display_index
+        end
+        
+        -- Use historical value
+        display_entry = get_history_entry(node, display_index)
         output_value = display_entry and display_entry.value or nil
     else
         -- When running, use input and add to history
