@@ -123,7 +123,7 @@ local function render_argument_outputs(node, is_placeholder)
         local param_type_name = param_type and param_type:get_name() or "Unknown"
         local param_full_name = param_type and param_type:get_full_name() or "Unknown"
         
-        -- If param_type is unknown but we have a userdata value, try to extract type from the value
+        -- Get arg value directly
         local arg_value = node.hook_arg_values and node.hook_arg_values[i]
         if not param_type and arg_value ~= nil and type(arg_value) == "userdata" then
             local success_type, value_type_def = pcall(function() 
@@ -164,9 +164,9 @@ local function render_argument_outputs(node, is_placeholder)
             imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
         elseif node.is_initialized then
             -- Display arg value if available
-            if node.hook_arg_values and node.hook_arg_values[i] ~= nil and node.last_hook_time then
+            if arg_value ~= nil and node.last_hook_time then
                 -- Display simplified value without address
-                local display_value = Utils.get_value_display_string(node.hook_arg_values[i])
+                local display_value = Utils.get_value_display_string(arg_value)
                 local arg_display = display_value .. " (?)"
                 local arg_pos = Utils.get_right_cursor_pos(node.id, arg_display)
                 imgui.set_cursor_pos(arg_pos)
@@ -177,12 +177,12 @@ local function render_argument_outputs(node, is_placeholder)
                     -- Build tooltip - use the dynamically extracted type if available
                     local tooltip_text = string.format("Param Type: %s\n%s", 
                         param_full_name,
-                        Utils.get_tooltip_for_value(node.hook_arg_values[i])
+                        Utils.get_tooltip_for_value(arg_value)
                     )
                     imgui.set_tooltip(tooltip_text)
                 end
                 
-                local can_continue, _ = Nodes.validate_continuation(node.hook_arg_values[i], nil)
+                local can_continue, _ = Nodes.validate_continuation(arg_value, nil)
                 if can_continue then
                     local arg_button_text = "+ Add Child to " .. arg_label
                     local arg_button_pos = Utils.get_right_cursor_pos(node.id, arg_button_text)
@@ -419,11 +419,6 @@ function HookStarter.render(node)
     if #node.pins.outputs == 1 then
         Nodes.add_output_pin(node, "main_output", nil)
     end
-    
-    local main_output_pin = node.pins.outputs[2]
-    
-    -- Always sync main output pin value with ending_value on every render
-    main_output_pin.value = node.ending_value
 
     imnodes.begin_node(node.id)
 
@@ -698,10 +693,10 @@ function HookStarter.render(node)
         imgui.text_colored("✓ Hook Active", 0xFF00FF00)
         imgui.spacing()
 
-        -- Get time string for positioning calculation
         local time_ago_str = node.last_hook_time 
             and Utils.format_time_ago(node.last_hook_time) 
             or "Never called"
+        
         imgui.text("Last call:")
         imgui.same_line()
         local pos = Utils.get_right_cursor_pos(node.id, time_ago_str)
@@ -839,6 +834,10 @@ function HookStarter.initialize_hook(node)
             local arg_offset = node.is_static and 2 or 3
             
             if managed or node.is_static then
+                -- Add reference to prevent garbage collection
+                if managed and type(managed) == "userdata" then
+                    pcall(function() managed:add_ref() end)
+                end
                 node.ending_value = managed
                 -- Update main output pin (index 2)
                 if #node.pins.outputs >= 2 then
@@ -860,13 +859,20 @@ function HookStarter.initialize_hook(node)
                     type_name = param_types[i]:get_full_name()
                 end
                 
-                node.hook_arg_values[i] = convert_ptr(arg, type_name)
+                local converted_arg = convert_ptr(arg, type_name)
+                
+                -- Add reference to prevent garbage collection for managed objects
+                if converted_arg and type(converted_arg) == "userdata" then
+                    pcall(function() converted_arg:add_ref() end)
+                end
                 
                 -- Fix value if needed
-                local _, fixed_val = Nodes.validate_continuation(node.hook_arg_values[i], nil, type_name)
+                local _, fixed_val = Nodes.validate_continuation(converted_arg, nil, type_name)
                 if fixed_val ~= nil then
-                    node.hook_arg_values[i] = fixed_val
+                    converted_arg = fixed_val
                 end
+                
+                node.hook_arg_values[i] = converted_arg
                 
                 -- Update arg output pin
                 local arg_pin_index = 3 + i  -- After was_called, main_output and return_output
@@ -874,7 +880,7 @@ function HookStarter.initialize_hook(node)
                     arg_pin_index = 2 + i  -- No return_output for void
                 end
                 if #node.pins.outputs >= arg_pin_index then
-                    node.pins.outputs[arg_pin_index].value = node.hook_arg_values[i]
+                    node.pins.outputs[arg_pin_index].value = converted_arg
                 end
             end
             
@@ -889,13 +895,20 @@ function HookStarter.initialize_hook(node)
             -- Convert return value to proper type if possible
             local ret_type = method:get_return_type()
             node.retval_vtypename = node.return_type_full_name  -- Pass the full type name for proper conversion
-            node.actual_return_value = convert_ptr(retval, node.retval_vtypename)
+            local converted_retval = convert_ptr(retval, node.retval_vtypename)
+            
+            -- Add reference to prevent garbage collection for managed objects
+            if converted_retval and type(converted_retval) == "userdata" then
+                pcall(function() converted_retval:add_ref() end)
+            end
             
             -- Fix value if needed
-            local _, fixed_val = Nodes.validate_continuation(node.actual_return_value, nil, node.retval_vtypename)
+            local _, fixed_val = Nodes.validate_continuation(converted_retval, nil, node.retval_vtypename)
             if fixed_val ~= nil then
-                node.actual_return_value = fixed_val
+                converted_retval = fixed_val
             end
+            
+            node.actual_return_value = converted_retval
             
             -- Build comprehensive status string with both pre and post hook info
             local status_parts = {}
@@ -919,7 +932,7 @@ function HookStarter.initialize_hook(node)
                 node.is_return_overridden = true
             else
                 table.insert(status_parts, "return unchanged")
-                node.return_value = node.actual_return_value
+                node.return_value = converted_retval
                 node.is_return_overridden = false
             end
             
