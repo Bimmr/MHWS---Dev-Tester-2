@@ -246,7 +246,7 @@ function HistoryBuffer.render(node)
     imgui.spacing()
     
     -- Time display
-    if display_entry and display_entry.timestamp then
+    if node.is_paused and display_entry and display_entry.timestamp then
         imgui.text("Time:")
         imgui.same_line()
         local time_str = Utils.format_time_ago(os.clock() - display_entry.timestamp)
