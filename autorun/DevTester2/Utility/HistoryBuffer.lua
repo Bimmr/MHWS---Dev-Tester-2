@@ -178,6 +178,7 @@ function HistoryBuffer.render(node)
     end
     
     output_pin.value = output_value
+    node.ending_value = output_value  -- Set ending_value for BaseUtility.render_action_buttons
     
     -- Begin node rendering
     imnodes.begin_node(node.id)
