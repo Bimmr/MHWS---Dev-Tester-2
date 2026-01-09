@@ -723,7 +723,7 @@ function HookStarter.render(node)
     imgui.spacing()
     
     -- Hook Options TreeNode
-    if imgui.tree_node("Hook Options") then
+    --if imgui.tree_node("Hook Options") then -- Same issue as seperator where it goes outside of node width
         -- Initialize exact_type_match if not present
         if node.exact_type_match == nil then
             node.exact_type_match = false
@@ -738,8 +738,8 @@ function HookStarter.render(node)
             imgui.set_tooltip("When enabled, hook only fires for exact type matches.\nFilters out calls from derived types.")
         end
         
-        imgui.tree_pop()
-    end
+        --imgui.tree_pop()
+    --end
     
     imgui.spacing()
     if imgui.button("- Remove Node") then
