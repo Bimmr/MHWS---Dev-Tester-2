@@ -18,6 +18,7 @@ Other RE Engine games may work with varying degrees of compatibility.
 - Visual connection of data flow
 - Real-time execution and debugging
 - Clean, organized node graphs
+- **Copy & Paste**: Duplicate nodes and configurations with CTRL+C/CTRL+V
 
 ### 🔧 **Node Types**
 
@@ -91,7 +92,8 @@ Helper nodes for organization and documentation.
 2. **Create a Starter**: Right-click in the node editor and add a Starter node
 3. **Add Operations**: Connect operation nodes to process data
 4. **Configure Hooks**: Set up method hooks to intercept game functions
-5. **Save Configuration**: Save your setup for reuse
+5. **Copy & Paste**: Select nodes and use CTRL+C to copy, CTRL+V to paste with new IDs
+6. **Save Configuration**: Save your setup for reuse
 
 ## Usage Guide
 
