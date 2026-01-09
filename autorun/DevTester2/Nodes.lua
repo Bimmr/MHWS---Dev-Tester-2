@@ -71,8 +71,11 @@ function Nodes.validate_continuation(result, parent_value, type_full_name)
         -- Check terminal type
         local success, type_def = pcall(function() return result:get_type_definition() end)
         if success and type_def then
-            if Nodes.is_terminal_type(type_def:get_full_name()) then
-                can_continue = false
+            local success_name, type_name = pcall(function() return type_def:get_name() end)
+            if success_name and type_name then
+                if Nodes.is_terminal_type(type_name) then
+                    can_continue = false
+                end
             end
         end
     end

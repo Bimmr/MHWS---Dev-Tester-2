@@ -69,8 +69,8 @@ function Utils.format_time_ago(timestamp)
         -- 100-999ms: 3 digits
         time_text = string.format("%03.0fms", math.floor(time_ago * 1000))
     elseif time_ago < 60 then
-        -- 1-59s: whole seconds only to prevent jumping
-        time_text = string.format("%ds", math.floor(time_ago))
+        -- 1-59s: show seconds with 2 decimal places
+        time_text = string.format("%.2fs", time_ago)
     elseif time_ago < 3600 then
         -- 1-59m: show minutes and seconds (e.g., 5m 23s)
         local minutes = math.floor(time_ago / 60)
@@ -251,16 +251,21 @@ function Utils.get_tooltip_for_value(value)
     if type(value) == "userdata" then
         local success, type_info = pcall(function() return value:get_type_definition() end)
         if success and type_info then
-            local address = "N/A"
+           
+            local success_name, name = pcall(function() return type_info:get_name() end)
+            if success_name and name then
+                tooltip_text = "Type: " .. name .. "\n"
+            end
+
             local success_addr, addr_val = pcall(function() return value:get_address() end)
             if success_addr and addr_val then
-                address = string.format("0x%X", addr_val)
+                tooltip_text = tooltip_text .. string.format("Address: 0x%X\n", addr_val).. "\n"
             end
-            
-            tooltip_text = string.format(
-                "Type: %s\nAddress: %s\nFull Name: %s",
-                type_info:get_name(), address, type_info:get_full_name()
-            )
+            local success_full_name, full_name = pcall(function() return type_info:get_full_name() end)
+            if success_full_name and full_name then
+                tooltip_text = tooltip_text .. "Full Name: " .. full_name
+            end
+
         else
             tooltip_text = "userdata (unknown type)"
         end
@@ -276,14 +281,22 @@ function Utils.get_value_display_string(value)
     if type(value) == "userdata" then
         local success, type_info = pcall(function() return value:get_type_definition() end)
         if success and type_info then
-            local type_name = type_info:get_name()
+            local success_name, type_name = pcall(function() return type_info:get_name() end)
+            if not success_name or not type_name then
+                return "Object"
+            end
 
             if type_name:find("Nullable") then 
-                local field = type_info:get_field("_Value")
-                local type = field:get_type()
-                local name = type:get_full_name()
-                local value = Utils.get_value_display_string(name)
-                return "Nullable(" .. value .. ")"
+                local success_nullable, nullable_result = pcall(function()
+                    local field = type_info:get_field("_Value")
+                    local type = field:get_type()
+                    local name = type:get_full_name()
+                    local value = Utils.get_value_display_string(name)
+                    return "Nullable(" .. value .. ")"
+                end)
+                if success_nullable then
+                    return nullable_result
+                end
             end
             
             -- Handle Vector types

@@ -130,8 +130,14 @@ local function render_argument_outputs(node, is_placeholder)
                 return arg_value:get_type_definition() 
             end)
             if success_type and value_type_def then
-                param_type_name = value_type_def:get_name()
-                param_full_name = value_type_def:get_full_name()
+                local success_name, name = pcall(function() return value_type_def:get_name() end)
+                local success_full_name, full_name = pcall(function() return value_type_def:get_full_name() end)
+                if success_name and name then
+                    param_type_name = name
+                end
+                if success_full_name and full_name then
+                    param_full_name = full_name
+                end
             end
         end
         
