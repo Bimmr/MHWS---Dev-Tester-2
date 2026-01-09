@@ -106,6 +106,11 @@ function State.reset_links()
     State.all_links = {}
 end
 
+function State.reset_variables()
+    State.variables = {}
+    State.reset_variables = {}
+end
+
 function State.reset_id_counters()
     State.node_id_counter = 1
     State.link_id_counter = 1

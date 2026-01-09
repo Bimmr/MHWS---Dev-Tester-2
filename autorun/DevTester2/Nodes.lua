@@ -536,6 +536,9 @@ function Nodes.clear_all_nodes()
     
     -- Reset node positioning state
     State.reset_positioning()
+
+    -- Reset variables
+    State.reset_variables()
 end
 
 -- ========================================
