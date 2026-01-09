@@ -92,7 +92,8 @@ function TypeStarter.render(node)
         imgui.same_line()
         imgui.text("(?)")
         if imgui.is_item_hovered() then
-            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
+            local full_name = node.ending_value:get_full_name()
+            imgui.set_tooltip("Type: " .. full_name)
         end
         imnodes.end_output_attribute()
     elseif node.status == "Type not found" then
