@@ -102,7 +102,18 @@ local function add_to_buffer(node, value)
     
     -- Get address for cycle detection
     local address = get_value_address(value)
-    
+
+    -- If adding first non-nil value and buffer only has one nil entry, remove the nil
+    if value ~= nil and node.call_count == 1 then
+        local first_entry = node.call_buffer[1]
+        if first_entry and first_entry.value == nil then
+            -- Clear the buffer before adding the non-nil value
+            node.call_buffer = {}
+            node.call_count = 0
+            node.seen_addresses = {}
+        end
+    end
+
     -- Check if this address was already seen (repeat detected)
     if node.seen_addresses[address] then
         -- Same address seen again - find and replace the existing entry
@@ -256,17 +267,22 @@ local function render_call_navigation(node)
     if has_index_input then
         imgui.begin_disabled()
     end
+
     local dropdown_changed, new_selection = imgui.combo("##CallEntry", display_index, dropdown_options)
-    if dropdown_changed and not has_index_input then
-        node.current_call_index = new_selection
-        -- Update ending_value immediately
-        local selected_entry = get_call_entry(node, node.current_call_index)
-        node.ending_value = selected_entry and selected_entry.value or nil
-        if node.pins.outputs[1] then
-            node.pins.outputs[1].value = node.ending_value
-        end
+    if dropdown_changed then
         State.mark_as_modified()
     end
+    if not has_index_input then
+        node.current_call_index = new_selection
+    end
+    
+    -- Update ending_value immediately
+    local selected_entry = get_call_entry(node, node.current_call_index)
+    node.ending_value = selected_entry and selected_entry.value or nil
+    if node.pins.outputs[1] then
+        node.pins.outputs[1].value = node.ending_value
+    end
+
     if has_index_input then
         imgui.end_disabled()
     end
@@ -334,11 +350,34 @@ function CallBuffer.execute(node)
         end
     else
         -- Connected - clean up stale entries first
-        cleanup_stale_entries(node)
+        if node.cleanup_stale_entries then 
+            cleanup_stale_entries(node)
+        end
         
-        -- Add value to buffer (even if nil)
+        -- Get input value and hook time (if applicable)
         local input_value = Nodes.get_input_pin_value(node, 1)
-        add_to_buffer(node, input_value)
+        local parent_node = nil
+        
+        -- Check if input is from a HookStarter and get its last_hook_time
+        if input_pin.connection then
+            local source_pin_info = State.pin_map[input_pin.connection.pin]
+            if source_pin_info then
+                parent_node = Nodes.find_node_by_id(source_pin_info.node_id)
+            end
+        end
+
+        
+        -- For hooks, only add if this is a new call (hook_time changed)
+        if parent_node and parent_node.category == Constants.NODE_CATEGORY_STARTER and parent_node.type == Constants.STARTER_TYPE_HOOK then
+            local last_hook_time = parent_node.last_hook_time
+            if not node.last_processed_hook_time or last_hook_time > node.last_processed_hook_time then
+                add_to_buffer(node, input_value)
+                node.last_processed_hook_time = last_hook_time
+            end
+        else
+           -- For non-hook sources, add normally
+           add_to_buffer(node, input_value)
+        end
     end
     
     -- Get selected call
@@ -467,9 +506,14 @@ function CallBuffer.render(node)
     end
     imnodes.end_output_attribute()
 
-   
-
     imgui.spacing()
+
+    local changed, new_cleanup = imgui.checkbox("Cleanup Stale Entries", node.cleanup_stale_entries or false)
+    if changed then
+        node.cleanup_stale_entries = new_cleanup
+        State.mark_as_modified()
+    end
+
     BaseUtility.render_action_buttons(node)
 
     imnodes.end_node()
