@@ -49,6 +49,7 @@ Constants.CONTROL_TYPE_CONDITION = 4
 
 -- Utility Node Types
 Constants.UTILITY_TYPE_LABEL = 1
+Constants.UTILITY_TYPE_HISTORY_BUFFER = 2
 
 -- Math Operation Types
 Constants.MATH_OPERATION_ADD = 1
@@ -120,6 +121,7 @@ Constants.NODE_WIDTH_DATA_ENUM = 300
 Constants.NODE_WIDTH_DATA_PRIMITIVE = 150
 
 Constants.NODE_WIDTH_UTILITY = 250
+Constants.NODE_WIDTH_UTILITY_HISTORY_BUFFER = 300
 
 -- ========================================
 -- UI Dimensions

@@ -36,6 +36,7 @@ local CounterControl = require("DevTester2.Control.CounterControl")
 local ConditionControl = require("DevTester2.Control.ConditionControl")
 local BaseUtility = require("DevTester2.Utility.BaseUtility")
 local Label = require("DevTester2.Utility.Label")
+local HistoryBuffer = require("DevTester2.Utility.HistoryBuffer")
 
 -- Local references
 local re = re
@@ -256,6 +257,13 @@ function render_utility_menu_items(position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a Label node for adding text comments and documentation to your node graph")
+    end
+    
+    if imgui.menu_item("History Buffer") then
+        BaseUtility.create(Constants.UTILITY_TYPE_HISTORY_BUFFER, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a History Buffer node to capture and review the history of values passing through it.\\nAllows pausing and navigating through past values.")
     end
 end
 
@@ -484,6 +492,8 @@ function render_node_editor()
 
             if node.type == Constants.UTILITY_TYPE_LABEL then
                 Label.render(node)
+            elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
+                HistoryBuffer.render(node)
             end
 
             imgui.pop_item_width()
@@ -518,8 +528,8 @@ function render_node_editor()
         -- Check if the target node is paused
         local target_node = Nodes.find_node_by_id(link.to_node)
         if target_node and target_node.is_paused then
-            -- Render paused link in dark red
-            imnodes.push_color_style(7, Constants.COLOR_DISABLED) -- Link color
+            -- Render paused link in dark gray
+            imnodes.push_color_style(7, Constants.COLOR_TEXT_DARK_GRAY) -- Link color
             imnodes.link(link.id, link.from_pin, link.to_pin)
             imnodes.pop_color_style()
         else

@@ -1237,6 +1237,15 @@ function Nodes.validate_and_restore_starter_node(node)
         if node.type == Constants.UTILITY_TYPE_LABEL then
             -- Label nodes are ready to use immediately
             node.status = "Ready"
+        elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
+            -- History buffer nodes need pins
+            if #node.pins.inputs == 0 then
+                Nodes.add_input_pin(node, "input", nil)
+            end
+            if #node.pins.outputs == 0 then
+                Nodes.add_output_pin(node, "output", nil)
+            end
+            node.status = "Ready"
         end
     end
 end

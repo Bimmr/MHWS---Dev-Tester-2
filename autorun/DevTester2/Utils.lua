@@ -46,6 +46,66 @@ function Utils.show_info(message)
 end
 
 -- ========================================
+-- Time Display Helpers
+-- ========================================
+
+-- Format a relative time display with consistent width formatting
+-- timestamp: os.clock() value to format
+-- Returns: formatted string
+-- Format examples: 01ms, 11ms, 111ms, 1.1s, 11.1s, 1.1m, 11.1m
+function Utils.format_time_ago(timestamp)
+    if not timestamp then return "" end
+    
+    local time_ago = os.clock() - timestamp
+    local time_text
+    
+    if time_ago < 0.01 then
+        -- 0-9ms: pad to 2 digits
+        time_text = string.format("%02.0fms", math.floor(time_ago * 1000))
+    elseif time_ago < 0.1 then
+        -- 10-99ms: 2 digits
+        time_text = string.format("%02.0fms", math.floor(time_ago * 1000))
+    elseif time_ago < 1 then
+        -- 100-999ms: 3 digits
+        time_text = string.format("%03.0fms", math.floor(time_ago * 1000))
+    elseif time_ago < 60 then
+        -- 1-59s: whole seconds only to prevent jumping
+        time_text = string.format("%ds", math.floor(time_ago))
+    elseif time_ago < 3600 then
+        -- 1-59m: show minutes and seconds (e.g., 5m 23s)
+        local minutes = math.floor(time_ago / 60)
+        local seconds = math.floor(time_ago % 60)
+        time_text = string.format("%dm %ds", minutes, seconds)
+    else
+        -- 1h+: show hours and minutes (e.g., 1h 15m)
+        local hours = math.floor(time_ago / 3600)
+        local minutes = math.floor((time_ago % 3600) / 60)
+        time_text = string.format("%dh %dm", hours, minutes)
+    end
+    
+    return time_text
+end
+
+-- Render a relative time display with hover tooltip showing exact time
+-- timestamp: os.clock() value to display
+function Utils.render_time_ago(timestamp)
+    if not timestamp then return end
+    
+    local time_text = Utils.format_time_ago(timestamp)
+    local time_ago = os.clock() - timestamp
+    
+    imgui.text(time_text)
+    
+    if imgui.is_item_hovered() then
+        -- Calculate the actual wall clock time when the event occurred
+        local current_time = os.time()
+        local event_time = current_time - math.floor(time_ago)
+        local absolute_time = os.date("%H:%M:%S", event_time)
+        imgui.set_tooltip("Exact time: " .. absolute_time)
+    end
+end
+
+-- ========================================
 -- UI Styling
 -- ========================================
 

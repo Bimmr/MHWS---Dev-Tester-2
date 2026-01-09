@@ -33,6 +33,17 @@ function BaseUtility.render_action_buttons(node)
     if imgui.button("- Remove Node") then
         Nodes.remove_node(node)
     end
+    
+    -- Only show Add Child Node if result is valid
+    local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
+    if can_continue then
+        imgui.same_line()
+        local pos = Utils.get_right_cursor_pos(node.id, "+ Add Child Node")
+        imgui.set_cursor_pos(pos)
+        if imgui.button("+ Add Child Node") then
+            Nodes.add_child_node(node)
+        end
+    end
 end
 
 function BaseUtility.render_debug_info(node)
@@ -88,6 +99,7 @@ function BaseUtility.create(node_type, position)
         position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
+        pins = { inputs = {}, outputs = {} },
         -- Label-specific
         text = ""
     }

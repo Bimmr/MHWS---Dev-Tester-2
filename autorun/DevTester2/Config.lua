@@ -155,6 +155,7 @@ function Config.serialize_node(node)
             data.return_override_manual = node.return_override_manual
             data.actual_return_value = node.actual_return_value
             data.is_return_overridden = node.is_return_overridden
+            data.exact_type_match = node.exact_type_match
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
             data.method_name = node.method_name
             data.action_type = node.action_type
@@ -262,6 +263,21 @@ function Config.serialize_node(node)
             end
         elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
             data.selected_element_index = node.selected_element_index
+        end
+    elseif node.category == Constants.NODE_CATEGORY_UTILITY then
+        data.category = node.category
+        data.type = node.type
+        
+        if node.type == Constants.UTILITY_TYPE_LABEL then
+            data.text = node.text
+        elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
+            data.buffer_size = node.buffer_size
+            data.is_paused = node.is_paused
+            data.current_history_index = node.current_history_index
+            data.history_write_index = node.history_write_index
+            data.history_count = node.history_count
+            -- Note: We don't serialize the actual history entries as they're runtime data
+            -- Users will need to recapture data after loading
         end
     end
     
@@ -599,6 +615,7 @@ function Config.deserialize_node(data)
             return_override_manual = data.return_override_manual,
             actual_return_value = data.actual_return_value,
             is_return_overridden = data.is_return_overridden or false,
+            exact_type_match = data.exact_type_match or false,
             -- Native-specific
             native_method_result = data.native_method_result,
             action_type = data.action_type
@@ -713,6 +730,29 @@ function Config.deserialize_node(data)
         }
         
         -- Operation nodes will be validated after parent connections are restored
+    elseif data.category == Constants.NODE_CATEGORY_UTILITY then
+        node = {
+            id = data.id,
+            category = data.category,
+            pins = pins,
+            type = data.type,
+            position = data.position or {x = 0, y = 0},
+            ending_value = nil,
+            status = nil
+        }
+        
+        if data.type == Constants.UTILITY_TYPE_LABEL then
+            node.text = data.text or ""
+        elseif data.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
+            node.buffer_size = data.buffer_size or 10
+            node.is_paused = data.is_paused or false
+            node.current_history_index = data.current_history_index or 1
+            node.history_write_index = data.history_write_index or 1
+            node.history_count = data.history_count or 0
+            node.history = {}  -- History entries are not persisted, will be recaptured
+            node.current_value = nil
+            node.display_value = nil
+        end
     end
     
     return node

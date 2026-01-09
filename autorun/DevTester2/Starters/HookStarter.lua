@@ -12,6 +12,7 @@
 -- - is_initialized: Boolean - Whether the hook is currently active and installed
 -- - hook_id: Method object - Reference to the hooked method (used for identification)
 -- - pre_hook_result: String - Either "CALL_ORIGINAL" or "SKIP_ORIGINAL" - determines if original method runs
+-- - exact_type_match: Boolean - When enabled, hook only fires for exact type matches (filters out derived types)
 --
 -- Pins:
 -- - pins.inputs[1]: "return_override" - Optional return override input (only for non-void methods)
@@ -689,21 +690,23 @@ function HookStarter.render(node)
     else
         local pos = imgui.get_cursor_pos()
         imgui.text_colored("✓ Hook Active", 0xFF00FF00)
-        local time_since_call = "Never called"
-        if node.last_hook_time then
-            local elapsed = os.clock() - node.last_hook_time
-            if elapsed < 1 then
-                time_since_call = string.format("%.0fms ago", elapsed * 1000)
-            else
-                time_since_call = string.format("%.1fs ago", elapsed)
-            end
-        end
-        imgui.same_line()
-        local pos = Utils.get_right_cursor_pos(node.id, "Last call: " .. time_since_call)
-        imgui.set_cursor_pos(pos)
-        imgui.text("Last call: " .. time_since_call)
         imgui.spacing()
+
+        -- Get time string for positioning calculation
+        local time_ago_str = node.last_hook_time 
+            and Utils.format_time_ago(node.last_hook_time) 
+            or "Never called"
+        imgui.text("Last call:")
+        imgui.same_line()
+        local pos = Utils.get_right_cursor_pos(node.id, time_ago_str)
+        imgui.set_cursor_pos(pos)
         
+        -- Render with hover effects
+        if node.last_hook_time then
+            Utils.render_time_ago(node.last_hook_time, false)
+        else
+            imgui.text_colored("Never called", Constants.COLOR_TEXT_DARK_GRAY)
+        end
         render_was_called_output(node, false)
         
         imgui.spacing()
@@ -717,6 +720,27 @@ function HookStarter.render(node)
         
     end
     imgui.spacing()
+    imgui.spacing()
+    
+    -- Hook Options TreeNode
+    if imgui.tree_node("Hook Options") then
+        -- Initialize exact_type_match if not present
+        if node.exact_type_match == nil then
+            node.exact_type_match = false
+        end
+        
+        local exact_type_changed, new_exact_type = imgui.checkbox("Exact Type Match", node.exact_type_match)
+        if exact_type_changed then
+            node.exact_type_match = new_exact_type
+            State.mark_as_modified()
+        end
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("When enabled, hook only fires for exact type matches.\nFilters out calls from derived types.")
+        end
+        
+        imgui.tree_pop()
+    end
+    
     imgui.spacing()
     if imgui.button("- Remove Node") then
         if node.is_initialized and node.hook_id then
@@ -780,21 +804,33 @@ function HookStarter.initialize_hook(node)
     -- Set up both pre and post hooks
     success, result = pcall(function()
         return sdk.hook(method, function(args)
-            -- Check if node still exists - if removed, call original method
+
+             -- Check if node still exists - if removed, call original method
             if not State.node_map[node.id] then
                 return sdk.PreHookResult.CALL_ORIGINAL
             end
-            
+
+            local managed = nil
+            if not node.is_static then
+                managed = sdk.to_managed_object(args[2])
+            end
+
+            -- Exact type matching - filter out derived types if enabled
+            if managed and node.exact_type_match then
+                local success_type_check, actual_type = pcall(function()
+                    return managed:get_type_definition():get_full_name()
+                end)
+                if success_type_check and actual_type ~= node.path then
+                    -- Type mismatch - skip processing this call silently
+                    return sdk.PreHookResult.CALL_ORIGINAL
+                end
+            end
+
             node.last_hook_time = os.clock()
             node.was_called_dirty = true
             
             -- Determine argument offset and 'this' value
             local arg_offset = node.is_static and 2 or 3
-            local managed = nil
-            
-            if not node.is_static then
-                managed = sdk.to_managed_object(args[2])
-            end
             
             if managed or node.is_static then
                 node.ending_value = managed
