@@ -135,4 +135,20 @@ function PlayerStarter.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function PlayerStarter.serialize(node, Config)
+    -- PlayerStarter has no additional fields beyond BaseStarter
+    return BaseStarter.serialize(node, Config)
+end
+
+function PlayerStarter.deserialize(data, Config)
+    local node = BaseStarter.deserialize(data, Config)
+    -- Add any PlayerStarter-specific fields here if needed
+    node.process_path = "" -- Initialize process_path
+    return node
+end
+
 return PlayerStarter

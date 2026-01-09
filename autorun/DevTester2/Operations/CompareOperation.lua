@@ -198,4 +198,16 @@ function CompareOperation.render(node)
     
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function CompareOperation.serialize(node, Config)
+    return BaseOperation.serialize(node, Config)
+end
+
+function CompareOperation.deserialize(data, Config)
+    return BaseOperation.deserialize(data, Config)
+end
+
 return CompareOperation

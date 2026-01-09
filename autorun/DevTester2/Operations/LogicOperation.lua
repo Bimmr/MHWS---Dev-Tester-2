@@ -194,4 +194,16 @@ function LogicOperation.render(node)
     
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function LogicOperation.serialize(node, Config)
+    return BaseOperation.serialize(node, Config)
+end
+
+function LogicOperation.deserialize(data, Config)
+    return BaseOperation.deserialize(data, Config)
+end
+
 return LogicOperation

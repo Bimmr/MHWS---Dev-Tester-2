@@ -281,4 +281,31 @@ function HistoryBuffer.execute(node)
     return Nodes.get_input_pin_value(node, 1)
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function HistoryBuffer.serialize(node, Config)
+    local data = BaseUtility.serialize(node, Config)
+    data.buffer_size = node.buffer_size
+    data.is_paused = node.is_paused
+    data.current_history_index = node.current_history_index
+    data.history_write_index = node.history_write_index
+    data.history_count = node.history_count
+    -- Note: We don't serialize the actual history entries as they're runtime data
+    return data
+end
+
+function HistoryBuffer.deserialize(data, Config)
+    local node = BaseUtility.deserialize(data, Config)
+    node.buffer_size = data.buffer_size or 10
+    node.is_paused = data.is_paused or false
+    node.current_history_index = data.current_history_index or 1
+    node.history_write_index = data.history_write_index or 1
+    node.history_count = data.history_count or 0
+    node.history = {}
+    node.display_value = nil
+    return node
+end
+
 return HistoryBuffer

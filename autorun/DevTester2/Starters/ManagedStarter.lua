@@ -116,4 +116,20 @@ function ManagedStarter.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function ManagedStarter.serialize(node, Config)
+    -- Get base serialization
+    local data = BaseStarter.serialize(node, Config)
+    -- ManagedStarter has no additional fields beyond BaseStarter
+    return data
+end
+
+function ManagedStarter.deserialize(data, Config)
+    -- ManagedStarter uses the base deserialize directly
+    return BaseStarter.deserialize(data, Config)
+end
+
 return ManagedStarter

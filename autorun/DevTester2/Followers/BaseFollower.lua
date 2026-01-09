@@ -339,6 +339,36 @@ function BaseFollower.create(position)
     return node
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function BaseFollower.serialize(node, Config)
+    return {
+        id = node.id,
+        category = node.category,
+        type = node.type,
+        position = {x = node.position.x, y = node.position.y},
+        action_type = node.action_type,
+        pins = Config.serialize_pins(node.pins)
+    }
+end
+
+function BaseFollower.deserialize(data, Config)
+    local Constants = require("DevTester2.Constants")
+    return {
+        id = data.id,
+        category = data.category,
+        type = data.type or Constants.FOLLOWER_TYPE_METHOD,
+        position = data.position or {x = 0, y = 0},
+        action_type = data.action_type,
+        starting_value = nil,
+        ending_value = nil,
+        status = nil,
+        pins = Config.deserialize_pins(data.pins, data.id)
+    }
+end
+
 return BaseFollower
 
 

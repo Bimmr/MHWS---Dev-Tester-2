@@ -289,4 +289,24 @@ function ConditionControl.create(position)
     return node
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function ConditionControl.serialize(node, Config)
+    local data = BaseControl.serialize(node, Config)
+    data.condition_manual_value = node.condition_manual_value
+    data.true_manual_value = node.true_manual_value
+    data.false_manual_value = node.false_manual_value
+    return data
+end
+
+function ConditionControl.deserialize(data, Config)
+    local node = BaseControl.deserialize(data, Config)
+    node.condition_manual_value = data.condition_manual_value or ""
+    node.true_manual_value = data.true_manual_value or ""
+    node.false_manual_value = data.false_manual_value or ""
+    return node
+end
+
 return ConditionControl

@@ -572,5 +572,39 @@ function MethodFollower.resolve_method_parameters(node, selected_method)
     return params
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function MethodFollower.serialize(node, Config)
+    local data = BaseFollower.serialize(node, Config)
+    
+    -- Add method-specific fields
+    local parent_value = Nodes.get_parent_value(node)
+    if parent_value then
+        local parent_type = BaseFollower.get_parent_type(parent_value)
+        if parent_type then
+            local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+            local method = Nodes.get_method_by_group_and_index(parent_type, node.method_group_index, node.method_index, is_static_context)
+            if method then
+                data.selected_method_signature = Nodes.get_method_signature(method)
+            end
+        end
+    end
+    
+    data.param_manual_values = node.param_manual_values
+    return data
+end
+
+function MethodFollower.deserialize(data, Config)
+    local node = BaseFollower.deserialize(data, Config)
+    node.selected_method_combo = data.selected_method_combo or 1
+    node.selected_method_signature = data.selected_method_signature
+    node.method_group_index = data.method_group_index
+    node.method_index = data.method_index
+    node.param_manual_values = data.param_manual_values or {}
+    return node
+end
+
 return MethodFollower
 

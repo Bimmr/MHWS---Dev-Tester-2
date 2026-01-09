@@ -313,4 +313,26 @@ function VariableData.execute(node)
     node.ending_value = VariableData.update_from_input(node, input_value)
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function VariableData.serialize(node, Config)
+    local data = BaseData.serialize(node, Config)
+    data.variable_name = node.variable_name
+    data.default_value = node.default_value
+    data.input_manual_value = node.input_manual_value
+    data.pending_reset = node.pending_reset
+    return data
+end
+
+function VariableData.deserialize(data, Config)
+    local node = BaseData.deserialize(data, Config)
+    node.variable_name = data.variable_name or ""
+    node.default_value = data.default_value or ""
+    node.input_manual_value = data.input_manual_value or ""
+    node.pending_reset = data.pending_reset or false
+    return node
+end
+
 return VariableData

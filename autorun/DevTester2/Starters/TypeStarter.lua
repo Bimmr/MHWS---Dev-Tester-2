@@ -107,4 +107,18 @@ function TypeStarter.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function TypeStarter.serialize(node, Config)
+    -- TypeStarter has no additional fields beyond BaseStarter
+    return BaseStarter.serialize(node, Config)
+end
+
+function TypeStarter.deserialize(data, Config)
+    -- TypeStarter uses the base deserialize directly
+    return BaseStarter.deserialize(data, Config)
+end
+
 return TypeStarter

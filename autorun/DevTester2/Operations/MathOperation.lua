@@ -210,4 +210,16 @@ function MathOperation.render(node)
     
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function MathOperation.serialize(node, Config)
+    return BaseOperation.serialize(node, Config)
+end
+
+function MathOperation.deserialize(data, Config)
+    return BaseOperation.deserialize(data, Config)
+end
+
 return MathOperation

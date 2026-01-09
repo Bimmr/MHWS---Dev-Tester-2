@@ -374,4 +374,48 @@ function NativeStarter.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function NativeStarter.serialize(node, Config)
+    -- Get base serialization
+    local data = BaseStarter.serialize(node, Config)
+    
+    -- Add native-specific fields
+    data.method_name = node.method_name
+    data.action_type = node.action_type
+    
+    -- Generate signature for method reconstruction
+    if node.path and node.method_group_index and node.method_index then
+        local type_def = sdk.find_type_definition(node.path)
+        if type_def then
+            local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
+            if method then
+                data.selected_method_signature = Nodes.get_method_signature(method)
+            end
+        end
+    end
+    
+    data.native_method_result = node.native_method_result
+    
+    return data
+end
+
+function NativeStarter.deserialize(data, Config)
+    -- Get base node structure
+    local node = BaseStarter.deserialize(data, Config)
+    
+    -- Add native-specific fields
+    node.method_name = data.method_name or ""
+    node.action_type = data.action_type
+    node.selected_method_combo = data.selected_method_combo
+    node.selected_method_signature = data.selected_method_signature
+    node.method_group_index = data.method_group_index
+    node.method_index = data.method_index
+    node.native_method_result = data.native_method_result
+    
+    return node
+end
+
 return NativeStarter

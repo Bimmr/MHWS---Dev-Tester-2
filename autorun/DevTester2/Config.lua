@@ -6,11 +6,102 @@ local Nodes = require("DevTester2.Nodes")
 local Constants = require("DevTester2.Constants")
 local Utils = require("DevTester2.Utils")
 local BaseFollower = require("DevTester2.Followers.BaseFollower")
+
+-- Require all node types for serialization
+local HookStarter = require("DevTester2.Starters.HookStarter")
+local ManagedStarter = require("DevTester2.Starters.ManagedStarter")
+local NativeStarter = require("DevTester2.Starters.NativeStarter")
+local PlayerStarter = require("DevTester2.Starters.PlayerStarter")
+local TypeStarter = require("DevTester2.Starters.TypeStarter")
+
+local PrimitiveData = require("DevTester2.Datas.PrimitiveData")
+local EnumData = require("DevTester2.Datas.EnumData")
+local VariableData = require("DevTester2.Datas.VariableData")
+
+local MathOperation = require("DevTester2.Operations.MathOperation")
+local CompareOperation = require("DevTester2.Operations.CompareOperation")
+local LogicOperation = require("DevTester2.Operations.LogicOperation")
+local InvertOperation = require("DevTester2.Operations.InvertOperation")
+
+local SwitchControl = require("DevTester2.Control.SwitchControl")
+local ToggleControl = require("DevTester2.Control.ToggleControl")
+local CounterControl = require("DevTester2.Control.CounterControl")
+local ConditionControl = require("DevTester2.Control.ConditionControl")
+
+local MethodFollower = require("DevTester2.Followers.MethodFollower")
+local FieldFollower = require("DevTester2.Followers.FieldFollower")
+local ArrayFollower = require("DevTester2.Followers.ArrayFollower")
+
+local Label = require("DevTester2.Utility.Label")
+local HistoryBuffer = require("DevTester2.Utility.HistoryBuffer")
+
 local json = json
 local fs = fs
 local sdk = sdk
 
 local Config = {}
+
+-- ========================================
+-- Shared Pin Serialization Utilities
+-- ========================================
+
+function Config.serialize_pins(pins)
+    local data = { inputs = {}, outputs = {} }
+    
+    if pins then
+        for _, pin in ipairs(pins.inputs) do
+            table.insert(data.inputs, {
+                id = pin.id,
+                name = pin.name,
+                value = pin.value,
+                connection = pin.connection
+            })
+        end
+        for _, pin in ipairs(pins.outputs) do
+            table.insert(data.outputs, {
+                id = pin.id,
+                name = pin.name,
+                value = pin.value,
+                connections = pin.connections
+            })
+        end
+    end
+    
+    return data
+end
+
+function Config.deserialize_pins(data, node_id)
+    local pins = { inputs = {}, outputs = {} }
+    
+    if data then
+        if data.inputs then
+            for _, pin_data in ipairs(data.inputs) do
+                local pin = {
+                    id = pin_data.id,
+                    name = pin_data.name,
+                    value = pin_data.value,
+                    connection = pin_data.connection
+                }
+                table.insert(pins.inputs, pin)
+                State.pin_map[pin.id] = { node_id = node_id, pin = pin }
+            end
+        end
+        if data.outputs then
+            for _, pin_data in ipairs(data.outputs) do
+                local pin = {
+                    id = pin_data.id,
+                    name = pin_data.name,
+                    value = pin_data.value,
+                    connections = pin_data.connections or {}
+                }
+                table.insert(pins.outputs, pin)
+                State.pin_map[pin.id] = { node_id = node_id, pin = pin }
+            end
+        end
+    end
+    
+    return pins
+end
 
 -- ========================================
 -- Configuration Directory
@@ -100,188 +191,72 @@ function Config.serialize_all_nodes()
 end
 
 function Config.serialize_node(node)
-    local data = {
-        id = node.id,
-        category = node.category,
-        position = {x = node.position.x, y = node.position.y},
-        pins = { inputs = {}, outputs = {} }
-    }
-    
-    -- Serialize pins
-    if node.pins then
-        for _, pin in ipairs(node.pins.inputs) do
-            table.insert(data.pins.inputs, {
-                id = pin.id,
-                name = pin.name,
-                value = pin.value,
-                connection = pin.connection
-            })
-        end
-        for _, pin in ipairs(node.pins.outputs) do
-            table.insert(data.pins.outputs, {
-                id = pin.id,
-                name = pin.name,
-                value = pin.value,
-                connections = pin.connections
-            })
-        end
-    end
-    
-    -- Add type-specific data
+    -- Dispatch to appropriate node type's serialize method
     if node.category == Constants.NODE_CATEGORY_STARTER then
-        data.category = node.category
-        data.type = node.type
-        data.path = node.path
-        data.param_manual_values = node.param_manual_values
-
         if node.type == Constants.STARTER_TYPE_HOOK then
-            data.method_name = node.method_name
-            
-            -- Generate signature
-            if node.path and node.method_group_index and node.method_index then
-                local type_def = sdk.find_type_definition(node.path)
-                if type_def then
-                    local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
-                    if method then
-                        data.selected_method_signature = Nodes.get_method_signature(method)
-                    end
-                end
-            end
-
-            data.pre_hook_result = node.pre_hook_result
-            data.return_type_name = node.return_type_name
-            data.return_type_full_name = node.return_type_full_name
-            data.is_initialized = node.is_initialized
-            data.return_override_manual = node.return_override_manual
-            data.actual_return_value = node.actual_return_value
-            data.is_return_overridden = node.is_return_overridden
-            data.exact_type_match = node.exact_type_match
+            return HookStarter.serialize(node, Config)
+        elseif node.type == Constants.STARTER_TYPE_MANAGED then
+            return ManagedStarter.serialize(node, Config)
         elseif node.type == Constants.STARTER_TYPE_NATIVE then
-            data.method_name = node.method_name
-            data.action_type = node.action_type
-            
-            -- Generate signature
-            if node.path and node.method_group_index and node.method_index then
-                local type_def = sdk.find_type_definition(node.path)
-                if type_def then
-                    local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
-                    if method then
-                        data.selected_method_signature = Nodes.get_method_signature(method)
-                    end
-                end
-            end
-
-            data.native_method_result = node.native_method_result
+            return NativeStarter.serialize(node, Config)
+        elseif node.type == Constants.STARTER_TYPE_PLAYER then
+            return PlayerStarter.serialize(node, Config)
+        elseif node.type == Constants.STARTER_TYPE_TYPE then
+            return TypeStarter.serialize(node, Config)
         end
     elseif node.category == Constants.NODE_CATEGORY_DATA then
-        data.category = node.category
-        data.type = node.type
-
         if node.type == Constants.DATA_TYPE_PRIMITIVE then
-            data.value = node.value
+            return PrimitiveData.serialize(node, Config)
         elseif node.type == Constants.DATA_TYPE_ENUM then
-            data.path = node.path
-            data.selected_enum_index = node.selected_enum_index
+            return EnumData.serialize(node, Config)
         elseif node.type == Constants.DATA_TYPE_VARIABLE then
-            data.variable_name = node.variable_name
-            data.default_value = node.default_value
-            data.input_manual_value = node.input_manual_value
-            data.pending_reset = node.pending_reset
+            return VariableData.serialize(node, Config)
         end
     elseif node.category == Constants.NODE_CATEGORY_OPERATIONS then
-        data.category = node.category
-        data.type = node.type
-        data.selected_operation = node.selected_operation  -- For math operations
-        -- Manual values
-        data.input1_manual_value = node.input1_manual_value
-        data.input2_manual_value = node.input2_manual_value
+        if node.type == Constants.OPERATIONS_TYPE_MATH then
+            return MathOperation.serialize(node, Config)
+        elseif node.type == Constants.OPERATIONS_TYPE_COMPARE then
+            return CompareOperation.serialize(node, Config)
+        elseif node.type == Constants.OPERATIONS_TYPE_LOGIC then
+            return LogicOperation.serialize(node, Config)
+        elseif node.type == Constants.OPERATIONS_TYPE_INVERT then
+            return InvertOperation.serialize(node, Config)
+        end
     elseif node.category == Constants.NODE_CATEGORY_CONTROL then
-        data.category = node.category
-        data.type = node.type
-        
-        -- Type-specific attributes
         if node.type == Constants.CONTROL_TYPE_SWITCH then
-            -- Enhanced Select Control properties
-            data.num_conditions = node.num_conditions
-            data.show_compare_input = node.show_compare_input
-            -- Legacy manual values (for backward compatibility)
-            data.condition_manual_value = node.condition_manual_value
-            data.true_manual_value = node.true_manual_value
-            data.false_manual_value = node.false_manual_value
+            return SwitchControl.serialize(node, Config)
         elseif node.type == Constants.CONTROL_TYPE_TOGGLE then
-            -- Manual values
-            data.input_manual_value = node.input_manual_value
-            data.enabled_manual_value = node.enabled_manual_value
+            return ToggleControl.serialize(node, Config)
         elseif node.type == Constants.CONTROL_TYPE_COUNTER then
-            -- Manual values
-            data.max_manual_value = node.max_manual_value
-            data.active_manual_value = node.active_manual_value
-            data.restart_manual_value = node.restart_manual_value
-            -- Runtime values
-            data.current_count = node.current_count
-            data.delay_ms = node.delay_ms
-            data.last_increment_time = node.last_increment_time
+            return CounterControl.serialize(node, Config)
         elseif node.type == Constants.CONTROL_TYPE_CONDITION then
-            -- Manual values
-            data.condition_manual_value = node.condition_manual_value
-            data.true_manual_value = node.true_manual_value
-            data.false_manual_value = node.false_manual_value
+            return ConditionControl.serialize(node, Config)
         end
     elseif node.category == Constants.NODE_CATEGORY_FOLLOWER then
-        data.category = node.category
-        data.type = node.type
-        data.action_type = node.action_type
-
         if node.type == Constants.FOLLOWER_TYPE_METHOD then
-            local parent_value = Nodes.get_parent_value(node)
-            if parent_value then
-                local parent_type = BaseFollower.get_parent_type(parent_value)
-                if parent_type then
-                    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
-                    local method = Nodes.get_method_by_group_and_index(parent_type, node.method_group_index, node.method_index, is_static_context)
-                    if method then
-                        data.selected_method_signature = Nodes.get_method_signature(method)
-                    end
-                end
-            end
-            data.param_manual_values = node.param_manual_values
+            return MethodFollower.serialize(node, Config)
         elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
-            local parent_value = Nodes.get_parent_value(node)
-            if parent_value then
-                local parent_type = BaseFollower.get_parent_type(parent_value)
-                if parent_type then
-                    local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
-                    local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
-                    if field then
-                        data.selected_field_signature = Nodes.get_field_signature(field)
-                    end
-                end
-            end
-            if node.action_type == 1 then -- Set
-                data.value_manual_input = node.value_manual_input
-                data.set_active = node.set_active
-            end
+            return FieldFollower.serialize(node, Config)
         elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
-            data.selected_element_index = node.selected_element_index
+            return ArrayFollower.serialize(node, Config)
         end
     elseif node.category == Constants.NODE_CATEGORY_UTILITY then
-        data.category = node.category
-        data.type = node.type
-        
         if node.type == Constants.UTILITY_TYPE_LABEL then
-            data.text = node.text
+            return Label.serialize(node, Config)
         elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
-            data.buffer_size = node.buffer_size
-            data.is_paused = node.is_paused
-            data.current_history_index = node.current_history_index
-            data.history_write_index = node.history_write_index
-            data.history_count = node.history_count
-            -- Note: We don't serialize the actual history entries as they're runtime data
-            -- Users will need to recapture data after loading
+            return HistoryBuffer.serialize(node, Config)
         end
     end
     
-    return data
+    -- Fallback - should never reach here
+    log.debug("Warning: Unknown node type during serialization")
+    return {
+        id = node.id,
+        category = node.category,
+        type = node.type,
+        position = {x = node.position.x, y = node.position.y},
+        pins = Config.serialize_pins(node.pins)
+    }
 end
 
 function Config.serialize_all_links()
@@ -559,203 +534,74 @@ function Config.load_autosave()
 end
 
 function Config.deserialize_node(data)
-    local node
-    
-    -- Restore pins
-    local pins = { inputs = {}, outputs = {} }
-    if data.pins then
-        if data.pins.inputs then
-            for _, pin_data in ipairs(data.pins.inputs) do
-                local pin = {
-                    id = pin_data.id,
-                    name = pin_data.name,
-                    value = pin_data.value,
-                    connection = pin_data.connection
-                }
-                table.insert(pins.inputs, pin)
-                State.pin_map[pin.id] = { node_id = data.id, pin = pin }
-            end
-        end
-        if data.pins.outputs then
-            for _, pin_data in ipairs(data.pins.outputs) do
-                local pin = {
-                    id = pin_data.id,
-                    name = pin_data.name,
-                    value = pin_data.value,
-                    connections = pin_data.connections or {}
-                }
-                table.insert(pins.outputs, pin)
-                State.pin_map[pin.id] = { node_id = data.id, pin = pin }
-            end
-        end
-    end
-    
+    -- Dispatch to appropriate node type's deserialize method
     if data.category == Constants.NODE_CATEGORY_STARTER then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type,
-            path = data.path,
-            position = data.position or {x = 0, y = 0},
-            ending_value = nil,
-            status = nil,
-            param_manual_values = data.param_manual_values or {},
-            -- Hook-specific
-            method_name = data.method_name or "",
-            selected_method_combo = data.selected_method_combo,
-            selected_method_signature = data.selected_method_signature,
-            method_group_index = data.method_group_index,
-            method_index = data.method_index,
-            pre_hook_result = data.pre_hook_result or "CALL_ORIGINAL",
-            return_type_name = data.return_type_name,
-            return_type_full_name = data.return_type_full_name,
-            hook_id = nil,
-            is_initialized = data.is_initialized or false,
-            return_override_manual = data.return_override_manual,
-            actual_return_value = data.actual_return_value,
-            is_return_overridden = data.is_return_overridden or false,
-            exact_type_match = data.exact_type_match or false,
-            -- Native-specific
-            native_method_result = data.native_method_result,
-            action_type = data.action_type
-        }
-    elseif data.category == Constants.NODE_CATEGORY_DATA then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type,
-            path = data.path or "",
-            position = data.position or {x = 0, y = 0},
-            ending_value = nil,
-            status = nil,
-            -- Enum-specific
-            selected_enum_index = data.selected_enum_index or 1,
-            -- Value-specific
-            value = data.value or "",
-            -- Variable-specific
-            variable_name = data.variable_name or "",
-            default_value = data.default_value or "",
-            input_manual_value = data.input_manual_value or "",
-            pending_reset = data.pending_reset or false
-        }
-    elseif data.category == Constants.NODE_CATEGORY_OPERATIONS then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type,
-            position = data.position or {x = 0, y = 0},
-            selected_operation = data.selected_operation or 
-                (data.type == Constants.OPERATIONS_TYPE_COMPARE and Constants.COMPARE_OPERATION_EQUALS) or
-                (data.type == Constants.OPERATIONS_TYPE_LOGIC and Constants.LOGIC_OPERATION_AND) or
-                (data.type == Constants.OPERATIONS_TYPE_INVERT and 0) or  -- Invert doesn't use selected_operation
-                Constants.MATH_OPERATION_ADD,  -- Default for math operations
-            ending_value = nil,
-            status = nil,
-            -- Manual values
-            input1_manual_value = data.input1_manual_value or "",
-            input2_manual_value = data.input2_manual_value or ""
-        }
-        
-    elseif data.category == Constants.NODE_CATEGORY_CONTROL then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type,
-            position = data.position or {x = 0, y = 0},
-            ending_value = nil,
-            status = nil
-        }
-        
-        -- Type-specific attributes
-        if data.type == Constants.CONTROL_TYPE_SWITCH then
-            -- Enhanced Select Control properties
-            node.num_conditions = data.num_conditions or 1
-            node.show_compare_input = data.show_compare_input or false
-            -- Legacy manual values (for backward compatibility)
-            node.condition_manual_value = data.condition_manual_value or ""
-            node.true_manual_value = data.true_manual_value or ""
-            node.false_manual_value = data.false_manual_value or ""
-        elseif data.type == Constants.CONTROL_TYPE_TOGGLE then
-            -- Manual values
-            node.input_manual_value = data.input_manual_value or ""
-            node.enabled_manual_value = data.enabled_manual_value or false
-        elseif data.type == Constants.CONTROL_TYPE_COUNTER then
-            -- Manual values
-            node.max_manual_value = data.max_manual_value or "10"
-            node.active_manual_value = data.active_manual_value or false
-            node.restart_manual_value = data.restart_manual_value or false
-            -- Runtime values
-            node.current_count = data.current_count or 0
-            node.delay_ms = data.delay_ms or 1000
-            node.last_increment_time = data.last_increment_time
-        elseif data.type == Constants.CONTROL_TYPE_CONDITION then
-            -- Manual values
-            node.condition_manual_value = data.condition_manual_value or ""
-            node.true_manual_value = data.true_manual_value or ""
-            node.false_manual_value = data.false_manual_value or ""
+        if data.type == Constants.STARTER_TYPE_HOOK then
+            return HookStarter.deserialize(data, Config)
+        elseif data.type == Constants.STARTER_TYPE_MANAGED then
+            return ManagedStarter.deserialize(data, Config)
+        elseif data.type == Constants.STARTER_TYPE_NATIVE then
+            return NativeStarter.deserialize(data, Config)
+        elseif data.type == Constants.STARTER_TYPE_PLAYER then
+            return PlayerStarter.deserialize(data, Config)
+        elseif data.type == Constants.STARTER_TYPE_TYPE then
+            return TypeStarter.deserialize(data, Config)
         end
-        
+    elseif data.category == Constants.NODE_CATEGORY_DATA then
+        if data.type == Constants.DATA_TYPE_PRIMITIVE then
+            return PrimitiveData.deserialize(data, Config)
+        elseif data.type == Constants.DATA_TYPE_ENUM then
+            return EnumData.deserialize(data, Config)
+        elseif data.type == Constants.DATA_TYPE_VARIABLE then
+            return VariableData.deserialize(data, Config)
+        end
+    elseif data.category == Constants.NODE_CATEGORY_OPERATIONS then
+        if data.type == Constants.OPERATIONS_TYPE_MATH then
+            return MathOperation.deserialize(data, Config)
+        elseif data.type == Constants.OPERATIONS_TYPE_COMPARE then
+            return CompareOperation.deserialize(data, Config)
+        elseif data.type == Constants.OPERATIONS_TYPE_LOGIC then
+            return LogicOperation.deserialize(data, Config)
+        elseif data.type == Constants.OPERATIONS_TYPE_INVERT then
+            return InvertOperation.deserialize(data, Config)
+        end
+    elseif data.category == Constants.NODE_CATEGORY_CONTROL then
+        if data.type == Constants.CONTROL_TYPE_SWITCH then
+            return SwitchControl.deserialize(data, Config)
+        elseif data.type == Constants.CONTROL_TYPE_TOGGLE then
+            return ToggleControl.deserialize(data, Config)
+        elseif data.type == Constants.CONTROL_TYPE_COUNTER then
+            return CounterControl.deserialize(data, Config)
+        elseif data.type == Constants.CONTROL_TYPE_CONDITION then
+            return ConditionControl.deserialize(data, Config)
+        end
     elseif data.category == Constants.NODE_CATEGORY_FOLLOWER then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type or Constants.FOLLOWER_TYPE_METHOD,
-            position = data.position or {x = 0, y = 0},
-            action_type = data.action_type,
-            -- Method-specific
-            selected_method_combo = data.selected_method_combo or 1,
-            selected_method_signature = data.selected_method_signature,
-            method_group_index = data.method_group_index,
-            method_index = data.method_index,
-            param_manual_values = data.param_manual_values or {},
-            -- Field-specific
-            selected_field_combo = data.selected_field_combo or 1,
-            selected_field_signature = data.selected_field_signature,
-            field_group_index = data.field_group_index,
-            field_index = data.field_index,
-            value_manual_input = data.value_manual_input or "",
-            set_active = data.set_active or false,
-            -- Array-specific
-            selected_element_index = data.selected_element_index or 0,
-            index_manual_value = "",
-            -- Common
-            starting_value = nil,
-            ending_value = nil,
-            status = nil
-        }
-        
-        -- Operation nodes will be validated after parent connections are restored
+        if data.type == Constants.FOLLOWER_TYPE_METHOD then
+            return MethodFollower.deserialize(data, Config)
+        elseif data.type == Constants.FOLLOWER_TYPE_FIELD then
+            return FieldFollower.deserialize(data, Config)
+        elseif data.type == Constants.FOLLOWER_TYPE_ARRAY then
+            return ArrayFollower.deserialize(data, Config)
+        end
     elseif data.category == Constants.NODE_CATEGORY_UTILITY then
-        node = {
-            id = data.id,
-            category = data.category,
-            pins = pins,
-            type = data.type,
-            position = data.position or {x = 0, y = 0},
-            ending_value = nil,
-            status = nil
-        }
-        
         if data.type == Constants.UTILITY_TYPE_LABEL then
-            node.text = data.text or ""
+            return Label.deserialize(data, Config)
         elseif data.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
-            node.buffer_size = data.buffer_size or 10
-            node.is_paused = data.is_paused or false
-            node.current_history_index = data.current_history_index or 1
-            node.history_write_index = data.history_write_index or 1
-            node.history_count = data.history_count or 0
-            node.history = {}  -- History entries are not persisted, will be recaptured
-            node.current_value = nil
-            node.display_value = nil
+            return HistoryBuffer.deserialize(data, Config)
         end
     end
     
-    return node
+    -- Fallback - should never reach here
+    log.debug("Warning: Unknown node type during deserialization")
+    return {
+        id = data.id,
+        category = data.category,
+        type = data.type,
+        position = data.position or {x = 0, y = 0},
+        ending_value = nil,
+        status = nil,
+        pins = Config.deserialize_pins(data.pins, data.id)
+    }
 end
 
 function Config.add_node_to_graph(node)

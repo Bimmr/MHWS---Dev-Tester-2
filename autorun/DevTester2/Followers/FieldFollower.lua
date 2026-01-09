@@ -481,4 +481,43 @@ function FieldFollower.execute(node, parent_value, selected_field)
     end
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function FieldFollower.serialize(node, Config)
+    local data = BaseFollower.serialize(node, Config)
+    
+    -- Add field-specific fields
+    local parent_value = Nodes.get_parent_value(node)
+    if parent_value then
+        local parent_type = BaseFollower.get_parent_type(parent_value)
+        if parent_type then
+            local is_static_context = BaseFollower.is_parent_type_definition(parent_value)
+            local field = Nodes.get_field_by_group_and_index(parent_type, node.field_group_index, node.field_index, is_static_context)
+            if field then
+                data.selected_field_signature = Nodes.get_field_signature(field)
+            end
+        end
+    end
+    
+    if node.action_type == 1 then -- Set
+        data.value_manual_input = node.value_manual_input
+        data.set_active = node.set_active
+    end
+    
+    return data
+end
+
+function FieldFollower.deserialize(data, Config)
+    local node = BaseFollower.deserialize(data, Config)
+    node.selected_field_combo = data.selected_field_combo or 1
+    node.selected_field_signature = data.selected_field_signature
+    node.field_group_index = data.field_group_index
+    node.field_index = data.field_index
+    node.value_manual_input = data.value_manual_input or ""
+    node.set_active = data.set_active or false
+    return node
+end
+
 return FieldFollower

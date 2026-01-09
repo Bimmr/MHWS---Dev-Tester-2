@@ -127,4 +127,16 @@ function InvertOperation.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function InvertOperation.serialize(node, Config)
+    return BaseOperation.serialize(node, Config)
+end
+
+function InvertOperation.deserialize(data, Config)
+    return BaseOperation.deserialize(data, Config)
+end
+
 return InvertOperation

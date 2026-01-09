@@ -385,4 +385,21 @@ function ArrayFollower.execute(node, parent_value)
     end
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function ArrayFollower.serialize(node, Config)
+    local data = BaseFollower.serialize(node, Config)
+    data.selected_element_index = node.selected_element_index
+    return data
+end
+
+function ArrayFollower.deserialize(data, Config)
+    local node = BaseFollower.deserialize(data, Config)
+    node.selected_element_index = data.selected_element_index or 0
+    node.index_manual_value = ""
+    return node
+end
+
 return ArrayFollower

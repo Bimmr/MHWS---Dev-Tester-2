@@ -81,4 +81,20 @@ function PrimitiveData.execute(node)
     node.ending_value = Utils.parse_primitive_value(node.value)
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function PrimitiveData.serialize(node, Config)
+    local data = BaseData.serialize(node, Config)
+    data.value = node.value
+    return data
+end
+
+function PrimitiveData.deserialize(data, Config)
+    local node = BaseData.deserialize(data, Config)
+    node.value = data.value or ""
+    return node
+end
+
 return PrimitiveData

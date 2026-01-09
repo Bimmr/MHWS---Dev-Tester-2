@@ -10,6 +10,7 @@
 local State = require("DevTester2.State")
 local Constants = require("DevTester2.Constants")
 local Nodes = require("DevTester2.Nodes")
+local BaseUtility = require("DevTester2.Utility.BaseUtility")
 local imgui = imgui
 local imnodes = imnodes
 
@@ -56,6 +57,22 @@ end
 function Label.execute(node)
     -- Label nodes don't need to execute anything
     -- They exist purely for visual annotation
+end
+
+-- ========================================
+-- Serialization
+-- ========================================
+
+function Label.serialize(node, Config)
+    local data = BaseUtility.serialize(node, Config)
+    data.text = node.text
+    return data
+end
+
+function Label.deserialize(data, Config)
+    local node = BaseUtility.deserialize(data, Config)
+    node.text = data.text or ""
+    return node
 end
 
 return Label

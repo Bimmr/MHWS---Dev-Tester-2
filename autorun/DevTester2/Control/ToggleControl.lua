@@ -189,4 +189,23 @@ function ToggleControl.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function ToggleControl.serialize(node, Config)
+    local data = BaseControl.serialize(node, Config)
+    data.input_manual_value = node.input_manual_value
+    data.enabled_manual_value = node.enabled_manual_value
+    return data
+end
+
+function ToggleControl.deserialize(data, Config)
+    local node = BaseControl.deserialize(data, Config)
+    node.input_manual_value = data.input_manual_value or ""
+    node.enabled_manual_value = data.enabled_manual_value or false
+    node.toggle_state = false
+    return node
+end
+
 return ToggleControl

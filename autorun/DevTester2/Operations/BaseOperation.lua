@@ -129,5 +129,42 @@ function BaseOperation.create(node_type, position)
     return node
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function BaseOperation.serialize(node, Config)
+    return {
+        id = node.id,
+        category = node.category,
+        type = node.type,
+        position = {x = node.position.x, y = node.position.y},
+        selected_operation = node.selected_operation,
+        input1_manual_value = node.input1_manual_value,
+        input2_manual_value = node.input2_manual_value,
+        pins = Config.serialize_pins(node.pins)
+    }
+end
+
+function BaseOperation.deserialize(data, Config)
+    local Constants = require("DevTester2.Constants")
+    return {
+        id = data.id,
+        category = data.category,
+        type = data.type,
+        position = data.position or {x = 0, y = 0},
+        selected_operation = data.selected_operation or 
+            (data.type == Constants.OPERATIONS_TYPE_COMPARE and Constants.COMPARE_OPERATION_EQUALS) or
+            (data.type == Constants.OPERATIONS_TYPE_LOGIC and Constants.LOGIC_OPERATION_AND) or
+            (data.type == Constants.OPERATIONS_TYPE_INVERT and 0) or
+            Constants.MATH_OPERATION_ADD,
+        ending_value = nil,
+        status = nil,
+        input1_manual_value = data.input1_manual_value or "",
+        input2_manual_value = data.input2_manual_value or "",
+        pins = Config.deserialize_pins(data.pins, data.id)
+    }
+end
+
 return BaseOperation
 

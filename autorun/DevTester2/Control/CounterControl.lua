@@ -279,4 +279,30 @@ function CounterControl.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function CounterControl.serialize(node, Config)
+    local data = BaseControl.serialize(node, Config)
+    data.max_manual_value = node.max_manual_value
+    data.active_manual_value = node.active_manual_value
+    data.restart_manual_value = node.restart_manual_value
+    data.current_count = node.current_count
+    data.delay_ms = node.delay_ms
+    data.last_increment_time = node.last_increment_time
+    return data
+end
+
+function CounterControl.deserialize(data, Config)
+    local node = BaseControl.deserialize(data, Config)
+    node.max_manual_value = data.max_manual_value or "10"
+    node.active_manual_value = data.active_manual_value or false
+    node.restart_manual_value = data.restart_manual_value or false
+    node.current_count = data.current_count or 0
+    node.delay_ms = data.delay_ms or 1000
+    node.last_increment_time = data.last_increment_time
+    return node
+end
+
 return CounterControl

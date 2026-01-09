@@ -195,4 +195,30 @@ function BaseControl.create(node_type, position)
     return node
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function BaseControl.serialize(node, Config)
+    return {
+        id = node.id,
+        category = node.category,
+        type = node.type,
+        position = {x = node.position.x, y = node.position.y},
+        pins = Config.serialize_pins(node.pins)
+    }
+end
+
+function BaseControl.deserialize(data, Config)
+    return {
+        id = data.id,
+        category = data.category,
+        type = data.type,
+        position = data.position or {x = 0, y = 0},
+        ending_value = nil,
+        status = nil,
+        pins = Config.deserialize_pins(data.pins, data.id)
+    }
+end
+
 return BaseControl

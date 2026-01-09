@@ -340,4 +340,23 @@ function EnumData.execute(node)
     end
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function EnumData.serialize(node, Config)
+    local data = BaseData.serialize(node, Config)
+    data.selected_enum_index = node.selected_enum_index
+    return data
+end
+
+function EnumData.deserialize(data, Config)
+    local node = BaseData.deserialize(data, Config)
+    node.selected_enum_index = data.selected_enum_index or 1
+    node.enum_names = nil
+    node.enum_values = nil
+    node.sorted_to_original_index = nil
+    return node
+end
+
 return EnumData

@@ -103,6 +103,36 @@ function BaseStarter.create(node_type, position)
     return node
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function BaseStarter.serialize(node, Config)
+    return {
+        id = node.id,
+        category = node.category,
+        type = node.type,
+        position = {x = node.position.x, y = node.position.y},
+        path = node.path,
+        param_manual_values = node.param_manual_values,
+        pins = Config.serialize_pins(node.pins)
+    }
+end
+
+function BaseStarter.deserialize(data, Config)
+    return {
+        id = data.id,
+        category = data.category,
+        type = data.type,
+        path = data.path or "",
+        position = data.position or {x = 0, y = 0},
+        ending_value = nil,
+        status = nil,
+        param_manual_values = data.param_manual_values or {},
+        pins = Config.deserialize_pins(data.pins, data.id)
+    }
+end
+
 return BaseStarter
 
 

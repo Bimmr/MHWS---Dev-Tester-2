@@ -940,4 +940,61 @@ function HookStarter.initialize_hook(node)
     end
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function HookStarter.serialize(node, Config)
+    -- Get base serialization
+    local data = BaseStarter.serialize(node, Config)
+    
+    -- Add hook-specific fields
+    data.method_name = node.method_name
+    
+    -- Generate signature for method reconstruction
+    if node.path and node.method_group_index and node.method_index then
+        local type_def = sdk.find_type_definition(node.path)
+        if type_def then
+            local method = Nodes.get_method_by_group_and_index(type_def, node.method_group_index, node.method_index, false)
+            if method then
+                data.selected_method_signature = Nodes.get_method_signature(method)
+            end
+        end
+    end
+    
+    data.pre_hook_result = node.pre_hook_result
+    data.return_type_name = node.return_type_name
+    data.return_type_full_name = node.return_type_full_name
+    data.is_initialized = node.is_initialized
+    data.return_override_manual = node.return_override_manual
+    data.actual_return_value = node.actual_return_value
+    data.is_return_overridden = node.is_return_overridden
+    data.exact_type_match = node.exact_type_match
+    
+    return data
+end
+
+function HookStarter.deserialize(data, Config)
+    -- Get base node structure
+    local node = BaseStarter.deserialize(data, Config)
+    
+    -- Add hook-specific fields
+    node.method_name = data.method_name or ""
+    node.selected_method_combo = data.selected_method_combo
+    node.selected_method_signature = data.selected_method_signature
+    node.method_group_index = data.method_group_index
+    node.method_index = data.method_index
+    node.pre_hook_result = data.pre_hook_result or "CALL_ORIGINAL"
+    node.return_type_name = data.return_type_name
+    node.return_type_full_name = data.return_type_full_name
+    node.hook_id = nil
+    node.is_initialized = data.is_initialized or false
+    node.return_override_manual = data.return_override_manual
+    node.actual_return_value = data.actual_return_value
+    node.is_return_overridden = data.is_return_overridden or false
+    node.exact_type_match = data.exact_type_match or false
+    
+    return node
+end
+
 return HookStarter

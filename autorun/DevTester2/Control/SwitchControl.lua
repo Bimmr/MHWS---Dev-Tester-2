@@ -535,4 +535,28 @@ function SwitchControl.render(node)
     imnodes.end_node()
 end
 
+-- ========================================
+-- Serialization
+-- ========================================
+
+function SwitchControl.serialize(node, Config)
+    local data = BaseControl.serialize(node, Config)
+    data.num_conditions = node.num_conditions
+    data.show_compare_input = node.show_compare_input
+    data.condition_manual_value = node.condition_manual_value
+    data.true_manual_value = node.true_manual_value
+    data.false_manual_value = node.false_manual_value
+    return data
+end
+
+function SwitchControl.deserialize(data, Config)
+    local node = BaseControl.deserialize(data, Config)
+    node.num_conditions = data.num_conditions or 1
+    node.show_compare_input = data.show_compare_input or false
+    node.condition_manual_value = data.condition_manual_value or ""
+    node.true_manual_value = data.true_manual_value or ""
+    node.false_manual_value = data.false_manual_value or ""
+    return node
+end
+
 return SwitchControl
