@@ -37,6 +37,7 @@ local ConditionControl = require("DevTester2.Control.ConditionControl")
 local BaseUtility = require("DevTester2.Utility.BaseUtility")
 local Label = require("DevTester2.Utility.Label")
 local HistoryBuffer = require("DevTester2.Utility.HistoryBuffer")
+local CallBuffer = require("DevTester2.Utility.CallBuffer")
 
 -- Local references
 local re = re
@@ -264,6 +265,13 @@ function render_utility_menu_items(position)
     end
     if imgui.is_item_hovered() then
         imgui.set_tooltip("Create a History Buffer node to capture and review the history of values passing through it.\nAllows pausing and navigating through past values.")
+    end
+
+    if imgui.menu_item("Call Buffer") then
+        BaseUtility.create(Constants.UTILITY_TYPE_CALL_BUFFER, position)
+    end
+    if imgui.is_item_hovered() then
+        imgui.set_tooltip("Create a Call Buffer node to capture and review the history of function calls passing through it")
     end
 end
 
@@ -494,6 +502,8 @@ function render_node_editor()
                 Label.render(node)
             elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
                 HistoryBuffer.render(node)
+            elseif node.type == Constants.UTILITY_TYPE_CALL_BUFFER then
+                CallBuffer.render(node)
             end
 
             imgui.pop_item_width()

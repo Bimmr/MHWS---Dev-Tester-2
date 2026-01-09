@@ -34,6 +34,7 @@ local ArrayFollower = require("DevTester2.Followers.ArrayFollower")
 
 local Label = require("DevTester2.Utility.Label")
 local HistoryBuffer = require("DevTester2.Utility.HistoryBuffer")
+local CallBuffer = require("DevTester2.Utility.CallBuffer")
 
 local json = json
 local fs = fs
@@ -245,6 +246,8 @@ function Config.serialize_node(node)
             return Label.serialize(node, Config)
         elseif node.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
             return HistoryBuffer.serialize(node, Config)
+        elseif node.type == Constants.UTILITY_TYPE_CALL_BUFFER then
+            return CallBuffer.serialize(node, Config)
         end
     end
     
@@ -588,6 +591,8 @@ function Config.deserialize_node(data)
             return Label.deserialize(data, Config)
         elseif data.type == Constants.UTILITY_TYPE_HISTORY_BUFFER then
             return HistoryBuffer.deserialize(data, Config)
+        elseif data.type == Constants.UTILITY_TYPE_CALL_BUFFER then
+            return CallBuffer.deserialize(data, Config)
         end
     end
     
