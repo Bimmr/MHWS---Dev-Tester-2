@@ -133,36 +133,52 @@ end
 -- Display Formatting
 -- ========================================
 
-function Utils.format_value_display(value)
+-- Helper to extract type information from a value
+-- Returns: type_info table with name, full_name, address (or nil for non-userdata)
+function Utils.get_type_info(value)
     if value == nil then
-        return "nil"
+        return nil
     end
     
-    local value_type = type(value)
+    if type(value) ~= "userdata" then
+        return {
+            name = type(value),
+            full_name = type(value),
+            address = nil,
+            type_def = nil,
+            is_userdata = false
+        }
+    end
     
-    if value_type == "userdata" then
-        -- It's a managed object
-        local success, type_def = pcall(function() return value:get_type_definition() end)
-        if success and type_def then
-            local type_name = type_def:get_name()
-            local success2, address = pcall(function() return value:get_address() end)
-            if success2 and address then
-                return string.format("%s | 0x%X", type_name, address)
-            else
-                return type_name
-            end
-        else
-            return "userdata"
+    local info = {
+        name = nil,
+        full_name = nil,
+        address = nil,
+        type_def = nil,
+        is_userdata = true
+    }
+    
+    local success, type_def = pcall(function() return value:get_type_definition() end)
+    if success and type_def then
+        info.type_def = type_def
+        
+        local success_name, name = pcall(function() return type_def:get_name() end)
+        if success_name and name then
+            info.name = name
         end
-    elseif value_type == "number" then
-        return string.format("%.2f", value)
-    elseif value_type == "boolean" then
-        return value and "true" or "false"
-    elseif value_type == "string" then
-        return string.format('"%s"', value)
-    else
-        return tostring(value)
+        
+        local success_full, full_name = pcall(function() return type_def:get_full_name() end)
+        if success_full and full_name then
+            info.full_name = full_name
+        end
+        
+        local success_addr, addr = pcall(function() return value:get_address() end)
+        if success_addr and addr then
+            info.address = addr
+        end
     end
+    
+    return info
 end
 
 -- ========================================
@@ -247,93 +263,98 @@ end
 function Utils.get_tooltip_for_value(value)
     if value == nil then return "nil" end
     
-    local tooltip_text = ""
-    if type(value) == "userdata" then
-        local success, type_info = pcall(function() return value:get_type_definition() end)
-        if success and type_info then
-           
-            local success_name, name = pcall(function() return type_info:get_name() end)
-            if success_name and name then
-                tooltip_text = "Type: " .. name .. "\n"
-            end
-
-            local success_addr, addr_val = pcall(function() return value:get_address() end)
-            if success_addr and addr_val then
-                tooltip_text = tooltip_text .. string.format("Address: 0x%X\n", addr_val).. "\n"
-            end
-            local success_full_name, full_name = pcall(function() return type_info:get_full_name() end)
-            if success_full_name and full_name then
-                tooltip_text = tooltip_text .. "Full Name: " .. full_name
-            end
-
-        else
-            tooltip_text = "userdata (unknown type)"
-        end
-    else
-        tooltip_text = string.format("Value: %s\nType: %s", tostring(value), type(value))
+    local info = Utils.get_type_info(value)
+    if not info then return "nil" end
+    
+    if not info.is_userdata then
+        return string.format("Value: %s\nType: %s", tostring(value), info.name)
     end
-    return tooltip_text
+    
+    -- Userdata tooltip
+    if not info.name then
+        return "userdata (unknown type)"
+    end
+    
+    local parts = {}
+    parts[#parts + 1] = "Type: " .. info.name
+    if info.address then
+        parts[#parts + 1] = string.format("Address: 0x%X", info.address)
+    end
+    if info.full_name then
+        parts[#parts + 1] = "Full Name: " .. info.full_name
+    end
+    
+    return table.concat(parts, "\n")
 end
 
 function Utils.get_value_display_string(value)
     if value == nil then return "nil" end
     
-    if type(value) == "userdata" then
-        local success, type_info = pcall(function() return value:get_type_definition() end)
-        if success and type_info then
-            local success_name, type_name = pcall(function() return type_info:get_name() end)
-            if not success_name or not type_name then
-                return "Object"
-            end
-
-            if type_name:find("Nullable") then 
-                local success_nullable, nullable_result = pcall(function()
-                    local field = type_info:get_field("_Value")
-                    local type = field:get_type()
-                    local name = type:get_full_name()
-                    local value = Utils.get_value_display_string(name)
-                    return "Nullable(" .. value .. ")"
-                end)
-                if success_nullable then
-                    return nullable_result
-                end
-            end
-            
-            -- Handle Vector types
-            if type_name == "vec3" then
-                local x = value.x or 0
-                local y = value.y or 0
-                local z = value.z or 0
-                return string.format("(%.2f, %.2f, %.2f)", x, y, z)
-            elseif type_name == "vec2" then
-                local x = value.x or 0
-                local y = value.y or 0
-                return string.format("(%.2f, %.2f)", x, y)
-            elseif type_name == "vec4" then
-                local x = value.x or 0
-                local y = value.y or 0
-                local z = value.z or 0
-                local w = value.w or 0
-                return string.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w)
-            elseif type_name == "Color" then
-                local r = value.r or 0
-                local g = value.g or 0
-                local b = value.b or 0
-                local a = value.a or 0
-                return string.format("RGBA(%.0f, %.0f, %.0f, %.0f)", r, g, b, a)
-            elseif type_name == "Size" then
-                local w = value.w or 0
-                local h = value.h or 0
-                return string.format("Size(%.2f, %.2f)", w, h)
-            end
-
-            return Utils.get_type_display_name(type_info)
-        else
-            return "Unknown"
-        end
-    else
+    local info = Utils.get_type_info(value)
+    if not info then return "nil" end
+    
+    if not info.is_userdata then
         return tostring(value)
     end
+    
+    -- Userdata - need type name for special handling
+    local type_name = info.name
+    if not type_name then
+        return "Unknown"
+    end
+    
+    -- Handle Nullable types
+    if type_name:find("Nullable") and info.type_def then
+        local success_nullable, nullable_result = pcall(function()
+            local field = info.type_def:get_field("_Value")
+            local inner_type = field:get_type()
+            local inner_name = inner_type:get_full_name()
+            return "Nullable(" .. Utils.get_value_display_string(inner_name) .. ")"
+        end)
+        if success_nullable then
+            return nullable_result
+        end
+    end
+    
+    -- Handle special display types (vectors, colors, etc.)
+    local special_display = Utils.format_special_type(value, type_name)
+    if special_display then
+        return special_display
+    end
+    
+    return Utils.get_type_display_name(info.type_def)
+end
+
+-- Format special types like vectors, colors, sizes for display
+-- Returns formatted string or nil if not a special type
+function Utils.format_special_type(value, type_name)
+    if type_name == "vec3" then
+        local x = value.x or 0
+        local y = value.y or 0
+        local z = value.z or 0
+        return string.format("(%.2f, %.2f, %.2f)", x, y, z)
+    elseif type_name == "vec2" then
+        local x = value.x or 0
+        local y = value.y or 0
+        return string.format("(%.2f, %.2f)", x, y)
+    elseif type_name == "vec4" then
+        local x = value.x or 0
+        local y = value.y or 0
+        local z = value.z or 0
+        local w = value.w or 0
+        return string.format("(%.2f, %.2f, %.2f, %.2f)", x, y, z, w)
+    elseif type_name == "Color" then
+        local r = value.r or 0
+        local g = value.g or 0
+        local b = value.b or 0
+        local a = value.a or 0
+        return string.format("RGBA(%.0f, %.0f, %.0f, %.0f)", r, g, b, a)
+    elseif type_name == "Size" then
+        local w = value.w or 0
+        local h = value.h or 0
+        return string.format("Size(%.2f, %.2f)", w, h)
+    end
+    return nil
 end
 
 function Utils.is_array(value)
