@@ -263,7 +263,7 @@ function render_utility_menu_items(position)
         BaseUtility.create(Constants.UTILITY_TYPE_HISTORY_BUFFER, position)
     end
     if imgui.is_item_hovered() then
-        imgui.set_tooltip("Create a History Buffer node to capture and review the history of values passing through it.\\nAllows pausing and navigating through past values.")
+        imgui.set_tooltip("Create a History Buffer node to capture and review the history of values passing through it.\nAllows pausing and navigating through past values.")
     end
 end
 
