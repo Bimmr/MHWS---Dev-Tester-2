@@ -598,7 +598,7 @@ function render_node_editor()
     end
     
     -- Handle copy/paste keybinds
-    local ctrl_held = imgui.is_key_down(imgui.ImGuiKey.LeftCtrl)
+    local ctrl_held = imgui.is_key_down(imgui.ImGuiKey.Key_LeftCtrl)
     if ctrl_held then
         -- CTRL + C (Copy)
         if imgui.is_key_pressed(imgui.ImGuiKey.Key_C) then
