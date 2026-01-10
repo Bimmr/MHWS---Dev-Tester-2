@@ -270,8 +270,27 @@ function HistoryBuffer.render(node)
         display_entry = get_history_entry(node, display_index)
         output_value = display_entry and display_entry.value or nil
     else
-        -- When running, use input and add to history
-        add_to_history(node, input_value)
+        local parent_node = nil
+        
+        -- Check if input is from a HookStarter and get its last_hook_time
+        if input_pin.connection then
+            local source_pin_info = State.pin_map[input_pin.connection.pin]
+            if source_pin_info then
+                parent_node = Nodes.find_node_by_id(source_pin_info.node_id)
+            end
+        end
+
+        
+        -- For hooks, only add if this is a new call (hook_time changed)
+        if parent_node and parent_node.category == Constants.NODE_CATEGORY_STARTER and parent_node.type == Constants.STARTER_TYPE_HOOK then
+            local last_hook_time = parent_node.last_hook_time
+            if not node.last_processed_hook_time or last_hook_time > node.last_processed_hook_time then
+                add_to_history(node, input_value)
+                node.last_processed_hook_time = last_hook_time
+            end
+        else
+            add_to_history(node, input_value)
+        end
         output_value = input_value
         display_entry = { timestamp = os.clock(), value = input_value }
     end
