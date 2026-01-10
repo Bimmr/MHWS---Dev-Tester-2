@@ -308,6 +308,14 @@ function NativeStarter.render(node)
                 local _, fixed_val = Nodes.validate_continuation(result, nil, return_type_name)
                 if fixed_val ~= nil then result = fixed_val end
 
+                -- Store actual runtime type for polymorphism support
+                if result and type(result) == "userdata" then
+                    local actual_type_name = Utils.get_actual_type_name(result, return_type_name)
+                    if actual_type_name ~= return_type_name then
+                        node.actual_return_type_name = actual_type_name
+                    end
+                end
+
                 node.native_method_result = result
                 node.ending_value = result
                 output_pin.value = result

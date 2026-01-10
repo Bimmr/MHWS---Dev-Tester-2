@@ -329,11 +329,16 @@ function FieldFollower.render(node)
             -- Execute and show output
             local result = FieldFollower.execute(node, parent_value, selected_field)
             
+            -- Get declared type name for tooltip
+            local declared_type = selected_field and selected_field:get_type()
+            local declared_type_name = declared_type and declared_type:get_full_name() or nil
+            
+            -- Get type info for display (includes actual runtime type)
+            local type_info = Utils.get_type_info_for_display(result, declared_type_name)
+            
             -- Always store result, even if nil
             node.ending_value = result
-            if result then
-                node.ending_value_full_name = selected_field:get_type():get_full_name()
-            end
+            node.ending_value_full_name = type_info.actual_type
             
             -- Check if result is userdata (can continue to child nodes)
             local can_continue
@@ -349,23 +354,21 @@ function FieldFollower.render(node)
             imnodes.begin_output_attribute(output_pin.id)
             
             if result ~= nil then
-                -- Display the actual result
-                local display_value = Utils.get_value_display_string(result)
-                local output_display = display_value .. " (?)"
+                local output_display = type_info.display .. " (?)"
                 local pos = Utils.get_right_cursor_pos(node.id, output_display)
                 imgui.set_cursor_pos(pos)
-                imgui.text(display_value)
-                if can_continue then
-                    local result_type = nil
-                    Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
-                    imgui.same_line()
-                    imgui.text("(?)")
-                    if imgui.is_item_hovered() then
-                        imgui.set_tooltip(Utils.get_tooltip_for_value(result))
-                    end
-                else
-                    Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
+                imgui.text(type_info.display)
+                imgui.same_line()
+                imgui.text("(?)")
+                if imgui.is_item_hovered() then
+                    imgui.set_tooltip(type_info.tooltip)
                 end
+                
+                Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
+                if node.ending_value_full_name and declared_type_name and node.ending_value_full_name ~= declared_type_name then
+                    Nodes.add_context_menu_option(node, "Copy output type (Expected)", declared_type_name)
+                end
+                Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
             else
                 -- Display "nil" when result is nil
                 local display_value = "nil"

@@ -11,12 +11,20 @@ local Utils = {}
 -- ========================================
 -- imGUI Cursor alignment Helpers
 -- ========================================
-function Utils.get_right_cursor_pos(node_id, text)
-    local text_width = imgui.calc_text_size(text).x
+function Utils.get_right_cursor_pos(node_id, text, padding)
+   local text_width = imgui.calc_text_size(text).x
     local node_width = imnodes.get_node_dimensions(node_id).x
     local pos = imgui.get_cursor_pos()
     local node_pos = imnodes.get_node_editor_space_pos(node_id)
-    pos.x = node_pos.x + node_width - text_width - 15
+    padding = padding or 15
+
+    -- Multiline doesn't get the correct width so we'll just add more to it
+    if imgui.calc_text_size(text).y > imgui.get_default_font_size() then
+        padding = padding + 20
+    end
+    
+    pos.x = node_pos.x + node_width - text_width - padding
+    
     return pos
 end
 
@@ -260,21 +268,80 @@ function Utils.get_type_display_name(type_info)
     return "Unknown"
 end
 
-function Utils.get_tooltip_for_value(value)
-    if value == nil then return "nil" end
-    
+-- Unified function to get all type display info for a value
+-- Returns: { display = "TypeName" or "GameObject (Name)", tooltip = "...", actual_type = "full.name" }
+function Utils.get_type_info_for_display(value, declared_type_name)
+    local result = {
+        display = "",
+        tooltip = "nil",
+        actual_type = nil
+    }
+   
+    if value == nil then return result end
+   
     local info = Utils.get_type_info(value)
-    if not info then return "nil" end
-    
+    if not info then return result end
+  
+    -- For non-userdata, simple display
     if not info.is_userdata then
-        return string.format("Value: %s\nType: %s", tostring(value), info.name)
+        result.display = tostring(value)
+        result.tooltip = string.format("Value: %s\nType: %s", tostring(value), info.name)
+        return result
     end
     
-    -- Userdata tooltip
-    if not info.name then
-        return "userdata (unknown type)"
+    -- Userdata handling - check for nil or empty string
+    if not info.name or info.name == "" then
+        -- Use full_name as fallback (works for arrays)
+        if info.full_name and info.full_name ~= "" then
+            -- Extract short name from full name (e.g., "app.EquipDef.BowBottleInfo[]" -> "BowBottleInfo[]")
+            local short_name = info.full_name:match("([^%.]+)$") or info.full_name
+            result.display = short_name
+            result.actual_type = info.full_name
+            result.tooltip = "Type: " .. short_name
+            if info.address then
+                result.tooltip = result.tooltip .. string.format("\nAddress: 0x%X", info.address)
+            end
+            if info.full_name then
+                result.tooltip = result.tooltip .. "\nFull Name: " .. info.full_name
+            end
+        -- Then try declared type as fallback
+        elseif declared_type_name and declared_type_name ~= "" then
+            local short_declared = declared_type_name:match("([^%.]+)$") or declared_type_name
+            result.display = short_declared
+            result.tooltip = "Declared Type: " .. declared_type_name
+            result.actual_type = declared_type_name
+        else
+            result.tooltip = "userdata (unknown type)"
+        end
+        return result
     end
     
+    -- Build display string
+    result.display = info.name
+    result.actual_type = info.full_name
+    
+    -- Special handling for GameObject - show the object's name
+    if info.full_name == "via.GameObject" then
+        local success_name, obj_name = pcall(function() return value:call("get_Name") end)
+        if success_name and obj_name then
+            result.display = info.name .. " (" .. obj_name .. ")"
+        else
+            -- Fallback to ToString()
+            local success_tostring, str_name = pcall(function() return value:call("ToString") end)
+            if success_tostring and str_name then
+                -- Parse ToString format: "GameObject[Name]" -> "Name"
+                local parsed_name = str_name:match("GameObject%[(.+)%]")
+                if parsed_name then
+                    result.display = info.name .. " (" .. parsed_name .. ")"
+                else
+                    -- If parsing fails, use the full ToString result
+                    result.display = info.name .. " (" .. str_name .. ")"
+                end
+            end
+        end
+    end
+    
+    -- Build tooltip
     local parts = {}
     parts[#parts + 1] = "Type: " .. info.name
     if info.address then
@@ -283,8 +350,49 @@ function Utils.get_tooltip_for_value(value)
     if info.full_name then
         parts[#parts + 1] = "Full Name: " .. info.full_name
     end
+    -- Show declared type if provided and different from runtime type
+    if declared_type_name and declared_type_name ~= info.full_name then
+        parts[#parts + 1] = "Declared: " .. declared_type_name
+    end
+    result.tooltip = table.concat(parts, "\n")
     
-    return table.concat(parts, "\n")
+    return result
+end
+
+-- Simple tooltip helper (for cases where you don't need full type_info)
+function Utils.get_tooltip_for_value(value, declared_type_name)
+    return Utils.get_type_info_for_display(value, declared_type_name).tooltip
+end
+
+-- Get the actual runtime type name of a value
+function Utils.get_actual_type_name(value, fallback_type_or_name)
+    if value and type(value) == "userdata" then
+        local success, runtime_type = pcall(function() 
+            return value:get_type_definition() 
+        end)
+        if success and runtime_type then
+            local success_name, type_name = pcall(function() 
+                return runtime_type:get_full_name() 
+            end)
+            if success_name and type_name then
+                return type_name
+            end
+        end
+    end
+    
+    -- Handle fallback
+    if type(fallback_type_or_name) == "string" then
+        return fallback_type_or_name
+    elseif fallback_type_or_name and type(fallback_type_or_name) == "userdata" then
+        local success, name = pcall(function() 
+            return fallback_type_or_name:get_full_name() 
+        end)
+        if success and name then
+            return name
+        end
+    end
+    
+    return "Unknown"
 end
 
 function Utils.get_value_display_string(value)

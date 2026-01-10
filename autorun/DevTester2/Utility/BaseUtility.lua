@@ -38,7 +38,7 @@ function BaseUtility.render_action_buttons(node)
     local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
     if can_continue then
         imgui.same_line()
-        local pos = Utils.get_right_cursor_pos(node.id, "+ Add Child Node")
+        local pos = Utils.get_right_cursor_pos(node.id, "+ Add Child Node", 25)
         imgui.set_cursor_pos(pos)
         if imgui.button("+ Add Child Node") then
             Nodes.add_child_node(node)

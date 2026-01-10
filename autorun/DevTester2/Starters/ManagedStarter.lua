@@ -86,22 +86,20 @@ function ManagedStarter.render(node)
     end
 
     if node.ending_value then
-        -- Display simplified value without address
-        local display_value = Utils.get_value_display_string(node.ending_value)
-        local type_info = node.ending_value:get_type_definition()
+        local type_info = Utils.get_type_info_for_display(node.ending_value, node.path)
         
-        Nodes.add_context_menu_option(node, "Copy output name", type_info:get_full_name())
+        Nodes.add_context_menu_option(node, "Copy output name", type_info.actual_type or "Unknown")
 
         -- Output pin
         imgui.spacing()
         imnodes.begin_output_attribute(output_pin.id)
-        local debug_pos = Utils.get_right_cursor_pos(node.id, display_value .. " (?)")
+        local debug_pos = Utils.get_right_cursor_pos(node.id, type_info.display .. " (?)")
         imgui.set_cursor_pos(debug_pos)
-        imgui.text(display_value)        
+        imgui.text(type_info.display)        
         imgui.same_line()
         imgui.text("(?)")
         if imgui.is_item_hovered() then
-            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
+            imgui.set_tooltip(type_info.tooltip)
         end
         imnodes.end_output_attribute()
     elseif node.status == "Managed singleton not found" then

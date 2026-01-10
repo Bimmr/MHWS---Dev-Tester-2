@@ -315,8 +315,6 @@ function MethodFollower.render(node)
             -- Execute and show output
             local result = nil
             
-            Nodes.add_context_menu_option(node, "Copy output type", return_type and return_type:get_full_name() or "Unknown")
-            
             if node.action_type == 0 then -- Run - auto execute
                 result = MethodFollower.execute(node, parent_value, selected_method)
             elseif node.action_type == 1 then -- Call - manual button
@@ -367,11 +365,15 @@ function MethodFollower.render(node)
             
             -- Always store result, even if nil
             node.ending_value = result
-            if result and return_type then
-                node.ending_value_full_name = return_type:get_full_name()
-            end
+            
+            -- Get declared type name for tooltip
+            local declared_type_name = return_type and return_type:get_full_name() or nil
             
             if not returns_void then
+                -- Get type info for display (includes actual runtime type)
+                local type_info = Utils.get_type_info_for_display(result, declared_type_name)
+                node.ending_value_full_name = type_info.actual_type
+                
                 can_continue, result = Nodes.validate_continuation(result, parent_value, node.ending_value_full_name)
                 node.ending_value = result
             end
@@ -385,18 +387,23 @@ function MethodFollower.render(node)
             imnodes.begin_output_attribute(output_pin.id)
             
             if result ~= nil and not returns_void then
-                -- Display the actual result
-                local display_value = Utils.get_value_display_string(result)
-                local output_display = display_value .. " (?)"
+                -- Get unified type info for display
+                local type_info = Utils.get_type_info_for_display(result, declared_type_name)
+                
+                local output_display = type_info.display .. " (?)"
                 local pos = Utils.get_right_cursor_pos(node.id, output_display)
                 imgui.set_cursor_pos(pos)
-                imgui.text(display_value)
+                imgui.text(type_info.display)
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
-                    imgui.set_tooltip(Utils.get_tooltip_for_value(result))
+                    imgui.set_tooltip(type_info.tooltip)
                 end
                 
+                Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
+                if node.ending_value_full_name and declared_type_name and node.ending_value_full_name ~= declared_type_name then
+                    Nodes.add_context_menu_option(node, "Copy output type (Expected)", declared_type_name)
+                end
                 Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
             elseif returns_void then
                 -- For void methods, show execution status

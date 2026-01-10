@@ -72,21 +72,21 @@ local function render_managed_output(node, is_placeholder)
         imgui.set_cursor_pos(pos)
         imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
     elseif node.ending_value then
-        -- Display simplified value without address
-        local display_value = Utils.get_value_display_string(node.ending_value)
-        local display = display_value .. " (?)"
+        -- Display type info
+        local type_info = Utils.get_type_info_for_display(node.ending_value, node.path)
+        local display = type_info.display .. " (?)"
         local pos = Utils.get_right_cursor_pos(node.id, display)
         imgui.set_cursor_pos(pos)
-        imgui.text(display_value)
+        imgui.text(type_info.display)
         imgui.same_line()
         imgui.text("(?)")
         if imgui.is_item_hovered() then
-            imgui.set_tooltip(Utils.get_tooltip_for_value(node.ending_value))
+            imgui.set_tooltip(type_info.tooltip)
         end
         
         local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
         if can_continue then
-            local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Output")
+            local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Output", 25)
             imgui.set_cursor_pos(button_pos)
             if imgui.button("+ Add Child to Output") then
                 Nodes.add_child_node_to_return(node, 2)
@@ -185,7 +185,7 @@ local function render_argument_outputs(node, is_placeholder)
                 local can_continue, _ = Nodes.validate_continuation(arg_value, nil)
                 if can_continue then
                     local arg_button_text = "+ Add Child to " .. arg_label
-                    local arg_button_pos = Utils.get_right_cursor_pos(node.id, arg_button_text)
+                    local arg_button_pos = Utils.get_right_cursor_pos(node.id, arg_button_text, 25)
                     imgui.set_cursor_pos(arg_button_pos)
                     if imgui.button(arg_button_text) then
                         Nodes.add_child_node_to_arg(node, current_pin_index)
@@ -274,27 +274,34 @@ local function render_return_info(node, is_placeholder)
             local return_pos = imgui.get_cursor_pos()
             imnodes.begin_output_attribute(return_output_pin.id)
             imgui.text("Return (" .. return_type .. "):")
-            Nodes.add_context_menu_option(node, "Copy return type", node.return_type_full_name)
             imgui.same_line()
            
             -- Display return value if available
             if node.return_value ~= nil and node.last_hook_time then
                 imgui.spacing()
-                -- Display simplified value without address
-                local display_value = Utils.get_value_display_string(node.return_value)
-                local return_display = display_value .. " (?)"
+                -- Display type info
+                local type_info = Utils.get_type_info_for_display(node.return_value, node.retval_vtypename)
+                
+                -- Add context menu options with actual type as default
+                Nodes.add_context_menu_option(node, "Copy return type", type_info.actual_type or node.return_type_full_name or "Unknown")
+                if type_info.actual_type and node.return_type_full_name and type_info.actual_type ~= node.return_type_full_name then
+                    Nodes.add_context_menu_option(node, "Copy return type (Expected)", node.return_type_full_name)
+                end
+                Nodes.add_context_menu_option(node, "Copy return value", tostring(node.return_value))
+                
+                local return_display = type_info.display .. " (?)"
                 local return_pos = Utils.get_right_cursor_pos(node.id, return_display)
                 imgui.set_cursor_pos(return_pos)
-                imgui.text(display_value)
+                imgui.text(type_info.display)
                 imgui.same_line()
                 imgui.text("(?)")
                 if imgui.is_item_hovered() then
-                    imgui.set_tooltip(Utils.get_tooltip_for_value(node.return_value))
+                    imgui.set_tooltip(type_info.tooltip)
                 end
                 
                 local can_continue, _ = Nodes.validate_continuation(node.return_value, nil)
                 if can_continue then
-                    local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Return")
+                    local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Return", 25)
                     imgui.set_cursor_pos(button_pos)
                     if imgui.button("+ Add Child to Return") then
                         Nodes.add_child_node_to_return(node, 3)
@@ -872,6 +879,16 @@ function HookStarter.initialize_hook(node)
                     converted_arg = fixed_val
                 end
                 
+                -- Store actual runtime type for polymorphism support
+                if converted_arg and type(converted_arg) == "userdata" then
+                    local actual_type_name = Utils.get_actual_type_name(converted_arg, type_name)
+                    if actual_type_name ~= type_name then
+                        -- Store both declared and actual types for reference
+                        node.hook_arg_actual_types = node.hook_arg_actual_types or {}
+                        node.hook_arg_actual_types[i] = actual_type_name
+                    end
+                end
+                
                 node.hook_arg_values[i] = converted_arg
                 
                 -- Update arg output pin
@@ -906,6 +923,14 @@ function HookStarter.initialize_hook(node)
             local _, fixed_val = Nodes.validate_continuation(converted_retval, nil, node.retval_vtypename)
             if fixed_val ~= nil then
                 converted_retval = fixed_val
+            end
+            
+            -- Store actual runtime type for polymorphism support
+            if converted_retval and type(converted_retval) == "userdata" then
+                local actual_type_name = Utils.get_actual_type_name(converted_retval, node.retval_vtypename)
+                if actual_type_name ~= node.retval_vtypename then
+                    node.actual_return_type_name = actual_type_name
+                end
             end
             
             node.actual_return_value = converted_retval

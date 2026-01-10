@@ -246,11 +246,35 @@ function ArrayFollower.render(node)
     -- Execute and show output
     local result = ArrayFollower.execute(node, parent_value)
     
+    -- Get declared element type from array
+    local declared_element_type = nil
+    if parent_value then
+        local success, array_type_def = pcall(function() 
+            return parent_value:get_type_definition() 
+        end)
+        if success and array_type_def then
+            local success_elem, element_type = pcall(function()
+                return array_type_def:get_element_type()
+            end)
+            if success_elem and element_type then
+                declared_element_type = element_type:get_full_name()
+            end
+        end
+    end
+    
+    -- Get type info for display (includes actual runtime type)
+    local type_info = Utils.get_type_info_for_display(result, declared_element_type)
+    
     -- Always store result, even if nil
     node.ending_value = result
-    if result and result:get_type_definition() then
-        node.ending_value_full_name = result:get_type_definition():get_full_name()
-        Nodes.add_context_menu_option(node, "Copy output name", node.ending_value_full_name)
+    node.ending_value_full_name = type_info.actual_type
+    
+    Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
+    if node.ending_value_full_name and declared_element_type and node.ending_value_full_name ~= declared_element_type then
+        Nodes.add_context_menu_option(node, "Copy output type (Expected)", declared_element_type)
+    end
+    if result ~= nil then
+        Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
     end
     
     local can_continue
@@ -260,35 +284,21 @@ function ArrayFollower.render(node)
     -- Update output pin value
     node.pins.outputs[1].value = result
     
-    -- If result is valid, check if we should unpause child nodes
-    if can_continue then
-        local success, result_type = pcall(function() 
-            return result:get_type_definition() 
-        end)
-        if success and result_type then
-            local result_type_name = result_type:get_full_name()
-            -- Try to unpause children if the type matches their expectations
-            -- Nodes.unpause_child_nodes(node, result_type_name)
-        end
-    end
-    
     -- Render output pin
     local output_pin = node.pins.outputs[1]
     imgui.spacing()
     imnodes.begin_output_attribute(output_pin.id)
     
     if result ~= nil then
-        -- Display the actual result
-        local display_value = Utils.get_value_display_string(result)
-        local output_display = display_value .. " (?)"
+        local output_display = type_info.display .. " (?)"
         local pos = Utils.get_right_cursor_pos(node.id, output_display)
         imgui.set_cursor_pos(pos)
-        imgui.text(display_value)
+        imgui.text(type_info.display)
         if can_continue then
             imgui.same_line()
             imgui.text("(?)")
             if imgui.is_item_hovered() then
-                imgui.set_tooltip(Utils.get_tooltip_for_value(result))
+                imgui.set_tooltip(type_info.tooltip)
             end
         end
     else

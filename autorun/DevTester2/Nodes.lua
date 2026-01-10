@@ -817,6 +817,8 @@ function Nodes.cleanup_cache(cache, max_size)
 end
 
 function Nodes.get_cached_type_info(type_def, is_static_context)
+    if not type_def then return nil end
+    
     local type_name = type_def:get_full_name() .. (is_static_context and "_static" or "_instance")
     
     if not State.type_cache[type_name] then
@@ -1109,7 +1111,10 @@ function Nodes.get_fields_for_combo(type_def, is_static_context)
 end
 
 function Nodes.get_field_by_group_and_index(type_def, group_index, field_index, is_static_context)
+    if not type_def then return nil end
+    
     local type_info = Nodes.get_cached_type_info(type_def, is_static_context)
+    if not type_info then return nil end
     
     for _, item in ipairs(type_info.fields) do
         if item.type == "field" and item.level == group_index and item.index == field_index then
