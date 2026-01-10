@@ -66,12 +66,21 @@ function BaseFollower.check_parent_connection(node)
 end
 
 function BaseFollower.get_parent_type(parent_value)
+    -- Check for nil first
+    if not parent_value then
+        return nil
+    end
+    
     -- Check if parent_value is already a type definition
-    if type(parent_value) == "userdata" and parent_value.get_full_name then
-        -- This is likely a type definition object
-        local success, test_name = pcall(function() return parent_value:get_full_name() end)
-        if success and test_name then
-            return parent_value
+    -- Wrap property access in pcall to avoid metamethod errors
+    if type(parent_value) == "userdata" then
+        local has_get_full_name = pcall(function() return parent_value.get_full_name end)
+        if has_get_full_name then
+            -- This is likely a type definition object
+            local success, test_name = pcall(function() return parent_value:get_full_name() end)
+            if success and test_name then
+                return parent_value
+            end
         end
     end
 
