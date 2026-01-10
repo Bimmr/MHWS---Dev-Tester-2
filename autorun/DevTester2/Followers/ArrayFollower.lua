@@ -13,7 +13,11 @@
 -- Runtime Values:
 -- - ending_value: Any - The value of the selected array element
 --
--- Inherits all BaseFollower properties (type, status, etc.)
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+-- - last_parent_type_name: String - Last seen parent type name for change detection
+--
+-- Inherits all BaseFollower properties (type)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -26,11 +30,20 @@ local sdk = sdk
 
 local ArrayFollower = {}
 
+-- Initialize array-specific properties
+local function ensure_initialized(node)
+    node.selected_element_index = node.selected_element_index or 0
+    node.index_manual_value = node.index_manual_value or "0"
+    node.last_parent_type_name = node.last_parent_type_name or nil
+end
+
 -- ========================================
 -- Array Follower Node
 -- ========================================
 
 function ArrayFollower.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pins exist
     if #node.pins.inputs < 2 then
         if #node.pins.inputs == 0 then

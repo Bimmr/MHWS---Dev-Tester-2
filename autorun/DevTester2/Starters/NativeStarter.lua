@@ -36,6 +36,20 @@ local sdk = sdk
 
 local NativeStarter = {}
 
+-- Initialize native-specific properties
+local function ensure_initialized(node)
+    node.path = node.path or ""
+    node.method_name = node.method_name or ""
+    node.selected_method_combo = node.selected_method_combo or nil
+    node.method_group_index = node.method_group_index or nil
+    node.method_index = node.method_index or nil
+    node.action_type = node.action_type or 0
+    node.selected_method_signature = node.selected_method_signature or nil
+    node.param_manual_values = node.param_manual_values or {}
+    node.native_method_result = node.native_method_result or nil
+    node.has_executed = node.has_executed or false
+end
+
 -- Helper to get method info safely
 local function get_method_info(type_def, group_index, method_index)
     if not group_index or not method_index then return nil end
@@ -43,6 +57,8 @@ local function get_method_info(type_def, group_index, method_index)
 end
 
 function NativeStarter.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pin exists
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "output", nil)

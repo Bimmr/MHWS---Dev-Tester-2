@@ -24,6 +24,11 @@ local sdk = sdk
 
 local LogicOperation = {}
 
+-- Initialize logic-specific properties
+local function ensure_initialized(node)
+    node.selected_operation = node.selected_operation or Constants.LOGIC_OPERATION_AND
+end
+
 -- ========================================
 -- Logic Operation Node
 -- ========================================
@@ -57,6 +62,8 @@ function LogicOperation.execute(node)
 end
 
 function LogicOperation.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pins exist
     if #node.pins.inputs < 2 then
         if #node.pins.inputs == 0 then

@@ -26,7 +26,16 @@ local imnodes = imnodes
 
 local VariableData = {}
 
+-- Initialize variable-specific properties
+local function ensure_initialized(node)
+    node.variable_name = node.variable_name or ""
+    node.default_value = node.default_value or ""
+    node.input_manual_value = node.input_manual_value or ""
+    node.pending_reset = node.pending_reset or false
+end
+
 function VariableData.render(node)
+    ensure_initialized(node)
     
     -- Execute the node to update ending_value based on inputs
     VariableData.execute(node)
@@ -48,9 +57,6 @@ function VariableData.render(node)
     imnodes.end_node_titlebar()
 
     -- Variable name input
-    if not node.variable_name then
-        node.variable_name = ""
-    end
     
     -- Collect existing variable names for the combo
     local items = {}

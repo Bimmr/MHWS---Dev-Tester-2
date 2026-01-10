@@ -92,18 +92,7 @@ function BaseData.create(node_type, position)
         position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
-        pins = { inputs = {}, outputs = {} },
-        -- Enum-specific
-        selected_enum_index = 1,
-        enum_names = nil,
-        enum_values = nil,
-        -- Value-specific
-        value = "",
-        -- Variable-specific
-        variable_name = "",
-        default_value = "",
-        input_manual_value = "",
-        pending_reset = false
+        pins = { inputs = {}, outputs = {} }
     }
     
     table.insert(State.all_nodes, node)

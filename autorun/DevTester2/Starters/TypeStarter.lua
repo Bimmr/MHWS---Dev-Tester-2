@@ -25,7 +25,13 @@ local sdk = sdk
 
 local TypeStarter = {}
 
+-- Initialize type-specific properties
+local function ensure_initialized(node)
+    node.path = node.path or ""
+end
+
 function TypeStarter.render(node)
+    ensure_initialized(node)
     -- Ensure output pin exists
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "output", nil)

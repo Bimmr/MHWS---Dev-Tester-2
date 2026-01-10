@@ -18,6 +18,9 @@
 --
 -- Runtime Values:
 -- - ending_value: Any - The currently selected enum value (output)
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -29,6 +32,15 @@ local imnodes = imnodes
 local sdk = sdk
 
 local EnumData = {}
+
+-- Initialize enum-specific properties
+local function ensure_initialized(node)
+    node.selected_enum_index = node.selected_enum_index or 1
+    node.enum_names = node.enum_names or nil
+    node.enum_values = node.enum_values or nil
+    node.enum_display_strings = node.enum_display_strings or nil
+    node.sorted_to_original_index = node.sorted_to_original_index or nil
+end
 
 local function generate_enum(typename)
     local t = sdk.find_type_definition(typename)
@@ -54,7 +66,7 @@ local function generate_enum(typename)
 end
 
 function EnumData.render(node)
-    
+    ensure_enum_initialized(node)
     -- Execute the node to update ending_value
     EnumData.execute(node)
     

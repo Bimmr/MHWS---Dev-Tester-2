@@ -19,7 +19,11 @@
 -- - ending_value: Any - The current field value (or the value that was just set)
 -- - ending_value_full_name: String - Full type name of the ending value
 --
--- Inherits all BaseFollower properties (type, action_type, status, etc.)
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+-- - last_parent_type_name: String - Last seen parent type name for change detection
+--
+-- Inherits all BaseFollower properties (type, action_type)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -31,6 +35,18 @@ local imnodes = imnodes
 local sdk = sdk
 
 local FieldFollower = {}
+
+-- Initialize field-specific properties
+local function ensure_initialized(node)
+    node.selected_field_combo = node.selected_field_combo or nil
+    node.field_group_index = node.field_group_index or nil
+    node.field_index = node.field_index or nil
+    node.value_manual_input = node.value_manual_input or ""
+    node.set_active = node.set_active or false
+    node.action_type = node.action_type or 0
+    node.ending_value_full_name = node.ending_value_full_name or nil
+    node.last_parent_type_name = node.last_parent_type_name or nil
+end
 
 -- ========================================
 -- Field Follower Node
@@ -44,6 +60,8 @@ end
 
 -- TODO: Putting an array in a set field will crash the game - need to handle that case
 function FieldFollower.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pins exist
     if #node.pins.inputs == 0 then
         Nodes.add_input_pin(node, "parent", nil)

@@ -29,11 +29,18 @@ local sdk = sdk
 
 local SwitchControl = {}
 
+-- Initialize switch-specific properties
+local function ensure_initialized(node)
+    node.num_conditions = node.num_conditions or 1
+end
+
 -- ========================================
 -- Helper Functions
 -- ========================================
 
 function SwitchControl.add_condition(node)
+    ensure_initialized(node)
+    
     local index = node.num_conditions
     
     -- Create case pin

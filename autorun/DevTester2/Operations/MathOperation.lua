@@ -28,6 +28,11 @@ local sdk = sdk
 
 local MathOperation = {}
 
+-- Initialize math-specific properties
+local function ensure_initialized(node)
+    node.selected_operation = node.selected_operation or Constants.MATH_OPERATION_ADD
+end
+
 -- ========================================
 -- Math Operation Node
 -- ========================================
@@ -71,6 +76,8 @@ function MathOperation.execute(node)
 end
 
 function MathOperation.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pins exist
     if #node.pins.inputs < 2 then
         if #node.pins.inputs == 0 then

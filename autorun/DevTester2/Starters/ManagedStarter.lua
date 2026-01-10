@@ -24,7 +24,13 @@ local sdk = sdk
 
 local ManagedStarter = {}
 
+-- Initialize managed-specific properties
+local function ensure_initialized(node)
+    node.path = node.path or ""
+end
+
 function ManagedStarter.render(node)
+    ensure_initialized(node)
     -- Ensure pin exists
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "output", nil)

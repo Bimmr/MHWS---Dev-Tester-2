@@ -24,6 +24,11 @@ local sdk = sdk
 
 local CompareOperation = {}
 
+-- Initialize compare-specific properties
+local function ensure_initialized(node)
+    node.selected_operation = node.selected_operation or Constants.COMPARE_OPERATION_EQUALS
+end
+
 -- ========================================
 -- Compare Operation Node
 -- ========================================
@@ -63,6 +68,8 @@ function CompareOperation.execute(node)
 end
 
 function CompareOperation.render(node)
+    ensure_initialized(node)
+    
     -- Ensure pins exist
     if #node.pins.inputs < 2 then
         if #node.pins.inputs == 0 then

@@ -29,11 +29,19 @@ local sdk = sdk
 
 local ToggleControl = {}
 
+-- Initialize toggle-specific properties
+local function ensure_initialized(node)
+    node.input_manual_value = node.input_manual_value or ""
+    node.enabled_manual_value = node.enabled_manual_value or false
+end
+
 -- ========================================
 -- Toggle Control Node
 -- ========================================
 
 function ToggleControl.execute(node)
+    ensure_initialized(node)
+    
     -- Get input values using pin system
     local input_pin = node.pins.inputs[1]
     local enabled_pin = node.pins.inputs[2]

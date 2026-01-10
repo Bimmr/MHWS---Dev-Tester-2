@@ -99,9 +99,7 @@ function BaseUtility.create(node_type, position)
         position = position or {x = 50, y = 50},
         ending_value = nil,
         status = nil,
-        pins = { inputs = {}, outputs = {} },
-        -- Label-specific
-        text = ""
+        pins = { inputs = {}, outputs = {} }
     }
 
     table.insert(State.all_nodes, node)

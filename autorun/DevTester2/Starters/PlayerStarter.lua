@@ -26,7 +26,14 @@ local sdk = sdk
 local PlayerStarter = {}
 local game = reframework:get_game_name()
 
+-- Initialize player-specific properties
+local function ensure_initialized(node)
+    node.path = node.path or ""
+    node.process_path = node.process_path or ""
+end
+
 function PlayerStarter.render(node)
+    ensure_initialized(node)
 
     -- Ensure output pin exists
     if #node.pins.outputs == 0 then

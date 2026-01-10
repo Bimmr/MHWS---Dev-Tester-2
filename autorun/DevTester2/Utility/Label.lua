@@ -6,6 +6,9 @@
 -- - text: String - The text content of the label
 --
 -- This node has no input or output pins - it's purely for visual annotation.
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging (inherited from BaseUtility)
 
 local State = require("DevTester2.State")
 local Constants = require("DevTester2.Constants")
@@ -16,7 +19,13 @@ local imnodes = imnodes
 
 local Label = {}
 
+-- Initialize label-specific properties
+local function ensure_initialized(node)
+    node.text = node.text or ""
+end
+
 function Label.render(node)
+    ensure_initialized(node)
 
     imnodes.begin_node(node.id)
 
@@ -25,9 +34,6 @@ function Label.render(node)
     imnodes.end_node_titlebar()
 
     -- Text input for the label content
-    if not node.text then
-        node.text = ""
-    end
     local width = math.max(imgui.calc_text_size(node.text).x + 20, Nodes.get_node_width(Constants.NODE_WIDTH_UTILITY, Constants.UTILITY_TYPE_LABEL)-10)
     imgui.set_next_item_width(width)
     local changed, new_text = imgui.input_text("##label_text", node.text)

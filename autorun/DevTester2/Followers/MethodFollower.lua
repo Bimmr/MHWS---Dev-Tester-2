@@ -17,7 +17,11 @@
 -- Runtime Values:
 -- - ending_value: Any - The return value from the method call (nil for void methods)
 --
--- Inherits all BaseFollower properties (type, action_type, status, last_call_time, etc.)
+-- UI/Debug:
+-- - status: String - Current status message for debugging
+-- - last_call_time: Table - Timestamp when method was last called {wall_time, clock_time}
+--
+-- Inherits all BaseFollower properties (type, action_type, last_parent_type_name)
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -30,6 +34,17 @@ local imnodes = imnodes
 local sdk = sdk
 
 local MethodFollower = {}
+
+-- Initialize method-specific properties
+local function ensure_initialized(node)
+    node.selected_method_combo = node.selected_method_combo or nil
+    node.method_group_index = node.method_group_index or nil
+    node.method_index = node.method_index or nil
+    node.param_manual_values = node.param_manual_values or {}
+    node.action_type = node.action_type or 0
+    node.last_call_time = node.last_call_time or nil
+    node.last_parent_type_name = node.last_parent_type_name or nil
+end
 
 -- ========================================
 -- Method Follower Node
@@ -54,6 +69,8 @@ local function get_method_info(parent_type, group_index, method_index, is_static
 end
 
 function MethodFollower.render(node)
+    ensure_initialized(node)
+    
     -- Ensure parent input and output pins exist
     if #node.pins.inputs == 0 then
         Nodes.add_input_pin(node, "parent", nil)
@@ -356,7 +373,7 @@ function MethodFollower.render(node)
 
                 if button_clicked or triggered_by_pin then
                     result = MethodFollower.execute(node, parent_value, selected_method)
-                    node.last_call_time = os.clock()  -- Record call time with high precision
+                    node.last_call_time = {wall_time = os.time(), clock_time = os.clock()}  -- Record call time with high precision
                 else
                     -- Keep previous result if button not clicked
                     result = node.ending_value

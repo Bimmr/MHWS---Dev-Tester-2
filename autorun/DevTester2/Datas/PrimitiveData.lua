@@ -5,11 +5,14 @@
 -- Configuration:
 -- - value: String - The text input value that gets parsed into a primitive
 --
--- Output Pins:
--- - pins.outputs[1]: The output pin (provides parsed primitive value)
+-- Pins:
+-- - pins.outputs[1]: "output" - The output pin (provides parsed primitive value)
 --
 -- Runtime Values:
 -- - ending_value: Any - The parsed primitive value (number, boolean, or string)
+--
+-- UI/Debug:
+-- - status: String - Current status message for debugging
 
 local State = require("DevTester2.State")
 local Nodes = require("DevTester2.Nodes")
@@ -21,7 +24,13 @@ local imnodes = imnodes
 
 local PrimitiveData = {}
 
+-- Initialize primitive-specific properties
+local function ensure_initialized(node)
+    node.value = node.value or ""
+end
+
 function PrimitiveData.render(node)
+    ensure_initialized(node)
     
     -- Execute the node to update ending_value
     PrimitiveData.execute(node)
@@ -38,9 +47,6 @@ function PrimitiveData.render(node)
     imnodes.end_node_titlebar()
 
     -- Value input as text
-    if not node.value then
-        node.value = ""
-    end
     local changed, new_value = imgui.input_text("Value", node.value)
     if changed then
         node.value = new_value
