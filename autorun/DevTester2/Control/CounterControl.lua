@@ -34,11 +34,24 @@ local sdk = sdk
 
 local CounterControl = {}
 
+-- Initialize counter-specific properties
+local function ensure_initialized(node)
+    node.max_manual_value = node.max_manual_value or "10"
+    node.active_manual_value = node.active_manual_value or false
+    node.restart_manual_value = node.restart_manual_value or false
+    node.delay_ms = node.delay_ms or 1000
+    node.current_count = node.current_count or 0
+    node.last_increment_time = node.last_increment_time or nil
+    node.at_max_waiting_restart = node.at_max_waiting_restart or false
+end
+
 -- ========================================
 -- Counter Control Node
 -- ========================================
 
 function CounterControl.execute(node)
+    ensure_initialized(node)
+    
     -- Get input pins
     local max_pin = node.pins.inputs[1]
     local active_pin = node.pins.inputs[2]
@@ -48,16 +61,6 @@ function CounterControl.execute(node)
     local max_value = Nodes.get_input_pin_value(node, 1)  -- First input pin
     local active_value = Nodes.get_input_pin_value(node, 2)  -- Second input pin
     local restart_value = Nodes.get_input_pin_value(node, 3)  -- Third input pin
-
-    -- Initialize counter if not set
-    if node.current_count == nil then
-        node.current_count = 0
-    end
-
-    -- Initialize delay_ms if not set
-    if node.delay_ms == nil then
-        node.delay_ms = 1000 -- default 1 second
-    end
 
     -- Convert max_value to number
     local max_count = 10 -- default
@@ -87,12 +90,14 @@ function CounterControl.execute(node)
         should_restart = not not node.restart_manual_value
     end
 
-    -- Handle restart - only when triggered AND counter reached max
-    if should_restart and node.current_count >= max_count then
+    -- Handle restart logic with one-cycle delay
+    -- If we were at max last cycle and restart is triggered, reset now
+    if node.at_max_waiting_restart and should_restart then
         node.current_count = 0
         node.last_increment_time = os.clock() * 1000 -- Start delay timer from restart
         node.status = "Restarted"
         node.restart_triggered = false -- Reset manual trigger
+        node.at_max_waiting_restart = false
     elseif is_active then
         -- Check if enough time has passed for increment
         local current_time = os.clock() * 1000 -- Convert to milliseconds
@@ -104,8 +109,15 @@ function CounterControl.execute(node)
                 node.current_count = node.current_count + 1
                 node.last_increment_time = current_time
                 node.status = "Counting"
+                node.at_max_waiting_restart = false
             else
-                node.status = "At Max"
+                -- Just reached max - set flag and wait one cycle before restart
+                if should_restart then
+                    node.at_max_waiting_restart = true
+                    node.status = "At Max (will restart)"
+                else
+                    node.status = "At Max"
+                end
             end
         else
             -- Still waiting for delay
@@ -282,7 +294,7 @@ end
 -- ========================================
 -- Serialization
 -- ========================================
-
+    
 function CounterControl.serialize(node, Config)
     local data = BaseControl.serialize(node, Config)
     data.max_manual_value = node.max_manual_value
@@ -291,6 +303,7 @@ function CounterControl.serialize(node, Config)
     data.current_count = node.current_count
     data.delay_ms = node.delay_ms
     data.last_increment_time = node.last_increment_time
+    data.at_max_waiting_restart = node.at_max_waiting_restart
     return data
 end
 
@@ -301,6 +314,7 @@ function CounterControl.deserialize(data, Config)
     node.restart_manual_value = data.restart_manual_value or false
     node.current_count = data.current_count or 0
     node.delay_ms = data.delay_ms or 1000
+    node.at_max_waiting_restart = data.at_max_waiting_restart or false
     node.last_increment_time = data.last_increment_time
     return node
 end
