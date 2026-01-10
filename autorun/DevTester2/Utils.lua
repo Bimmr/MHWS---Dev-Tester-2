@@ -57,13 +57,26 @@ end
 -- ========================================
 
 -- Format a relative time display with consistent width formatting
+-- Helper function to get clock time from timestamp
+function Utils.get_clock_time(timestamp)
+    if not timestamp then return nil end
+    if type(timestamp) ~= "table" then return nil end
+    return timestamp.clock_time
+end
+
 -- timestamp: os.clock() value to format
 -- Returns: formatted string
 -- Format examples: 01ms, 11ms, 111ms, 1.1s, 11.1s, 1.1m, 11.1m
 function Utils.format_time_ago(timestamp)
     if not timestamp then return "" end
+    if type(timestamp) ~= "table" then return "" end
     
-    local time_ago = os.clock() - timestamp
+    local clock_time = timestamp.clock_time
+    
+    -- Ensure clock_time is a valid number
+    if type(clock_time) ~= "number" then return "" end
+    
+    local time_ago = os.clock() - clock_time
     local time_text
     
     if time_ago < 0.01 then
@@ -94,20 +107,36 @@ function Utils.format_time_ago(timestamp)
 end
 
 -- Render a relative time display with hover tooltip showing exact time
--- timestamp: os.clock() value to display
+-- timestamp: os.clock() value or table {wall_time = os.time(), clock_time = os.clock()}
 function Utils.render_time_ago(timestamp)
     if not timestamp then return end
+    if type(timestamp) ~= "table" then return end
+    
+    local clock_time = timestamp.clock_time
+    local wall_time = timestamp.wall_time
+    
+    if type(clock_time) ~= "number" then return end
     
     local time_text = Utils.format_time_ago(timestamp)
-    local time_ago = os.clock() - timestamp
+    local time_ago = os.clock() - clock_time
     
     imgui.text(time_text)
     
     if imgui.is_item_hovered() then
         -- Calculate the actual wall clock time when the event occurred
-        local current_time = os.time()
-        local event_time = current_time - math.floor(time_ago)
-        local absolute_time = os.date("%H:%M:%S", event_time)
+        local absolute_time
+        if wall_time then
+            -- Use stored wall time with fractional seconds from clock
+            local event_millis = math.floor((clock_time - math.floor(clock_time)) * 1000)
+            absolute_time = os.date("%H:%M:%S", wall_time) .. string.format(".%03d", event_millis)
+        else
+            -- Fallback for old format - estimate from current time
+            local current_time = os.time()
+            local event_time_with_fraction = current_time - time_ago
+            local event_time_seconds = math.floor(event_time_with_fraction)
+            local event_millis = math.floor((event_time_with_fraction - event_time_seconds) * 1000)
+            absolute_time = os.date("%H:%M:%S", event_time_seconds) .. string.format(".%03d", event_millis)
+        end
         imgui.set_tooltip("Exact time: " .. absolute_time)
     end
 end

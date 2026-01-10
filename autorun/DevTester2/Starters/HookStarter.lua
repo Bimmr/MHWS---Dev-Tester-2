@@ -30,7 +30,7 @@
 -- - return_value: Any - The final return value (may be overridden)
 -- - actual_return_value: Any - The original return value from the method before override
 -- - hook_arg_values: Array - Converted values of method parameters (args[3], args[4], etc.)
--- - last_hook_time: Number - Timestamp (os.clock()) of the last hook execution
+-- - last_hook_time: Table - Timestamp of last hook execution {wall_time = os.time(), clock_time = os.clock()}
 --
 -- Type Information:
 -- - param_types: Array - List of parameter type definitions for the hooked method
@@ -52,6 +52,208 @@ local sdk = sdk
 
 local HookStarter = {}
 
+-- ========================================
+-- History Snapshot Functions
+-- ========================================
+
+-- Add a complete call snapshot to history (circular buffer)
+local function add_to_history(node, snapshot)
+    if not node.history_enabled then return end
+    if not node.history then
+        node.history = {}
+    end
+    
+    -- Write to circular buffer
+    node.history[node.history_write_index] = snapshot
+    
+    -- Move write index forward (circular)
+    node.history_write_index = (node.history_write_index % node.history_buffer_size) + 1
+    
+    -- Increment count up to buffer_size
+    if node.history_count < node.history_buffer_size then
+        node.history_count = node.history_count + 1
+    end
+    
+    -- Update current_index to point to newest entry when not paused
+    if not node.history_paused then
+        node.history_current_index = node.history_count
+    end
+end
+
+-- Get a history snapshot by index (1 = oldest, history_count = newest)
+local function get_history_snapshot(node, index)
+    if not node.history or node.history_count == 0 then
+        return nil
+    end
+    
+    -- Clamp index
+    index = math.max(1, math.min(index, node.history_count))
+    
+    -- Calculate actual position in circular buffer
+    local actual_index
+    if node.history_count < node.history_buffer_size then
+        actual_index = index
+    else
+        -- Buffer is full - calculate offset from oldest entry
+        actual_index = ((node.history_write_index - 1 + index - 1) % node.history_buffer_size) + 1
+    end
+    
+    return node.history[actual_index]
+end
+
+-- Clear history buffer
+local function clear_history(node)
+    node.history = {}
+    node.history_count = 0
+    node.history_write_index = 1
+    node.history_current_index = 1
+end
+
+-- Get the current display values (either live or from history snapshot)
+local function get_display_values(node)
+    if node.history_enabled and node.history_paused and node.history_count > 0 then
+        -- Return historical snapshot values
+        local snapshot = get_history_snapshot(node, node.history_current_index)
+        if snapshot then
+            return {
+                ending_value = snapshot.ending_value,
+                return_value = snapshot.return_value,
+                hook_arg_values = snapshot.hook_arg_values,
+                timestamp = snapshot.timestamp,
+                is_historical = true,
+                snapshot_index = node.history_current_index,
+                total_snapshots = node.history_count
+            }
+        end
+    end
+    
+    -- Return live values
+    return {
+        ending_value = node.ending_value,
+        return_value = node.return_value,
+        hook_arg_values = node.hook_arg_values,
+        timestamp = node.last_hook_time,
+        is_historical = false
+    }
+end
+
+-- Render history navigation UI
+local function render_history_navigation(node)
+    if not node.history_enabled then return end
+    
+    imgui.spacing()
+    imgui.spacing()
+    
+    -- History header with pause/resume toggle
+    local pause_label = node.history_paused and " ▶ Resume" or "⏸ Pause"
+    if imgui.button(pause_label .. "##history") then
+        node.history_paused = not node.history_paused
+        if not node.history_paused then
+            -- When resuming, jump to newest
+            node.history_current_index = node.history_count
+        end
+        State.mark_as_modified()
+    end
+    
+    imgui.same_line()
+    imgui.text(string.format("History: %d/%d", node.history_count, node.history_buffer_size))
+    
+    -- Clear button
+    imgui.same_line()
+    if imgui.button("Clear##history") then
+        clear_history(node)
+        State.mark_as_modified()
+    end
+    
+    -- Navigation controls (only when paused and has history)
+    if node.history_paused and node.history_count > 0 then
+        imgui.spacing()
+        
+        -- Build dropdown options
+        local dropdown_options = {}
+        for i = 1, node.history_count do
+            local snapshot = get_history_snapshot(node, i)
+            if snapshot then
+                local wall_time = snapshot.timestamp and snapshot.timestamp.wall_time or os.time()
+                local clock_time = snapshot.timestamp and snapshot.timestamp.clock_time
+                local milliseconds = clock_time and math.floor((clock_time - math.floor(clock_time)) * 1000) or 0
+                local time_str = os.date("%H:%M:%S", wall_time) .. string.format(".%03d", milliseconds)
+                local value_preview = Utils.get_value_display_string(snapshot.ending_value)
+                table.insert(dropdown_options, string.format("%d. %s: %s", i, time_str, value_preview))
+            else
+                table.insert(dropdown_options, string.format("%d. <error>", i))
+            end
+        end
+        
+        -- Left arrow (older)
+        local can_go_prev = node.history_current_index > 1
+        if not can_go_prev then imgui.begin_disabled() end
+        if imgui.arrow_button("history_left", 0) then
+            node.history_current_index = node.history_current_index - 1
+            State.mark_as_modified()
+        end
+        if not can_go_prev then imgui.end_disabled() end
+        
+        imgui.same_line()
+        
+        -- Dropdown for direct selection
+        imgui.set_next_item_width(imgui.calc_item_width() - 50)
+        local changed, new_index = imgui.combo("##history_nav", node.history_current_index, dropdown_options)
+        if changed then
+            node.history_current_index = new_index
+            State.mark_as_modified()
+        end
+        
+        imgui.same_line()
+        
+        -- Right arrow (newer)
+        local can_go_next = node.history_current_index < node.history_count
+        if not can_go_next then imgui.begin_disabled() end
+        if imgui.arrow_button("history_right", 1) then
+            node.history_current_index = node.history_current_index + 1
+            State.mark_as_modified()
+        end
+        if not can_go_next then imgui.end_disabled() end
+        
+        -- Show viewing indicator
+        imgui.text_colored(string.format("Viewing snapshot %d of %d", node.history_current_index, node.history_count), Constants.COLOR_TEXT_WARNING)
+    end
+    imgui.spacing()
+    imgui.spacing()
+end
+
+-- Initialize hook-specific properties
+local function ensure_initialized(node)
+    node.path = node.path or ""
+    node.method_name = node.method_name or ""
+    node.selected_method_combo = node.selected_method_combo or nil
+    node.method_group_index = node.method_group_index or nil
+    node.method_index = node.method_index or nil
+    node.is_initialized = node.is_initialized or false
+    node.hook_id = node.hook_id or nil
+    node.pre_hook_result = node.pre_hook_result or "CALL_ORIGINAL"
+    node.exact_type_match = node.exact_type_match or false
+    node.return_override_manual = node.return_override_manual or ""
+    node.is_return_overridden = node.is_return_overridden or false
+    node.hook_arg_values = node.hook_arg_values or {}
+    node.last_hook_time = node.last_hook_time or {}
+    node.hook_call_sequence = node.hook_call_sequence or 0
+    node.hook_call_queue = node.hook_call_queue or {}
+    node.param_types = node.param_types or nil
+    node.return_type_name = node.return_type_name or nil
+    node.return_type_full_name = node.return_type_full_name or nil
+    node.retval_vtypename = node.retval_vtypename or nil
+    
+    -- History snapshot properties
+    node.history_enabled = node.history_enabled or false
+    node.history_buffer_size = node.history_buffer_size or 25
+    node.history_paused = node.history_paused or false
+    node.history_current_index = node.history_current_index or 1
+    node.history = node.history or {}  -- Array of snapshots
+    node.history_count = node.history_count or 0
+    node.history_write_index = node.history_write_index or 1
+end
+
 -- Render the managed object output attribute
 local function render_managed_output(node, is_placeholder)
     -- Get main output pin (always index 2)
@@ -60,6 +262,9 @@ local function render_managed_output(node, is_placeholder)
     
     -- Hide when initialized (reduce visual noise, but pin still exists for connections)
     if not node.is_initialized then return end
+    
+    -- Get display values (live or historical)
+    local display = get_display_values(node)
     
     imgui.spacing()
     imnodes.begin_output_attribute(main_output_pin.id)
@@ -71,11 +276,11 @@ local function render_managed_output(node, is_placeholder)
         local pos = Utils.get_right_cursor_pos(node.id, status_text)
         imgui.set_cursor_pos(pos)
         imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
-    elseif node.ending_value then
+    elseif display.ending_value then
         -- Display type info
-        local type_info = Utils.get_type_info_for_display(node.ending_value, node.path)
-        local display = type_info.display .. " (?)"
-        local pos = Utils.get_right_cursor_pos(node.id, display)
+        local type_info = Utils.get_type_info_for_display(display.ending_value, node.path)
+        local display_text = type_info.display .. " (?)"
+        local pos = Utils.get_right_cursor_pos(node.id, display_text)
         imgui.set_cursor_pos(pos)
         imgui.text(type_info.display)
         imgui.same_line()
@@ -84,7 +289,7 @@ local function render_managed_output(node, is_placeholder)
             imgui.set_tooltip(type_info.tooltip)
         end
         
-        local can_continue, _ = Nodes.validate_continuation(node.ending_value, nil)
+        local can_continue, _ = Nodes.validate_continuation(display.ending_value, nil)
         if can_continue then
             local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Output", 25)
             imgui.set_cursor_pos(button_pos)
@@ -94,8 +299,15 @@ local function render_managed_output(node, is_placeholder)
             imgui.spacing()
         end
     else
-        -- No ending_value - show as failed/not initialized
-        local status_text = node.is_initialized and "Failed to initialize" or "Not initialized"
+        -- No ending_value - show as failed/not initialized or static
+        local status_text
+        if node.is_initialized and node.is_static then
+            status_text = "Static (No Instance)"
+        elseif node.is_initialized then
+            status_text = "Failed to initialize"
+        else
+            status_text = "Not initialized"
+        end
         local pos = Utils.get_right_cursor_pos(node.id, status_text)
         imgui.set_cursor_pos(pos)
         imgui.text_colored(status_text, Constants.COLOR_TEXT_WARNING)
@@ -115,6 +327,9 @@ local function render_argument_outputs(node, is_placeholder)
     
     if num_arg_pins <= 0 then return end
     
+    -- Get display values (live or historical)
+    local display = get_display_values(node)
+    
     for i = 1, num_arg_pins do
         local current_pin_index = arg_pin_start_index + i - 1
         local arg_pin = node.pins.outputs[current_pin_index]
@@ -123,8 +338,8 @@ local function render_argument_outputs(node, is_placeholder)
         local param_type_name = param_type and param_type:get_name() or "Unknown"
         local param_full_name = param_type and param_type:get_full_name() or "Unknown"
         
-        -- Get arg value directly
-        local arg_value = node.hook_arg_values and node.hook_arg_values[i]
+        -- Get arg value from display values (live or historical)
+        local arg_value = display.hook_arg_values and display.hook_arg_values[i]
         if not param_type and arg_value ~= nil and type(arg_value) == "userdata" then
             local success_type, value_type_def = pcall(function() 
                 return arg_value:get_type_definition() 
@@ -212,6 +427,9 @@ end
 
 -- Render return information (handles void vs non-void)
 local function render_return_info(node, is_placeholder)
+    -- Get display values (live or historical)
+    local display = get_display_values(node)
+    
     -- Display return override input if it exists (only for non-void methods and initialized)
     local return_override_pin = #node.pins.inputs > 0 and node.pins.inputs[1] or nil
     if return_override_pin and (not node.return_type_name or node.return_type_name ~= "Void") and node.is_initialized then
@@ -276,18 +494,18 @@ local function render_return_info(node, is_placeholder)
             imgui.text("Return (" .. return_type .. "):")
             imgui.same_line()
            
-            -- Display return value if available
-            if node.return_value ~= nil and node.last_hook_time then
+            -- Display return value if available (use display values for live/historical)
+            if display.return_value ~= nil and display.timestamp then
                 imgui.spacing()
                 -- Display type info
-                local type_info = Utils.get_type_info_for_display(node.return_value, node.retval_vtypename)
+                local type_info = Utils.get_type_info_for_display(display.return_value, node.retval_vtypename)
                 
                 -- Add context menu options with actual type as default
                 Nodes.add_context_menu_option(node, "Copy return type", type_info.actual_type or node.return_type_full_name or "Unknown")
                 if type_info.actual_type and node.return_type_full_name and type_info.actual_type ~= node.return_type_full_name then
                     Nodes.add_context_menu_option(node, "Copy return type (Expected)", node.return_type_full_name)
                 end
-                Nodes.add_context_menu_option(node, "Copy return value", tostring(node.return_value))
+                Nodes.add_context_menu_option(node, "Copy return value", tostring(display.return_value))
                 
                 local return_display = type_info.display .. " (?)"
                 local return_pos = Utils.get_right_cursor_pos(node.id, return_display)
@@ -299,7 +517,7 @@ local function render_return_info(node, is_placeholder)
                     imgui.set_tooltip(type_info.tooltip)
                 end
                 
-                local can_continue, _ = Nodes.validate_continuation(node.return_value, nil)
+                local can_continue, _ = Nodes.validate_continuation(display.return_value, nil)
                 if can_continue then
                     local button_pos = Utils.get_right_cursor_pos(node.id, "+ Add Child to Return", 25)
                     imgui.set_cursor_pos(button_pos)
@@ -419,6 +637,8 @@ local function convert_ptr(arg, td_name)
 end
 
 function HookStarter.render(node)
+    ensure_initialized(node)
+    
     -- Ensure output pins exist
     if #node.pins.outputs == 0 then
         Nodes.add_output_pin(node, "was_called", nil)
@@ -746,6 +966,42 @@ function HookStarter.render(node)
             imgui.set_tooltip("When enabled, hook only fires for exact type matches.\nFilters out calls from derived types.")
         end
         
+        -- History enable/disable checkbox
+        local history_changed, new_history_enabled = imgui.checkbox("Enable History", node.history_enabled)
+        if history_changed then
+            node.history_enabled = new_history_enabled
+            if not new_history_enabled then
+                -- Clear history when disabled
+                clear_history(node)
+            end
+            State.mark_as_modified()
+        end
+        if imgui.is_item_hovered() then
+            imgui.set_tooltip("When enabled, captures complete snapshots of each hook call.\nAllows pausing and navigating through historical values.")
+        end
+        
+        -- Buffer size control (only when history enabled)
+        if node.history_enabled then
+            imgui.set_next_item_width(100)
+            local size_changed, new_size = imgui.drag_int("Buffer Size", node.history_buffer_size, 1, 1, 1000)
+            if size_changed then
+                node.history_buffer_size = new_size
+                -- If new size is smaller than current count, clear history
+                if node.history_buffer_size < node.history_count then
+                    clear_history(node)
+                end
+                State.mark_as_modified()
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("Drag to adjust buffer size (1-1000)")
+            end
+        end
+        
+        -- Render history navigation UI if enabled and initialized
+        if node.is_initialized then
+            render_history_navigation(node)
+        end
+        
         --imgui.tree_pop()
     --end
     
@@ -787,6 +1043,8 @@ function HookStarter.initialize_hook(node)
         return
     end
     node.last_hook_time = nil
+    node.hook_call_sequence = 0
+    node.hook_call_queue = {}
     node.return_value = nil  -- Initialize return value
     node.actual_return_value = nil  -- Initialize actual return value
     node.is_return_overridden = false  -- Initialize override flag
@@ -838,30 +1096,36 @@ function HookStarter.initialize_hook(node)
                 end
             end
 
-            node.last_hook_time = os.clock()
+            local call_timestamp = {wall_time = os.time(), clock_time = os.clock()}
+            node.hook_call_sequence = node.hook_call_sequence + 1
             node.was_called_dirty = true
             
             -- Determine argument offset and 'this' value
             local arg_offset = node.is_static and 2 or 3
+            
+            -- Build call data to queue
+            local call_data = {
+                sequence = node.hook_call_sequence,
+                timestamp = call_timestamp,
+                ending_value = nil,
+                return_value = nil,
+                hook_arg_values = {},
+                pre_hook_info = nil
+            }
             
             if managed or node.is_static then
                 -- Add reference to prevent garbage collection
                 if managed and type(managed) == "userdata" then
                     pcall(function() managed:add_ref() end)
                 end
-                node.ending_value = managed
-                -- Update main output pin (index 2)
-                if #node.pins.outputs >= 2 then
-                    node.pins.outputs[2].value = managed
-                end
+                call_data.ending_value = managed
                 -- Store pre-hook info for combined status
-                node.pre_hook_info = node.pre_hook_result == "SKIP_ORIGINAL" and "skipping original" or "calling original"
+                call_data.pre_hook_info = node.pre_hook_result == "SKIP_ORIGINAL" and "skipping original" or "calling original"
             else
-                node.pre_hook_info = "managed object not found"
+                call_data.pre_hook_info = "managed object not found"
             end
             
             -- Convert and store method arguments
-            node.hook_arg_values = {}
             local arg_count = #args - arg_offset + 1
             for i = 1, arg_count do
                 local arg = args[i + arg_offset - 1]
@@ -883,25 +1147,29 @@ function HookStarter.initialize_hook(node)
                     converted_arg = fixed_val
                 end
                 
-                -- Store actual runtime type for polymorphism support
-                if converted_arg and type(converted_arg) == "userdata" then
-                    local actual_type_name = Utils.get_actual_type_name(converted_arg, type_name)
-                    if actual_type_name ~= type_name then
-                        -- Store both declared and actual types for reference
-                        node.hook_arg_actual_types = node.hook_arg_actual_types or {}
-                        node.hook_arg_actual_types[i] = actual_type_name
-                    end
-                end
-                
-                node.hook_arg_values[i] = converted_arg
-                
-                -- Update arg output pin
+                call_data.hook_arg_values[i] = converted_arg
+            end
+            
+            -- Queue this call for buffer nodes to consume
+            table.insert(node.hook_call_queue, call_data)
+            
+            -- Also update current node state with latest values (for UI display)
+            node.last_hook_time = call_timestamp
+            node.ending_value = call_data.ending_value
+            node.hook_arg_values = call_data.hook_arg_values
+            node.pre_hook_info = call_data.pre_hook_info
+            
+            -- Update pins with latest values
+            if #node.pins.outputs >= 2 then
+                node.pins.outputs[2].value = call_data.ending_value
+            end
+            for i = 1, #call_data.hook_arg_values do
                 local arg_pin_index = 3 + i  -- After was_called, main_output and return_output
                 if node.return_type_name == "Void" then
                     arg_pin_index = 2 + i  -- No return_output for void
                 end
                 if #node.pins.outputs >= arg_pin_index then
-                    node.pins.outputs[arg_pin_index].value = converted_arg
+                    node.pins.outputs[arg_pin_index].value = call_data.hook_arg_values[i]
                 end
             end
             
@@ -939,6 +1207,11 @@ function HookStarter.initialize_hook(node)
             
             node.actual_return_value = converted_retval
             
+            -- Update the most recent call_data with return value
+            if #node.hook_call_queue > 0 then
+                node.hook_call_queue[#node.hook_call_queue].return_value = converted_retval
+            end
+            
             -- Build comprehensive status string with both pre and post hook info
             local status_parts = {}
             table.insert(status_parts, "Pre: " .. (node.pre_hook_info or "unknown"))
@@ -959,6 +1232,11 @@ function HookStarter.initialize_hook(node)
                 table.insert(status_parts, "return overridden")
                 node.return_value = override_value  -- Use the parsed override value directly
                 node.is_return_overridden = true
+                
+                -- Update queue entry with overridden value
+                if #node.hook_call_queue > 0 then
+                    node.hook_call_queue[#node.hook_call_queue].return_value = override_value
+                end
             else
                 table.insert(status_parts, "return unchanged")
                 node.return_value = converted_retval
@@ -968,6 +1246,23 @@ function HookStarter.initialize_hook(node)
             -- Update return output pin (index 3, if exists and non-void)
             if node.return_type_name and node.return_type_name ~= "Void" and #node.pins.outputs >= 3 then
                 node.pins.outputs[3].value = node.return_value
+            end
+            
+            -- Capture history snapshot (complete call data including return value)
+            if node.history_enabled and #node.hook_call_queue > 0 then
+                local latest_call = node.hook_call_queue[#node.hook_call_queue]
+                local snapshot = {
+                    sequence = latest_call.sequence,
+                    timestamp = latest_call.timestamp,
+                    ending_value = latest_call.ending_value,
+                    return_value = latest_call.return_value,
+                    hook_arg_values = {}
+                }
+                -- Deep copy arg values
+                for i, v in ipairs(latest_call.hook_arg_values or {}) do
+                    snapshot.hook_arg_values[i] = v
+                end
+                add_to_history(node, snapshot)
             end
             
             node.status = "Hook: " .. table.concat(status_parts, ", ")
@@ -1019,6 +1314,10 @@ function HookStarter.serialize(node, Config)
     data.is_return_overridden = node.is_return_overridden
     data.exact_type_match = node.exact_type_match
     
+    -- History settings (not the history data itself - that's runtime only)
+    data.history_enabled = node.history_enabled
+    data.history_buffer_size = node.history_buffer_size
+    
     return data
 end
 
@@ -1041,6 +1340,10 @@ function HookStarter.deserialize(data, Config)
     node.actual_return_value = data.actual_return_value
     node.is_return_overridden = data.is_return_overridden or false
     node.exact_type_match = data.exact_type_match or false
+    
+    -- History settings
+    node.history_enabled = data.history_enabled or false
+    node.history_buffer_size = data.history_buffer_size or 25
     
     return node
 end

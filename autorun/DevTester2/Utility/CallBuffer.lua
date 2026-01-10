@@ -1,13 +1,19 @@
 -- CallBuffer Node Properties:
--- This control node captures multiple hook calls and allows selection of a specific call.
+-- This utility node captures multiple hook calls and allows selection of a specific call.
 -- Automatically updates existing entries when the same object address is seen again (On Repeat mode).
 --
--- Configuration:
--- - buffer_size: Number - Maximum number of calls to store (default: 25)
+-- Pins:
+-- - pins.inputs[1]: "input" - Connection to HookStarter or other data source
+-- - pins.inputs[2]: "index" - Index selection (can be connected or manual)
+-- - pins.outputs[1]: "output" - The buffered value at selected index
+-- - pins.outputs[2]: "call_count" - Total number of calls captured
+--
+-- Buffer Configuration:
+-- - buffer_size: Number - Maximum number of calls to buffer (default: 25)
 -- - current_call_index: Number - Current selected call position (1 = first call, call_count = last)
 --
 -- Buffer State:
--- - call_buffer: Array - Array of {value, timestamp, absolute_time, address} entries
+-- - call_buffer: Array - Circular buffer storing {value, timestamp, absolute_time, address} entries
 -- - call_count: Number - Number of unique calls captured
 -- - seen_addresses: Table - Set of addresses seen (for repeat detection)
 --
@@ -32,7 +38,7 @@ local imnodes = imnodes
 local CallBuffer = {}
 
 -- Initialize call buffer properties
-local function ensure_buffer_initialized(node)
+local function ensure_initialized(node)
     node.buffer_size = node.buffer_size or 25
     node.current_call_index = node.current_call_index or 1
     
@@ -43,6 +49,7 @@ local function ensure_buffer_initialized(node)
     if not node.seen_addresses then
         node.seen_addresses = {}
     end
+    node.last_processed_sequence = node.last_processed_sequence or 0
 end
 
 -- Get address/pointer from a value
@@ -73,6 +80,7 @@ local function clear_buffer(node)
     node.call_count = 0
     node.current_call_index = 1
     node.seen_addresses = {}
+    node.last_processed_sequence = 0
 end
 
 -- Clean up stale entries (replace with nil if not updated in last 1 second)
@@ -83,12 +91,13 @@ local function cleanup_stale_entries(node)
     for i = 1, node.call_count do
         local entry = node.call_buffer[i]
         if entry and entry.value ~= nil then
-            local time_since_update = current_time - entry.timestamp
+            -- Handle both old (number) and new (table) timestamp formats
+            local entry_clock_time = type(entry.timestamp) == "table" and entry.timestamp.clock_time or entry.timestamp
+            local time_since_update = current_time - (entry_clock_time or 0)
             if time_since_update > timeout then
                 -- Entry is stale - replace value with nil
                 entry.value = nil
-                entry.absolute_time = os.time()
-                entry.timestamp = current_time
+                entry.timestamp = {wall_time = os.time(), clock_time = current_time}
             end
         end
     end
@@ -121,8 +130,7 @@ local function add_to_buffer(node, value)
             if node.call_buffer[i] and node.call_buffer[i].address == address then
                 -- Replace the existing entry with updated value
                 node.call_buffer[i].value = value
-                node.call_buffer[i].timestamp = os.clock()
-                node.call_buffer[i].absolute_time = os.time()
+                node.call_buffer[i].timestamp = {wall_time = os.time(), clock_time = os.clock()}
                 node.status = string.format("Updated call %d (repeat)", i)
                 return
             end
@@ -137,8 +145,7 @@ local function add_to_buffer(node, value)
     
     local entry = {
         value = value,
-        timestamp = os.clock(),
-        absolute_time = os.time(),
+        timestamp = {wall_time = os.time(), clock_time = os.clock()},
         address = address
     }
     
@@ -189,19 +196,29 @@ end
 
 -- Render the call navigation UI (arrows + combo)
 local function render_call_navigation(node)
+    imgui.spacing()
+    imgui.spacing()
+    
     if node.call_count == 0 then
+        -- Show placeholder pin when buffer is empty
+        local index_pin = node.pins.inputs[2]
+        if index_pin then
+            imnodes.begin_input_attribute(index_pin.id)
+            imgui.text("Index (Waiting for calls...)")
+            imnodes.end_input_attribute()
+        end
         return
     end
-    
-    imgui.spacing()
-    imgui.spacing()
     
     -- Build dropdown options for all calls
     local dropdown_options = {}
     for i = 1, node.call_count do
         local entry = get_call_entry(node, i)
         if entry then
-            local time_str = os.date("%H:%M:%S", entry.absolute_time or os.time())
+            local wall_time = type(entry.timestamp) == "table" and entry.timestamp.wall_time or (entry.absolute_time or os.time())
+            local clock_time = Utils.get_clock_time(entry.timestamp)
+            local milliseconds = clock_time and math.floor((clock_time - math.floor(clock_time)) * 1000) or 0
+            local time_str = os.date("%H:%M:%S", wall_time) .. string.format(".%03d", milliseconds)
             local value_name = Utils.get_value_display_string(entry.value)
             table.insert(dropdown_options, string.format("%d. %s:  %s",  i, time_str, value_name))
         else
@@ -334,7 +351,7 @@ local function render_call_navigation(node)
 end
 
 function CallBuffer.execute(node)
-    ensure_buffer_initialized(node)
+    ensure_initialized(node)
     
     -- Check if input pin is connected
     local input_pin = node.pins.inputs[1]
@@ -367,13 +384,58 @@ function CallBuffer.execute(node)
         end
 
         
-        -- For hooks, only add if this is a new call (hook_time changed)
+        -- For hooks, process entire call queue
         if parent_node and parent_node.category == Constants.NODE_CATEGORY_STARTER and parent_node.type == Constants.STARTER_TYPE_HOOK then
-            local last_hook_time = parent_node.last_hook_time
-            if not node.last_processed_hook_time or last_hook_time > node.last_processed_hook_time then
-                add_to_buffer(node, input_value)
-                node.last_processed_hook_time = last_hook_time
+            local hook_queue = parent_node.hook_call_queue or {}
+            
+            -- Determine which pin we're connected to
+            local source_pin_id = input_pin.connection and input_pin.connection.pin
+            local source_pin_info = source_pin_id and State.pin_map[source_pin_id]
+            local source_pin_index = nil
+            if source_pin_info then
+                -- Find pin index in parent's outputs
+                for i, pin in ipairs(parent_node.pins.outputs) do
+                    if pin.id == source_pin_id then
+                        source_pin_index = i
+                        break
+                    end
+                end
             end
+            
+            -- Process all unprocessed calls in the queue
+            for _, call_data in ipairs(hook_queue) do
+                if call_data.sequence > node.last_processed_sequence then
+                    -- Get the value from the correct pin
+                    local value_to_add = nil
+                    if source_pin_index == 2 then
+                        -- Main output (managed object)
+                        value_to_add = call_data.ending_value
+                    elseif source_pin_index == 3 and parent_node.return_type_name ~= "Void" then
+                        -- Return value
+                        value_to_add = call_data.return_value
+                    elseif source_pin_index then
+                        -- Argument pin
+                        local arg_start_index = parent_node.return_type_name == "Void" and 3 or 4
+                        local arg_index = source_pin_index - arg_start_index + 1
+                        if arg_index >= 1 and arg_index <= #call_data.hook_arg_values then
+                            value_to_add = call_data.hook_arg_values[arg_index]
+                        end
+                    end
+                    
+                    -- Add this specific call's value to buffer
+                    add_to_buffer(node, value_to_add)
+                    node.last_processed_sequence = call_data.sequence
+                end
+            end
+            
+            -- Clean up processed calls from queue (keep only unprocessed)
+            local new_queue = {}
+            for _, call_data in ipairs(hook_queue) do
+                if call_data.sequence > node.last_processed_sequence then
+                    table.insert(new_queue, call_data)
+                end
+            end
+            parent_node.hook_call_queue = new_queue
         else
            -- For non-hook sources, add normally
            add_to_buffer(node, input_value)
@@ -402,7 +464,7 @@ function CallBuffer.execute(node)
 end
 
 function CallBuffer.render(node)
-    ensure_buffer_initialized(node)
+    ensure_initialized(node)
     
     -- Ensure pins exist (2 inputs, 2 outputs)
     if #node.pins.inputs < 2 then

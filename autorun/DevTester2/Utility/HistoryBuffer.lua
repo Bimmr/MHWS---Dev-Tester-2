@@ -2,9 +2,14 @@
 -- This utility node captures and stores a history of values passing through it.
 -- Allows pausing the display and navigating through past values.
 --
--- Configuration:
+-- Pins:
+-- - pins.inputs[1]: "input" - Value to track in history
+-- - pins.outputs[1]: "output" - Current or historical value based on pause state
+-- - pins.outputs[2]: "history_count" - Number of entries in history
+--
+-- Buffer Configuration:
 -- - buffer_size: Number - Maximum number of history entries to store (default: 10)
--- - is_paused: Boolean - When true, outputs historical value instead of input
+-- - is_paused: Boolean - When true, outputs historical value instead of current input
 -- - current_history_index: Number - Current position in history (1 = oldest, history_count = newest)
 --
 -- History Data:
@@ -31,7 +36,7 @@ local imnodes = imnodes
 local HistoryBuffer = {}
 
 -- Initialize history buffer properties
-local function ensure_history_initialized(node)
+local function ensure_initialized(node)
     node.buffer_size = node.buffer_size or 10
     node.is_paused = node.is_paused or false
     node.current_history_index = node.current_history_index or 1
@@ -41,6 +46,7 @@ local function ensure_history_initialized(node)
     end
     node.history_write_index = node.history_write_index or 1
     node.history_count = node.history_count or 0
+    node.last_processed_sequence = node.last_processed_sequence or 0
 end
 
 -- Add a value to the history buffer (circular buffer logic)
@@ -50,8 +56,7 @@ local function add_to_history(node, value)
     end
     
     local entry = {
-        timestamp = os.clock(),      -- Relative time for time-ago calculations
-        absolute_time = os.time(),   -- Absolute time for display
+        timestamp = {wall_time = os.time(), clock_time = os.clock()},
         value = value
     }
     
@@ -105,7 +110,10 @@ local function render_history_navigation(node)
     for i = 1, node.history_count do
         local entry = get_history_entry(node, i)
         if entry then
-            local time_str = os.date("%H:%M:%S", entry.absolute_time or os.time())
+            local wall_time = type(entry.timestamp) == "table" and entry.timestamp.wall_time or (entry.absolute_time or os.time())
+            local clock_time = Utils.get_clock_time(entry.timestamp)
+            local milliseconds = clock_time and math.floor((clock_time - math.floor(clock_time)) * 1000) or 0
+            local time_str = os.date("%H:%M:%S", wall_time) .. string.format(".%03d", milliseconds)
             local value_name = Utils.get_value_display_string(entry.value)
             table.insert(dropdown_options, string.format("%d. %s:  %s", i, time_str, value_name))
         else
@@ -211,7 +219,7 @@ local function render_history_navigation(node)
 end
 
 function HistoryBuffer.render(node)
-    ensure_history_initialized(node)
+    ensure_initialized(node)
     
     -- Ensure pins exist (2 inputs, 1 output)
     if #node.pins.inputs < 2 then
@@ -281,18 +289,63 @@ function HistoryBuffer.render(node)
         end
 
         
-        -- For hooks, only add if this is a new call (hook_time changed)
+        -- For hooks, process entire call queue
         if parent_node and parent_node.category == Constants.NODE_CATEGORY_STARTER and parent_node.type == Constants.STARTER_TYPE_HOOK then
-            local last_hook_time = parent_node.last_hook_time
-            if not node.last_processed_hook_time or last_hook_time > node.last_processed_hook_time then
-                add_to_history(node, input_value)
-                node.last_processed_hook_time = last_hook_time
+            local hook_queue = parent_node.hook_call_queue or {}
+            
+            -- Determine which pin we're connected to
+            local source_pin_id = input_pin.connection and input_pin.connection.pin
+            local source_pin_info = source_pin_id and State.pin_map[source_pin_id]
+            local source_pin_index = nil
+            if source_pin_info then
+                -- Find pin index in parent's outputs
+                for i, pin in ipairs(parent_node.pins.outputs) do
+                    if pin.id == source_pin_id then
+                        source_pin_index = i
+                        break
+                    end
+                end
             end
+            
+            -- Process all unprocessed calls in the queue
+            for _, call_data in ipairs(hook_queue) do
+                if call_data.sequence > node.last_processed_sequence then
+                    -- Get the value from the correct pin
+                    local value_to_add = nil
+                    if source_pin_index == 2 then
+                        -- Main output (managed object)
+                        value_to_add = call_data.ending_value
+                    elseif source_pin_index == 3 and parent_node.return_type_name ~= "Void" then
+                        -- Return value
+                        value_to_add = call_data.return_value
+                    elseif source_pin_index then
+                        -- Argument pin
+                        local arg_start_index = parent_node.return_type_name == "Void" and 3 or 4
+                        local arg_index = source_pin_index - arg_start_index + 1
+                        if arg_index >= 1 and arg_index <= #call_data.hook_arg_values then
+                            value_to_add = call_data.hook_arg_values[arg_index]
+                        end
+                    end
+                    
+                    -- Add this specific call's value to history
+                    add_to_history(node, value_to_add)
+                    node.last_processed_sequence = call_data.sequence
+                end
+            end
+            
+            -- Clean up processed calls from queue (keep only unprocessed)
+            local new_queue = {}
+            for _, call_data in ipairs(hook_queue) do
+                if call_data.sequence > node.last_processed_sequence then
+                    table.insert(new_queue, call_data)
+                end
+            end
+            parent_node.hook_call_queue = new_queue
         else
             add_to_history(node, input_value)
         end
         output_value = input_value
-        display_entry = { timestamp = os.clock(), value = input_value }
+        display_entry = { timestamp = {wall_time = os.time(), clock_time = os.clock()}, value = input_value }
     end
     
     output_pin.value = output_value
@@ -346,15 +399,14 @@ function HistoryBuffer.render(node)
         end
     end
     
-    imgui.spacing()
-    
+    imgui.same_line()
     -- State indicator
     if node.is_paused then
-        imgui.text_colored("⏸ PAUSED", Constants.COLOR_TEXT_WARNING)
+        imgui.text_colored("PAUSED", Constants.COLOR_TEXT_WARNING)
         imgui.same_line()
         imgui.text(string.format("(Entry %d)", node.current_history_index))
     else
-        imgui.text_colored("▶ LIVE", Constants.COLOR_TEXT_SUCCESS)
+        imgui.text_colored("LIVE", Constants.COLOR_TEXT_SUCCESS)
     end
     
     -- History navigation
@@ -368,7 +420,7 @@ function HistoryBuffer.render(node)
     if node.is_paused and display_entry and display_entry.timestamp then
         imgui.text("Time:")
         imgui.same_line()
-        local time_str = Utils.format_time_ago(os.clock() - display_entry.timestamp)
+        local time_str = Utils.format_time_ago(display_entry.timestamp)
         local pos = Utils.get_right_cursor_pos(node.id, time_str)
         imgui.set_cursor_pos(pos)
         Utils.render_time_ago(display_entry.timestamp)
