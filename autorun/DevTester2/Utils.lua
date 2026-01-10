@@ -18,9 +18,8 @@ function Utils.get_right_cursor_pos(node_id, text, padding)
     local node_pos = imnodes.get_node_editor_space_pos(node_id)
     padding = padding or 15
 
-    -- Multiline doesn't get the correct width so we'll just add more to it
-    if imgui.calc_text_size(text).y > imgui.get_default_font_size() then
-        padding = padding + 20
+    if text:find("\n") then
+       padding = padding + 20  -- Add extra padding for multiline, for some reason it needs extra padding even through text width is calculated correctly
     end
     
     pos.x = node_pos.x + node_width - text_width - padding
