@@ -59,6 +59,7 @@ local HookStarter = {}
 -- Add a complete call snapshot to history (circular buffer)
 local function add_to_history(node, snapshot)
     if not node.history_enabled then return end
+    if node.history_paused then return end  -- Don't record when paused
     if not node.history then
         node.history = {}
     end
@@ -137,12 +138,42 @@ local function get_display_values(node)
     }
 end
 
+-- Update pin values based on current display values (live or historical)
+local function update_pin_values(node)
+    local display = get_display_values(node)
+    
+    -- Update main output pin (index 2 - "this")
+    if #node.pins.outputs >= 2 then
+        node.pins.outputs[2].value = display.ending_value
+    end
+    
+    -- Update return output pin (index 3 if non-void)
+    if node.return_type_name and node.return_type_name ~= "Void" and #node.pins.outputs >= 3 then
+        node.pins.outputs[3].value = display.return_value
+    end
+    
+    -- Update arg output pins
+    local arg_pin_start_index = 4
+    if node.return_type_name == "Void" then
+        arg_pin_start_index = 3
+    end
+    
+    if display.hook_arg_values then
+        for i, arg_value in ipairs(display.hook_arg_values) do
+            local arg_pin_index = arg_pin_start_index + i - 1
+            if #node.pins.outputs >= arg_pin_index then
+                node.pins.outputs[arg_pin_index].value = arg_value
+            end
+        end
+    end
+end
+
 -- Render history navigation UI
 local function render_history_navigation(node)
     if not node.history_enabled then return end
     
     imgui.spacing()
-    imgui.spacing()
+    imgui.indent(5)
     
     -- History header with pause/resume toggle
     local pause_label = node.history_paused and " ▶ Resume" or "⏸ Pause"
@@ -152,6 +183,7 @@ local function render_history_navigation(node)
             -- When resuming, jump to newest
             node.history_current_index = node.history_count
         end
+        update_pin_values(node)  -- Update pins when pause state changes
         State.mark_as_modified()
     end
     
@@ -190,6 +222,7 @@ local function render_history_navigation(node)
         if not can_go_prev then imgui.begin_disabled() end
         if imgui.arrow_button("history_left", 0) then
             node.history_current_index = node.history_current_index - 1
+            update_pin_values(node)  -- Update pins when navigating
             State.mark_as_modified()
         end
         if not can_go_prev then imgui.end_disabled() end
@@ -201,6 +234,7 @@ local function render_history_navigation(node)
         local changed, new_index = imgui.combo("##history_nav", node.history_current_index, dropdown_options)
         if changed then
             node.history_current_index = new_index
+            update_pin_values(node)  -- Update pins when navigating
             State.mark_as_modified()
         end
         
@@ -211,6 +245,7 @@ local function render_history_navigation(node)
         if not can_go_next then imgui.begin_disabled() end
         if imgui.arrow_button("history_right", 1) then
             node.history_current_index = node.history_current_index + 1
+            update_pin_values(node)  -- Update pins when navigating
             State.mark_as_modified()
         end
         if not can_go_next then imgui.end_disabled() end
@@ -218,8 +253,7 @@ local function render_history_navigation(node)
         -- Show viewing indicator
         imgui.text_colored(string.format("Viewing snapshot %d of %d", node.history_current_index, node.history_count), Constants.COLOR_TEXT_WARNING)
     end
-    imgui.spacing()
-    imgui.spacing()
+    imgui.unindent(5)
 end
 
 -- Initialize hook-specific properties
@@ -547,9 +581,17 @@ local function render_was_called_output(node, is_placeholder)
     if node.is_initialized then
         imnodes.begin_output_attribute(pin.id)
         
-        -- Update pin value based on dirty flag
-        local was_called = node.was_called_dirty or false
-        node.was_called_dirty = false -- Reset
+        -- Check if viewing historical snapshot
+        local display = get_display_values(node)
+        local was_called
+        if display.is_historical then
+            -- Historical snapshot - not a new call
+            was_called = false
+        else
+            -- Live mode - use dirty flag
+            was_called = node.was_called_dirty or false
+            node.was_called_dirty = false -- Reset
+        end
         
         -- Set pin value
         pin.value = was_called
@@ -920,9 +962,16 @@ function HookStarter.render(node)
         imgui.text_colored("✓ Hook Active", 0xFF00FF00)
         imgui.spacing()
 
-        local time_ago_str = node.last_hook_time 
-            and Utils.format_time_ago(node.last_hook_time) 
+        -- Get display values to check if showing snapshot
+        local display = get_display_values(node)
+        local time_ago_str = display.timestamp 
+            and Utils.format_time_ago(display.timestamp) 
             or "Never called"
+        
+        -- Show indicator if viewing snapshot
+        if display.is_historical then
+            imgui.text_colored(string.format("[Snapshot %d/%d]", display.snapshot_index, display.total_snapshots), Constants.COLOR_TEXT_WARNING)
+        end
         
         imgui.text("Last call:")
         imgui.same_line()
@@ -930,8 +979,8 @@ function HookStarter.render(node)
         imgui.set_cursor_pos(pos)
         
         -- Render with hover effects
-        if node.last_hook_time then
-            Utils.render_time_ago(node.last_hook_time, false)
+        if display.timestamp then
+            Utils.render_time_ago(display.timestamp, false)
         else
             imgui.text_colored("Never called", Constants.COLOR_TEXT_DARK_GRAY)
         end
@@ -971,8 +1020,9 @@ function HookStarter.render(node)
         if history_changed then
             node.history_enabled = new_history_enabled
             if not new_history_enabled then
-                -- Clear history when disabled
+                -- Clear history and unpause when disabled
                 clear_history(node)
+                node.history_paused = false
             end
             State.mark_as_modified()
         end
@@ -982,6 +1032,7 @@ function HookStarter.render(node)
         
         -- Buffer size control (only when history enabled)
         if node.history_enabled then
+            imgui.same_line()
             imgui.set_next_item_width(100)
             local size_changed, new_size = imgui.drag_int("Buffer Size", node.history_buffer_size, 1, 1, 1000)
             if size_changed then
@@ -1000,11 +1051,17 @@ function HookStarter.render(node)
         -- Render history navigation UI if enabled and initialized
         if node.is_initialized then
             render_history_navigation(node)
+            -- Update pin values when paused to ensure connected nodes see historical data
+            if node.history_paused then
+                update_pin_values(node)
+            end
         end
         
         --imgui.tree_pop()
     --end
     
+    imgui.spacing()
+    imgui.spacing()
     imgui.spacing()
     if imgui.button("- Remove Node") then
         if node.is_initialized and node.hook_id then
