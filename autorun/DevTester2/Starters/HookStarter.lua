@@ -819,8 +819,12 @@ function HookStarter.initialize_hook(node)
             end
 
             local managed = nil
-            if not node.is_static then
-                managed = sdk.to_managed_object(args[2])
+            local success_managed, managed = pcall(function()
+                return sdk.to_managed_object(args[2])
+            end)
+            if not success_managed then
+                node.is_static = true
+                managed = nil
             end
 
             -- Exact type matching - filter out derived types if enabled
