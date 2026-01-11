@@ -66,7 +66,7 @@ local function generate_enum(typename)
 end
 
 function EnumData.render(node)
-    ensure_enum_initialized(node)
+    ensure_initialized(node)
     -- Execute the node to update ending_value
     EnumData.execute(node)
     
