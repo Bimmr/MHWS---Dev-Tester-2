@@ -254,7 +254,7 @@ function FieldFollower.render(node)
                     imgui.input_text("Value (" .. field_type:get_name() .. ")", display_value)
                     imgui.end_disabled()
                     if imgui.is_item_hovered() then
-                        imgui.set_tooltip(field_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value))
+                        imgui.set_tooltip("Expected Type: " .. field_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value, field_type:get_full_name()))
                     end
                 else
                     node.value_manual_input = node.value_manual_input or ""

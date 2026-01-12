@@ -313,7 +313,12 @@ function Utils.get_type_info_for_display(value, declared_type_name)
     -- For non-userdata, simple display
     if not info.is_userdata then
         result.display = tostring(value)
-        result.tooltip = string.format("Value: %s\nType: %s", tostring(value), info.name)
+        if declared_type_name then
+            result.tooltip = string.format("Value: %s\nActual Type: %s (Lua)\nExpected Type: %s", 
+                tostring(value), info.name, declared_type_name)
+        else
+            result.tooltip = string.format("Value: %s\nType: %s", tostring(value), info.name)
+        end
         return result
     end
     

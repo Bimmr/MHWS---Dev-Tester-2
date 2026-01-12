@@ -276,7 +276,7 @@ function MethodFollower.render(node)
                             imgui.input_text(label, display_value)
                             imgui.end_disabled()
                             if imgui.is_item_hovered() then
-                                imgui.set_tooltip(param_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value))
+                                imgui.set_tooltip("Expected Type: " .. param_type:get_full_name() .. "\n" .. Utils.get_tooltip_for_value(connected_value, param_type:get_full_name()))
                             end
                         else
                             node.param_manual_values[i] = node.param_manual_values[i] or ""
