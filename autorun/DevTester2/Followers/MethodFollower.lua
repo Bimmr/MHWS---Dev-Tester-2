@@ -440,27 +440,13 @@ function MethodFollower.render(node)
                         imgui.set_tooltip(tooltip_text)
                     end
                 elseif node.last_call_time then
-                    local elapsed = os.clock() - node.last_call_time
-                    local time_since_call
-                    if elapsed < 1 then
-                        time_since_call = string.format("%.0fms ago", elapsed * 1000)
-                    else
-                        time_since_call = string.format("%.1fs ago", elapsed)
-                    end
+                    local time_since_call = Utils.format_time_ago(node.last_call_time)
                     local executed_text = "Executed | Last call: " .. time_since_call
                     local pos = Utils.get_right_cursor_pos(node.id, executed_text)
                     imgui.set_cursor_pos(pos)
-                    imgui.text(executed_text)
-                    if imgui.is_item_hovered() then
-                        -- Show tooltip with method info
-                        local method_name = selected_method:get_name()
-                        local return_type_name = "void"
-                        local tooltip_text = string.format(
-                            "Method: %s\nReturn Type: %s\nStatus: Executed successfully",
-                            method_name, return_type_name
-                        )
-                        imgui.set_tooltip(tooltip_text)
-                    end
+                    imgui.text("Executed | Last call:")
+                    imgui.same_line()
+                    Utils.render_time_ago(node.last_call_time)
                 else
                     -- Show ready status for void methods that haven't been called
                     local ready_text = "Ready"
