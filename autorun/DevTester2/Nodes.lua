@@ -428,6 +428,20 @@ function Nodes.remove_node(node)
     -- Remove connected links (this will disconnect children without deleting them)
     Nodes.remove_links_for_node(node)
     
+    -- Clean up pin_map entries for all pins belonging to this node
+    if node.pins then
+        if node.pins.inputs then
+            for _, pin in ipairs(node.pins.inputs) do
+                State.pin_map[pin.id] = nil
+            end
+        end
+        if node.pins.outputs then
+            for _, pin in ipairs(node.pins.outputs) do
+                State.pin_map[pin.id] = nil
+            end
+        end
+    end
+    
     -- Remove from all_nodes list
     for i, n in ipairs(State.all_nodes) do
         if n.id == node.id then
@@ -605,15 +619,9 @@ function Nodes.handle_link_destroyed(link_id)
     -- Use the disconnect helper which handles pin.connection cleanup
     Nodes.disconnect_link(link_id)
     
-    -- No additional cleanup needed - pins handle all connection tracking
-    for i, link in ipairs(State.all_links) do
-        if link.id == link_id then
-            table.remove(State.all_links, i)
-            State.link_map[link_id] = nil
-            State.mark_as_modified()
-            break
-        end
-    end
+    -- disconnect_link already removes the link from State.all_links and State.link_map
+    -- Just mark as modified
+    State.mark_as_modified()
 end
 
 function Nodes.find_node_by_pin(pin_id)
