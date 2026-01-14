@@ -442,7 +442,7 @@ function Config.load_configuration(config_path)
     
     -- Update state
     State.current_config_name = config.name
-    State.current_config_description = config.description or ""
+    State.current_config_description = config.description ~= nil and config.description or ""
     
     -- Load variables as simple key-value pairs, convert to internal format
     local variables = config.variables or {}
