@@ -534,6 +534,8 @@ function Utils.parse_primitive_value(text_value)
         return true
     elseif text_value == "false" then
         return false
+    elseif text_value == "nil" then
+        return nil
     end
     
     -- Otherwise return as string
