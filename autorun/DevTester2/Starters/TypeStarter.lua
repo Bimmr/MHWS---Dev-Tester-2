@@ -81,9 +81,9 @@ function TypeStarter.render(node)
             imgui.set_tooltip("Cannot change path while node has children")
         end
     end
-
+    
     if node.ending_value then
-        Nodes.add_context_menu_option(node, "Copy output name", node.ending_value:get_full_name())
+        Nodes.add_context_menu_option(node, "Copy output type", node.ending_value:get_full_name())
 
         -- Display type information
         local display_value = node.ending_value:get_name()
