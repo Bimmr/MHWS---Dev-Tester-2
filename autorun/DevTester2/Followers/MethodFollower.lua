@@ -389,7 +389,8 @@ function MethodFollower.render(node)
             if not returns_void then
                 -- Get type info for display (includes actual runtime type)
                 local type_info = Utils.get_type_info_for_display(result, declared_type_name)
-                node.ending_value_full_name = type_info.actual_type
+                -- Fallback to declared type if actual type is nil (e.g., for primitives)
+                node.ending_value_full_name = type_info.actual_type or declared_type_name
                 
                 can_continue, result = Nodes.validate_continuation(result, parent_value, node.ending_value_full_name)
                 node.ending_value = result
@@ -418,7 +419,8 @@ function MethodFollower.render(node)
                 end
                 
                 Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
-                if node.ending_value_full_name and declared_type_name and node.ending_value_full_name ~= declared_type_name then
+                -- Show expected type if we have a declared type that differs from actual, or if we have both types
+                if declared_type_name and node.ending_value_full_name ~= declared_type_name then
                     Nodes.add_context_menu_option(node, "Copy output type (Expected)", declared_type_name)
                 end
                 Nodes.add_context_menu_option(node, "Copy output value", tostring(result))

@@ -356,7 +356,8 @@ function FieldFollower.render(node)
             
             -- Always store result, even if nil
             node.ending_value = result
-            node.ending_value_full_name = type_info.actual_type
+            -- Fallback to declared type if actual type is nil (e.g., for primitives)
+            node.ending_value_full_name = type_info.actual_type or declared_type_name
             
             -- Check if result is userdata (can continue to child nodes)
             local can_continue
@@ -383,7 +384,8 @@ function FieldFollower.render(node)
                 end
                 
                 Nodes.add_context_menu_option(node, "Copy output type", node.ending_value_full_name or "Unknown")
-                if node.ending_value_full_name and declared_type_name and node.ending_value_full_name ~= declared_type_name then
+                -- Show expected type if we have a declared type that differs from actual, or if we have both types
+                if declared_type_name and node.ending_value_full_name ~= declared_type_name then
                     Nodes.add_context_menu_option(node, "Copy output type (Expected)", declared_type_name)
                 end
                 Nodes.add_context_menu_option(node, "Copy output value", tostring(result))
