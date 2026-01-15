@@ -46,6 +46,7 @@ local function ensure_initialized(node)
     node.action_type = node.action_type or 0
     node.ending_value_full_name = node.ending_value_full_name or nil
     node.last_parent_type_name = node.last_parent_type_name or nil
+    node.field_cache = node.field_cache or {}
 end
 
 -- ========================================
@@ -181,6 +182,17 @@ function FieldFollower.render(node)
                 end
                 
                 node.value_manual_input = "" -- Reset value
+                
+                -- Update cache for current type
+                if parent_type then
+                    node.field_cache = node.field_cache or {}
+                    local type_name = parent_type:get_full_name()
+                    node.field_cache[type_name] = {
+                        selected_field_combo = node.selected_field_combo,
+                        field_group_index = node.field_group_index,
+                        field_index = node.field_index
+                    }
+                end
                 
                 -- Remove value input pin if it exists
                 if #node.pins.inputs > 1 then
@@ -529,6 +541,7 @@ function FieldFollower.serialize(node, Config)
         data.set_active = node.set_active
     end
     
+    data.field_cache = node.field_cache
     return data
 end
 
@@ -540,6 +553,7 @@ function FieldFollower.deserialize(data, Config)
     node.field_index = data.field_index
     node.value_manual_input = data.value_manual_input or ""
     node.set_active = data.set_active or false
+    node.field_cache = data.field_cache or {}
     return node
 end
 

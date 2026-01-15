@@ -102,13 +102,36 @@ function BaseFollower.handle_parent_type_change(node, parent_type)
     local current_type_name = parent_type:get_full_name()
     
     if node.last_parent_type_name and node.last_parent_type_name ~= current_type_name then
-        -- Type changed, reset selection
+        -- Type changed, cache current selection before switching
         
         if node.type == Constants.FOLLOWER_TYPE_METHOD then
-            node.selected_method_combo = nil
-            node.method_group_index = nil
-            node.method_index = nil
-            node.param_manual_values = {}
+            -- Initialize cache if needed
+            node.method_cache = node.method_cache or {}
+            
+            -- Cache current selection for old type
+            if node.last_parent_type_name then
+                node.method_cache[node.last_parent_type_name] = {
+                    selected_method_combo = node.selected_method_combo,
+                    method_group_index = node.method_group_index,
+                    method_index = node.method_index,
+                    param_manual_values = node.param_manual_values
+                }
+            end
+            
+            -- Try to restore cached selection for new type
+            local cached = node.method_cache[current_type_name]
+            if cached then
+                node.selected_method_combo = cached.selected_method_combo
+                node.method_group_index = cached.method_group_index
+                node.method_index = cached.method_index
+                node.param_manual_values = cached.param_manual_values or {}
+            else
+                -- No cache, reset selection
+                node.selected_method_combo = nil
+                node.method_group_index = nil
+                node.method_index = nil
+                node.param_manual_values = {}
+            end
             
             -- Keep first input (parent)
             if node.pins and node.pins.inputs and #node.pins.inputs > 0 then
@@ -117,9 +140,31 @@ function BaseFollower.handle_parent_type_change(node, parent_type)
             end
             
         elseif node.type == Constants.FOLLOWER_TYPE_FIELD then
-            node.selected_field_combo = nil
-            node.field_group_index = nil
-            node.field_index = nil
+            -- Initialize cache if needed
+            node.field_cache = node.field_cache or {}
+            
+            -- Cache current selection for old type
+            if node.last_parent_type_name then
+                node.field_cache[node.last_parent_type_name] = {
+                    selected_field_combo = node.selected_field_combo,
+                    field_group_index = node.field_group_index,
+                    field_index = node.field_index
+                }
+            end
+            
+            -- Try to restore cached selection for new type
+            local cached = node.field_cache[current_type_name]
+            if cached then
+                node.selected_field_combo = cached.selected_field_combo
+                node.field_group_index = cached.field_group_index
+                node.field_index = cached.field_index
+            else
+                -- No cache, reset selection
+                node.selected_field_combo = nil
+                node.field_group_index = nil
+                node.field_index = nil
+            end
+            
         elseif node.type == Constants.FOLLOWER_TYPE_ARRAY then
             node.selected_element_index = 0
         end

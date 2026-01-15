@@ -44,6 +44,7 @@ local function ensure_initialized(node)
     node.action_type = node.action_type or 0
     node.last_call_time = node.last_call_time or nil
     node.last_parent_type_name = node.last_parent_type_name or nil
+    node.method_cache = node.method_cache or {}
 end
 
 -- ========================================
@@ -183,6 +184,18 @@ function MethodFollower.render(node)
 
                 node.param_manual_values = {} -- Reset params
                 node.last_call_time = nil -- Reset Last Call timer when method changes
+                
+                -- Update cache for current type
+                if parent_type then
+                    node.method_cache = node.method_cache or {}
+                    local type_name = parent_type:get_full_name()
+                    node.method_cache[type_name] = {
+                        selected_method_combo = node.selected_method_combo,
+                        method_group_index = node.method_group_index,
+                        method_index = node.method_index,
+                        param_manual_values = node.param_manual_values
+                    }
+                end
 
                 -- Remove all parameter input pins (start from index 2, after parent)
                 while #node.pins.inputs > 1 do
@@ -605,6 +618,7 @@ function MethodFollower.serialize(node, Config)
     end
     
     data.param_manual_values = node.param_manual_values
+    data.method_cache = node.method_cache
     return data
 end
 
@@ -615,6 +629,7 @@ function MethodFollower.deserialize(data, Config)
     node.method_group_index = data.method_group_index
     node.method_index = data.method_index
     node.param_manual_values = data.param_manual_values or {}
+    node.method_cache = data.method_cache or {}
     return node
 end
 
